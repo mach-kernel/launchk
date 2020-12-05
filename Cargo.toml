@@ -8,3 +8,6 @@ edition = "2018"
 
 [dependencies]
 cursive = "0.15.0"
+
+[build-dependencies]
+bindgen = "0.53.1"
