@@ -1,18 +1,21 @@
 extern crate bindgen;
+extern crate xcrun;
 
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::ffi::OsString;
+
+static MACOS_INCLUDE_PATH: &str = "/usr/include";
 
 fn main() {
-    println!("cargo:rustc-link-search={}", "/usr/lib/system");
-    println!("cargo:rustc-flags={}", "-lliblaunch");
+    let sdk_pb = xcrun::find_sdk(xcrun::SDK::macOS(None))
+        .expect("macOS SDK Required");
 
-    // Tell cargo to tell rustc to link the system launchd
-    // shared library.
-    // println!("cargo:rustc-link-lib=dylib=liblaunch");
+    let sdk_path = sdk_pb.to_str().unwrap().strip_suffix("\n").unwrap();
+    let launch_path = format!("{}{}/launch.h", sdk_path, MACOS_INCLUDE_PATH);
 
     // Tell cargo to invalidate the built crate whenever the wrapper changes
-    println!("cargo:rerun-if-changed=wrapper.h");
+    println!("cargo:rerun-if-changed={}", launch_path);
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
@@ -20,7 +23,7 @@ fn main() {
     let bindings = bindgen::Builder::default()
         // The input header we would like to generate
         // bindings for.
-        .header("wrapper.h")
+        .header(launch_path)
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))

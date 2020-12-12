@@ -11,3 +11,4 @@ cursive = "0.15.0"
 
 [build-dependencies]
 bindgen = "0.53.1"
+xcrun = "1.0.4"

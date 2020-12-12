@@ -386,6 +386,7 @@ version = "0.1.0"
 dependencies = [
  "bindgen",
  "cursive",
+ "xcrun",
 ]
 
 [[package]]
@@ -794,6 +795,12 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
+
+[[package]]
+name = "xcrun"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19faa325682887a17e8a740868bf298cf9f2df75b1f1ca941a818f91914794f0"
 
 [[package]]
 name = "xi-unicode"

@@ -1,3 +1,5 @@
+mod launchd;
+
 use cursive::views::{Dialog, TextView};
 
 fn main() {
@@ -10,4 +12,6 @@ fn main() {
 
     // Starts the event loop.
     siv.run();
+
+    // println!("agents {}", launchd::list_agents());
 }
