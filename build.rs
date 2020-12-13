@@ -3,19 +3,18 @@ extern crate xcrun;
 
 use std::env;
 use std::path::{Path, PathBuf};
-use std::ffi::OsString;
+
+use xcrun::SDK;
 
 static MACOS_INCLUDE_PATH: &str = "/usr/include";
 
 fn main() {
-    let sdk_pb = xcrun::find_sdk(xcrun::SDK::macOS(None))
+    let sdk_path = xcrun::find_sdk(SDK::macOS(None))
+        .and_then(|pb| pb.to_str().map(String::from))
+        .and_then(|p| p.strip_suffix("\n").map(String::from))
         .expect("macOS SDK Required");
 
-    let sdk_path = sdk_pb.to_str().unwrap().strip_suffix("\n").unwrap();
     let launch_path = format!("{}{}/launch.h", sdk_path, MACOS_INCLUDE_PATH);
-
-    // Tell cargo to invalidate the built crate whenever the wrapper changes
-    println!("cargo:rerun-if-changed={}", launch_path);
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
@@ -27,6 +26,7 @@ fn main() {
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .opaque_type("_launch_data")
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.

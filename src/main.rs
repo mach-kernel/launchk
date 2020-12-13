@@ -1,6 +1,6 @@
-mod launchd;
-
 use cursive::views::{Dialog, TextView};
+
+mod launchd;
 
 fn main() {
     let mut siv = cursive::default();
