@@ -26,7 +26,9 @@ fn main() {
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
-        .opaque_type("_launch_data")
+        // Blacklist
+        // Bindings generated as opaque
+        .blacklist_type("_launch_data")
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.
