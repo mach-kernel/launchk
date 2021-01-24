@@ -1,0 +1,14 @@
+[package]
+name = "launchk"
+version = "0.1.0"
+authors = ["David Stancu <dstancu@nyu.edu>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+xpc-bindgen = { path="../xpc-bindgen" }
+block = "0.1.6"
+tokio = { version = "1.1.0", features = ["full"] }
+futures = "0.3"
+cursive = "0.15.0"
