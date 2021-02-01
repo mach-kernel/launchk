@@ -15,6 +15,7 @@ fn main() {
         .expect("macOS SDK Required");
 
     let xpc_path = format!("{}{}/xpc/xpc.h", sdk_path, MACOS_INCLUDE_PATH);
+    let bootstrap_path = format!("{}{}/bootstrap.h", sdk_path, MACOS_INCLUDE_PATH);
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
@@ -23,6 +24,7 @@ fn main() {
         // The input header we would like to generate
         // bindings for.
         .header(xpc_path)
+        .header(bootstrap_path)
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))

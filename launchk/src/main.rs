@@ -1,14 +1,9 @@
-/*
-basic XPC message example
-dstancu@nyu.edu
-*/
-
 use cursive::views::{Dialog, TextView};
 
 use xpc_bindgen;
-use xpc_bindgen::{xpc_connection_create_mach_service, xpc_connection_t, XPC_CONNECTION_MACH_SERVICE_PRIVILEGED, dispatch_queue_create, xpc_connection_set_event_handler, xpc_object_t, xpc_copy_description, xpc_int64_create, xpc_dictionary_create, xpc_connection_send_message, xpc_string_create, xpc_connection_resume, XPC_CONNECTION_MACH_SERVICE_LISTENER, xpc_bool_create, xpc_connection_create};
-use std::ffi::CString;
-use std::os::raw::{c_char};
+use xpc_bindgen::{xpc_connection_create_mach_service, xpc_connection_t, XPC_CONNECTION_MACH_SERVICE_PRIVILEGED, dispatch_queue_create, xpc_connection_set_event_handler, xpc_object_t, xpc_copy_description, xpc_int64_create, xpc_dictionary_create, xpc_connection_send_message, xpc_string_create, xpc_connection_resume, XPC_CONNECTION_MACH_SERVICE_LISTENER, xpc_bool_create, xpc_connection_create, bootstrap_port, mach_port_t};
+use std::ffi::{CString, CStr};
+use std::os::raw::{c_char, c_void, c_int};
 use std::ptr::null_mut;
 use block::ConcreteBlock;
 use std::ops::Deref;
@@ -24,6 +19,17 @@ use futures::SinkExt;
 use std::thread::sleep;
 
 static APP_ID: &str = "com.dstancu.launchk";
+
+// xpc_pipe_routine_with_flags
+// https://chromium.googlesource.com/chromium/src.git/+/47.0.2507.2/sandbox/mac/xpc_private_stubs.sig
+extern "C" {
+    pub fn xpc_pipe_create_from_port(port: mach_port_t, flags: u64) -> *mut c_void;
+    pub fn xpc_pipe_routine_with_flags(pipe: *mut c_void, msg: xpc_object_t, response: *mut xpc_object_t, flags: u64) -> c_int;
+
+    // TODO: bindgen
+    static errno: c_int;
+    pub fn strerror(errnum: c_int) -> *const c_char;
+}
 
 fn xpc_i64(value: i64) -> Rc<xpc_object_t> {
     unsafe {
@@ -55,47 +61,7 @@ fn xpc_bool(value: bool) -> Rc<xpc_object_t> {
     }
 }
 
-fn main() {
-    let app_id_cstr = CString::new(APP_ID)
-        .unwrap()
-        .into_boxed_c_str()
-        .as_ptr();
-
-    let queue = unsafe {
-        dispatch_queue_create(app_id_cstr, null_mut())
-    };
-
-    let connection: xpc_connection_t = unsafe {
-        xpc_connection_create_mach_service(
-            app_id_cstr,
-            queue,
-            XPC_CONNECTION_MACH_SERVICE_LISTENER as u64
-        )
-        // xpc_connection_create(app_id_cstr, queue)
-    };
-
-    mem::forget(app_id_cstr);
-
-    let (tx, mut rx) = unbounded::<xpc_object_t>();
-
-    let handler = ConcreteBlock::new(move |obj: xpc_object_t| tx.unbounded_send(obj));
-    let handler = handler.copy();
-
-    // Register handler
-    unsafe {
-        xpc_connection_set_event_handler(connection, &*handler as *const _ as *mut _);
-        xpc_connection_resume(connection);
-    }
-
-    let mut message: HashMap<String, xpc_object_t> = HashMap::new();
-
-    message.insert("type".to_string(), *xpc_i64(7));
-    message.insert("handle".to_string(), *xpc_i64(0));
-    message.insert("subsystem".to_string(), *xpc_i64(3));
-    message.insert("routine".to_string(), *xpc_i64(815));
-    message.insert("legacy".to_string(), *xpc_bool(true));
-    message.insert("name".to_string(), *xpc_str("com.apple.Spotlight"));
-
+fn xpc_dict(message: HashMap<String, xpc_object_t>) -> xpc_object_t {
     let mut xpc_dict_keys = Vec::new();
     let mut xpc_dict_values = Vec::new();
 
@@ -111,31 +77,56 @@ fn main() {
         mem::forget(key);
     }
 
-    let msg_dict = unsafe {
+    unsafe {
         xpc_dictionary_create(
             xpc_dict_keys.into_boxed_slice().as_mut_ptr(),
             xpc_dict_values.into_boxed_slice().as_mut_ptr(),
             message.len() as u64
         )
+    }
+}
+
+fn print_errno() {
+    unsafe {
+        let error = CStr::from_ptr(strerror(errno));
+        println!("Error: {}", error.to_str().unwrap());
+    }
+}
+
+fn main() {
+    let bootstrap_pipe = unsafe {
+        xpc_pipe_create_from_port(bootstrap_port, 0)
     };
+
+    print_errno();
+
+    let mut message: HashMap<String, xpc_object_t> = HashMap::new();
+
+    message.insert("type".to_string(), *xpc_i64(7));
+    message.insert("handle".to_string(), *xpc_i64(0));
+    message.insert("subsystem".to_string(), *xpc_i64(3));
+    message.insert("routine".to_string(), *xpc_i64(815));
+    message.insert("legacy".to_string(), *xpc_bool(true));
+    message.insert("name".to_string(), *xpc_str("com.apple.Spotlight"));
+
+    unsafe {
+        message.insert("domain-port".to_string(), *xpc_i64(bootstrap_port as i64));
+    }
+
+    let msg_dict = xpc_dict(message);
 
     unsafe {
         let desc = CString::from_raw(xpc_copy_description(msg_dict));
         println!("Sending {}", desc.to_string_lossy());
-        xpc_connection_send_message(connection, msg_dict);
+        // xpc_connection_send_message(connection, msg_dict);
     }
 
-    loop {
-        if let Ok(Some(recv)) = rx.try_next() {
-            unsafe {
-                let desc = CString::from_raw(xpc_copy_description(recv));
-                println!("Received message! {}", desc.to_str().unwrap());
-            }
-        } else {
-            println!("Polling...nothing here");
-            std::thread::sleep(std::time::Duration::new(10, 0));
-        }
-    }
+    unsafe {
+        let mut response: xpc_object_t = null_mut();
+        let xpcwr_err = xpc_pipe_routine_with_flags(bootstrap_pipe, msg_dict, &mut response, 0);
+        let error = CStr::from_ptr(strerror(xpcwr_err));
+        println!("sent pipe with {}", error.to_str().unwrap());
+    };
 
     // let mut siv = cursive::default();
     //
