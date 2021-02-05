@@ -25,6 +25,7 @@ static APP_ID: &str = "com.dstancu.launchk";
 extern "C" {
     pub fn xpc_pipe_create_from_port(port: mach_port_t, flags: u64) -> *mut c_void;
     pub fn xpc_pipe_routine_with_flags(pipe: *mut c_void, msg: xpc_object_t, response: *mut xpc_object_t, flags: u64) -> c_int;
+    pub fn xpc_dictionary_set_mach_send(object: xpc_object_t, name: *const c_char, port: mach_port_t);
 
     // TODO: bindgen
     static errno: c_int;
@@ -109,16 +110,14 @@ fn main() {
     message.insert("legacy".to_string(), *xpc_bool(true));
     message.insert("name".to_string(), *xpc_str("com.apple.Spotlight"));
 
-    unsafe {
-        message.insert("domain-port".to_string(), *xpc_i64(bootstrap_port as i64));
-    }
-
     let msg_dict = xpc_dict(message);
 
     unsafe {
+        let name = CString::new("domain-port").unwrap();
+        xpc_dictionary_set_mach_send(msg_dict, name.as_ptr(), bootstrap_port);
+
         let desc = CString::from_raw(xpc_copy_description(msg_dict));
         println!("Sending {}", desc.to_string_lossy());
-        // xpc_connection_send_message(connection, msg_dict);
     }
 
     unsafe {
