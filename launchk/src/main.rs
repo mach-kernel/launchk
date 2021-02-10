@@ -1,7 +1,7 @@
 use cursive::views::{Dialog, TextView};
 
 use xpc_bindgen;
-use xpc_bindgen::{xpc_connection_create_mach_service, xpc_connection_t, XPC_CONNECTION_MACH_SERVICE_PRIVILEGED, dispatch_queue_create, xpc_connection_set_event_handler, xpc_object_t, xpc_copy_description, xpc_int64_create, xpc_dictionary_create, xpc_connection_send_message, xpc_string_create, xpc_connection_resume, XPC_CONNECTION_MACH_SERVICE_LISTENER, xpc_bool_create, xpc_connection_create, bootstrap_port, mach_port_t};
+use xpc_bindgen::{xpc_connection_create_mach_service, xpc_connection_t, XPC_CONNECTION_MACH_SERVICE_PRIVILEGED, dispatch_queue_create, xpc_connection_set_event_handler, xpc_object_t, xpc_copy_description, xpc_int64_create, xpc_dictionary_create, xpc_connection_send_message, xpc_string_create, xpc_connection_resume, XPC_CONNECTION_MACH_SERVICE_LISTENER, xpc_bool_create, xpc_connection_create, bootstrap_port, mach_port_t, kern_return_t, mach_ports_lookup, mach_task_self_, mach_msg_type_number_t, MACH_PORT_NULL};
 use std::ffi::{CString, CStr};
 use std::os::raw::{c_char, c_void, c_int};
 use std::ptr::null_mut;
@@ -90,13 +90,43 @@ fn xpc_dict(message: HashMap<String, xpc_object_t>) -> xpc_object_t {
 fn print_errno() {
     unsafe {
         let error = CStr::from_ptr(strerror(errno));
-        println!("Error: {}", error.to_str().unwrap());
+        println!("Error {}: {}", errno, error.to_str().unwrap());
+    }
+}
+
+fn print_err(err: i32) {
+    unsafe {
+        let error = CStr::from_ptr(strerror(err));
+        println!("Error {}: {}", err, error.to_str().unwrap());
+    }
+}
+
+
+fn get_bootstrap_port() -> mach_port_t {
+    let mut num_ports: mach_msg_type_number_t = 0;
+    let mut ret_ports: *mut mach_port_t = null_mut();
+
+    unsafe {
+        mach_ports_lookup(mach_task_self_, &mut ret_ports as *mut _, &mut num_ports);
+    }
+
+    println!("Found {} ports for mach_task_self_", num_ports);
+
+    unsafe {
+        println!("Returning mach_port_t {}", *ret_ports);
+        return *ret_ports;
     }
 }
 
 fn main() {
+    unsafe {
+        println!("Does bootstrap port exist? {}", bootstrap_port == MACH_PORT_NULL);
+    }
+    print_errno();
+
+    let found_strap_port = get_bootstrap_port();
     let bootstrap_pipe = unsafe {
-        xpc_pipe_create_from_port(bootstrap_port, 0)
+        xpc_pipe_create_from_port(found_strap_port, 0)
     };
 
     print_errno();
@@ -118,13 +148,13 @@ fn main() {
 
         let desc = CString::from_raw(xpc_copy_description(msg_dict));
         println!("Sending {}", desc.to_string_lossy());
+        // bootstrap
     }
 
     unsafe {
-        let mut response: xpc_object_t = null_mut();
-        let xpcwr_err = xpc_pipe_routine_with_flags(bootstrap_pipe, msg_dict, &mut response, 0);
-        let error = CStr::from_ptr(strerror(xpcwr_err));
-        println!("sent pipe with {}", error.to_str().unwrap());
+        let mut response: *mut xpc_object_t = null_mut();
+        let xpcwr_err = xpc_pipe_routine_with_flags(bootstrap_pipe, msg_dict, response, 0);
+        print_err(xpcwr_err);
     };
 
     // let mut siv = cursive::default();
