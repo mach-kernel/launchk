@@ -1,5 +1,5 @@
 [package]
-name = "xpc-bindgen"
+name = "xpc-sys"
 version = "0.1.0"
 authors = ["David Stancu <dstancu@nyu.edu>"]
 edition = "2018"

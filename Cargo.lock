@@ -502,7 +502,7 @@ dependencies = [
  "cursive",
  "futures",
  "tokio",
- "xpc-bindgen",
+ "xpc-sys",
 ]
 
 [[package]]
@@ -1084,7 +1084,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e71b85d8b1b8bfaf4b5c834187554d201a8cd621c2bbfa33efd41a3ecabd48b2"
 
 [[package]]
-name = "xpc-bindgen"
+name = "xpc-sys"
 version = "0.1.0"
 dependencies = [
  "bindgen",

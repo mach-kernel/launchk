@@ -1,2 +1,2 @@
 [workspace]
-members = ["xpc-bindgen", "launchk"]
+members = ["xpc-sys", "launchk"]
