@@ -15,42 +15,6 @@ use std::mem;
 use std::sync::{mpsc, Arc};
 use std::thread::sleep;
 
-extern "C" {
-    pub fn xpc_strerror(err: c_int) -> *const c_char;
-    pub fn strerror(err: c_int) -> *const c_char;
-    static errno: c_int;
-
-    static _os_alloc_once_table: *const _os_alloc_once_s;
-    // let global_data: *mut xpc_global_data = unsafe {
-    //     let first = _os_alloc_once_table.offset(1);
-    //     (*first).ptr as *mut _
-    // };
-}
-
-fn print_errno(err: Option<i32>) {
-    let reserr = unsafe { match err {
-        Some(e) => e,
-        None => errno,
-    } };
-
-    unsafe {
-        let error = CStr::from_ptr(strerror(reserr));
-        println!("Error {}: {}", reserr, error.to_str().unwrap());
-    }
-}
-
-fn print_xpc_errno(err: Option<i32>) {
-    let reserr = unsafe { match err {
-        Some(e) => e,
-        None => errno,
-    } };
-
-    unsafe {
-        let error = CStr::from_ptr(xpc_strerror(reserr));
-        println!("Error {}: {}", reserr, error.to_str().unwrap());
-    }
-}
-
 fn main() {
     let res_bootstrap_port = get_bootstrap_port();
 
@@ -73,12 +37,11 @@ fn main() {
         println!("Assembled message {}", desc.to_string_lossy());
     }
 
-    let pipe = unsafe { xpc_pipe_create_from_port(res_bootstrap_port, 0) };
-
+    let pipe = get_xpc_bootstrap_pipe();
     unsafe {
         let mut response: xpc_object_t = null_mut();
         let pipe_err = xpc_pipe_routine_with_flags(pipe, msg_dict.ptr, &mut response, 0);
-        print_xpc_errno(Some(pipe_err));
+        print_errno(Some(pipe_err));
         let desc = CString::from_raw(xpc_copy_description(response));
         println!("Recv {}", desc.to_string_lossy());
     };

@@ -4,12 +4,12 @@
 
 use std::os::raw::{c_void, c_char, c_int, c_long, c_uint};
 use std::sync::Arc;
-use std::ffi::CString;
+use std::ffi::{CString, CStr};
 use std::collections::HashMap;
 use std::mem;
 use std::ops::Deref;
 use std::iter::FromIterator;
-use std::ptr::{null_mut};
+use std::ptr::{null_mut, null};
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
@@ -22,9 +22,20 @@ type xpc_pipe_t = *mut c_void;
  * https://chromium.googlesource.com/chromium/src.git/+/47.0.2507.2/sandbox/mac/xpc_private_stubs.sig
  */
 extern "C" {
+    // Seems to give same output as strerror ¯\_(ツ)_/¯
+    pub fn xpc_strerror(err: c_int) ->  *const c_char;
+
+    pub static errno: c_int;
+
     pub fn xpc_pipe_create_from_port(port: mach_port_t, flags: u64) -> xpc_pipe_t;
     pub fn xpc_pipe_routine_with_flags(pipe: *mut c_void, msg: xpc_object_t, response: *mut xpc_object_t, flags: u64) -> c_int;
     pub fn xpc_dictionary_set_mach_send(object: xpc_object_t, name: *const c_char, port: mach_port_t);
+
+    // https://opensource.apple.com/source/Libsystem/Libsystem-1213/alloc_once_private.h.auto.html
+    pub static _os_alloc_once_table: [_os_alloc_once_s; 10];
+
+    // TODO: why doesn't this work?
+    // pub static _os_alloc_once_table: *const _os_alloc_once_s;
 }
 
 /// newtype for xpc_object_t
@@ -131,25 +142,45 @@ pub fn lookup_bootstrap_port() -> mach_port_t {
 /// MACH_PORT_NULL
 pub fn get_bootstrap_port() -> mach_port_t {
     unsafe {
-        match bootstrap_port {
-            MACH_PORT_NULL => {
-                println!("Bootstrap port is null! Querying for port");
-                lookup_bootstrap_port()
-            },
-            _ => {
-                println!("Found bootstrap port {}", bootstrap_port);
-                bootstrap_port
-            }
+        if bootstrap_port == MACH_PORT_NULL {
+            println!("Bootstrap port is null! Querying for port");
+            lookup_bootstrap_port()
+        } else {
+            println!("Found bootstrap port {}", bootstrap_port);
+            bootstrap_port
         }
     }
 }
 
-// pub fn get_xpc_global_data() -> Option<xpc_global_data> {
-//     let global_data: *mut xpc_global_data = unsafe {
-//         let first = _os_alloc_once_table.offset(1);
-//         (*first).ptr as *mut _
-//     };
-// }
+/// Get xpc global data bootstrap pipe or find bootstrap port + create new pipe
+pub fn get_xpc_bootstrap_pipe() -> xpc_pipe_t {
+    match read_xpc_global_data() {
+        Some(xpcgd) => {
+            unsafe {
+                println!("Found _os_alloc_once_table: {:?}", &_os_alloc_once_table as *const _);
+                println!("Found xpc_bootstrap_pipe: {:?}", xpcgd.xpc_bootstrap_pipe);
+            }
+            xpcgd.xpc_bootstrap_pipe
+        },
+        None => unsafe {
+            println!("Can't find _os_alloc_once_table, creating new bootstrap pipe");
+            xpc_pipe_create_from_port(get_bootstrap_port(), 0)
+        }
+    }
+}
+
+pub fn read_xpc_global_data() -> Option<&'static xpc_global_data> {
+    let gd: *mut xpc_global_data = unsafe { _os_alloc_once_table[1].ptr as *mut _ };
+    unsafe { gd.as_ref() }
+}
+
+pub fn print_errno(err: Option<i32>) {
+    unsafe {
+        let unwrapped = err.unwrap_or(errno);
+        let error = CStr::from_ptr(strerror(unwrapped));
+        println!("Error {}: {}", unwrapped, error.to_str().unwrap());
+    }
+}
 
 #[cfg(test)]
 mod tests {
