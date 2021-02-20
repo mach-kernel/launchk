@@ -1,19 +1,7 @@
-use cursive::views::{Dialog, TextView};
-
-use cursive::view::AnyView;
-use std::any::Any;
 use std::collections::HashMap;
-use std::ffi::{CStr, CString};
-use std::mem;
-use std::ops::Deref;
-use std::os::raw::{c_char, c_int, c_void};
 use std::ptr::null_mut;
-use std::rc::Rc;
 use xpc_sys;
 use xpc_sys::*;
-
-use std::sync::{mpsc, Arc};
-use std::thread::sleep;
 
 fn main() {
     // "launchctl list com.apple.Spotlight"

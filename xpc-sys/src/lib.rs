@@ -4,12 +4,10 @@
 
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
-use std::iter::FromIterator;
-use std::ops::Deref;
-use std::os::raw::{c_char, c_int, c_long, c_uint, c_void};
-use std::ptr::{null, null_mut};
-use std::sync::Arc;
-use std::{fmt, mem};
+use std::os::raw::{c_char, c_int, c_long, c_void};
+use std::ptr::{null_mut};
+
+use std::{fmt};
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
@@ -166,7 +164,7 @@ pub fn lookup_bootstrap_port() -> mach_port_t {
         panic!("Unable to obtain Mach bootstrap port!");
     }
 
-    let mut ret_port: mach_port_t = unsafe { *found_ports.offset(0) };
+    let ret_port: mach_port_t = unsafe { *found_ports.offset(0) };
     println!(
         "{} ports for mach_task_self_, taking first: mach_port_t {}",
         num_ports, ret_port
