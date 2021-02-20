@@ -1,0 +1,11 @@
+[package]
+name = "xpc-sys"
+version = "0.1.0"
+authors = ["David Stancu <dstancu@nyu.edu>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+bindgen = "0.53.1"
+xcrun = "1.0.4"
