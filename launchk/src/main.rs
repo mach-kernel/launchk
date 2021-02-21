@@ -1,7 +1,12 @@
 use std::collections::HashMap;
+use actix::prelude::*;
 use std::ptr::null_mut;
 use xpc_sys;
 use xpc_sys::*;
+
+mod actor;
+use actor::xpc::{XPCActor, XPCRequest};
+
 
 fn main() {
     // "launchctl list com.apple.Spotlight"
@@ -17,23 +22,35 @@ fn main() {
         XPCObject::from(get_bootstrap_port() as mach_port_t),
     );
 
-    let msg_dict = XPCObject::from(message);
-    println!("Sending {}", msg_dict);
+    let mut system = actix::System::new("launchk");
+    system.block_on(async {
+        let addr = XPCActor::start_default();
+        let res = addr.send(XPCRequest::PipeRoutine(XPCObject::from(message).data)).await;
 
-    let pipe = get_xpc_bootstrap_pipe();
-    let response = unsafe {
-        let mut response: xpc_object_t = null_mut();
-        let err = xpc_pipe_routine_with_flags(pipe, msg_dict.data, &mut response, 0);
-
-        if err != 0 {
-            print_errno(Some(err));
-            panic!("Could not send!")
+        match res {
+            Ok(data) => println!("Recv {}", data),
+            _ => println!("Error"),
         }
+    });
+    system.run();
 
-        response
-    };
-
-    println!("Received {}", XPCObject::from(response));
+    // let msg_dict = XPCObject::from(message);
+    // println!("Sending {}", msg_dict);
+    //
+    // let pipe = get_xpc_bootstrap_pipe();
+    // let response = unsafe {
+    //     let mut response: xpc_object_t = null_mut();
+    //     let err = xpc_pipe_routine_with_flags(pipe, msg_dict.data, &mut response, 0);
+    //
+    //     if err != 0 {
+    //         print_errno(Some(err));
+    //         panic!("Could not send!")
+    //     }
+    //
+    //     response
+    // };
+    //
+    // println!("Received {}", XPCObject::from(response));
 
     // let mut siv = cursive::default();
     // Creates a dialog with a single "Quit" button

@@ -8,10 +8,11 @@ use std::os::raw::{c_char, c_int, c_long, c_void};
 use std::ptr::{null_mut};
 
 use std::{fmt};
+use std::sync::Arc;
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-type xpc_pipe_t = *mut c_void;
+pub type xpc_pipe_t = *mut c_void;
 
 /**
  * Some extra private API definitions. Thanks:
@@ -46,7 +47,6 @@ extern "C" {
     pub static _os_alloc_once_table: [_os_alloc_once_s; 10];
 }
 
-/// newtype for xpc_object_t
 #[repr(C)]
 pub struct XPCObject {
     pub data: xpc_object_t,
@@ -67,6 +67,7 @@ pub struct xpc_global_data {
 }
 
 impl fmt::Display for XPCObject {
+    /// Use xpc_copy_description to get an easy snapshot of a dictionary
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let xpc_desc = unsafe { xpc_copy_description(self.data) };
         let cstr = unsafe { CStr::from_ptr(xpc_desc) };
@@ -149,6 +150,16 @@ impl From<HashMap<&str, XPCObject>> for XPCObject {
         }
 
         XPCObject { data: dict }
+    }
+}
+
+impl Drop for XPCObject {
+    fn drop(&mut self) {
+        if self.data == null_mut() {
+            return
+        }
+
+        unsafe { xpc_release(self.data) }
     }
 }
 
