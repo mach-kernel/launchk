@@ -52,6 +52,8 @@ pub struct XPCObject {
     pub data: xpc_object_t,
 }
 
+unsafe impl Send for XPCObject {}
+
 #[repr(C)]
 pub struct _os_alloc_once_s {
     pub once: c_long,

@@ -28,29 +28,11 @@ fn main() {
         let res = addr.send(XPCRequest::PipeRoutine(XPCObject::from(message).data)).await;
 
         match res {
-            Ok(data) => println!("Recv {}", data),
+            Ok(Ok(response)) => println!("Recv {}", response),
             _ => println!("Error"),
         }
     });
     system.run();
-
-    // let msg_dict = XPCObject::from(message);
-    // println!("Sending {}", msg_dict);
-    //
-    // let pipe = get_xpc_bootstrap_pipe();
-    // let response = unsafe {
-    //     let mut response: xpc_object_t = null_mut();
-    //     let err = xpc_pipe_routine_with_flags(pipe, msg_dict.data, &mut response, 0);
-    //
-    //     if err != 0 {
-    //         print_errno(Some(err));
-    //         panic!("Could not send!")
-    //     }
-    //
-    //     response
-    // };
-    //
-    // println!("Received {}", XPCObject::from(response));
 
     // let mut siv = cursive::default();
     // Creates a dialog with a single "Quit" button

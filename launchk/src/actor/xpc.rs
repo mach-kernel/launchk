@@ -19,6 +19,8 @@ pub enum XPCRequest {
     PipeRoutineWithFlags(xpc_object_t, u64)
 }
 
+unsafe impl Send for XPCRequest {}
+
 pub enum XPCRequestError {
     PipeNotInitialized,
     XPCPipeRoutineError(c_int)
