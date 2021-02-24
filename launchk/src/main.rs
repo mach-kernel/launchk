@@ -16,7 +16,7 @@ fn main() {
     message.insert("subsystem", XPCObject::from(3 as u64));
     message.insert("routine", XPCObject::from(815 as u64));
     message.insert("legacy", XPCObject::from(true));
-    message.insert("name", XPCObject::from("com.apple.Spotlight"));
+    // message.insert("name", XPCObject::from("com.apple.Spotlight"));
     message.insert(
         "domain-port",
         XPCObject::from(get_bootstrap_port() as mach_port_t),
