@@ -9,4 +9,3 @@ edition = "2018"
 [dependencies]
 xpc-sys = { path= "../xpc-sys" }
 cursive = "0.15.0"
-actix = "0.10"

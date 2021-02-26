@@ -1,12 +1,24 @@
 use std::collections::HashMap;
-use actix::prelude::*;
 use std::ptr::null_mut;
 use xpc_sys;
 use xpc_sys::*;
 
-mod actor;
-use actor::xpc::{XPCActor, XPCRequest};
+use cursive::direction::Orientation;
+use cursive::views::Panel;
+use cursive::{Printer, View};
+use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
+use std::sync::Arc;
+use xpc_sys::objects::types::XPCObject;
 
+// struct ServiceListView {
+//     services: Vec<String>,
+// }
+
+// impl View for ServiceListView {
+//     fn draw(&self, printer: &Printer) {
+//     }
+// }
 
 fn main() {
     // "launchctl list com.apple.Spotlight"
@@ -22,24 +34,18 @@ fn main() {
         XPCObject::from(get_bootstrap_port() as mach_port_t),
     );
 
-    let mut system = actix::System::new("launchk");
-    system.block_on(async {
-        let addr = XPCActor::start_default();
-        let res = addr.send(XPCRequest::PipeRoutine(XPCObject::from(message).data)).await;
+    let bootstrap_pipe = get_xpc_bootstrap_pipe();
+    let mut reply: xpc_object_t = null_mut();
 
-        match res {
-            Ok(Ok(response)) => println!("Recv {}", response),
-            _ => println!("Error"),
-        }
-    });
-    system.run();
+    let response =
+        unsafe { xpc_pipe_routine(bootstrap_pipe, XPCObject::from(message).0, &mut reply) };
 
-    // let mut siv = cursive::default();
-    // Creates a dialog with a single "Quit" button
-    // siv.add_layer(Dialog::around(TextView::new(recv))
-    //     .title("test")
-    //     .button("Quit", |s| s.quit()));
+    if response != 0 {
+        panic!("XPC query failed!")
+    }
 
-    // Starts the event loop.
-    // siv.run();
+    let lift = XPCObject(reply);
+    println!("Response {}", lift);
+
+    // let siv = cursive::default();
 }
