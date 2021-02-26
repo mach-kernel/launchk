@@ -2,15 +2,15 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-use std::collections::HashMap;
-use std::error::Error;
-use std::ffi::{CStr, CString};
-use std::fmt;
-use std::fmt::Display;
+
+
+use std::ffi::{CStr};
+
+
 use std::os::raw::{c_char, c_int, c_long, c_void};
 use std::ptr::null_mut;
 
-use block::ConcreteBlock;
+
 
 #[macro_use]
 extern crate lazy_static;

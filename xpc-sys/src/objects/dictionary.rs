@@ -1,11 +1,11 @@
 use crate::objects;
-use crate::objects::types::{XPCObject, XPCType};
+use crate::objects::types::{XPCObject};
 use crate::{
     xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_get_type,
     xpc_object_t, xpc_type_t,
 };
 use block::ConcreteBlock;
-use std::cell::{Cell, RefCell};
+use std::cell::{RefCell};
 use std::collections::HashMap;
 use std::error::Error;
 use std::ffi::{CStr, CString};
@@ -29,9 +29,8 @@ impl Error for XPCDictionaryError {}
 pub struct XPCDictionary(HashMap<String, XPCObject>);
 impl XPCDictionary {
     /// Reify xpc_object_t dictionary as a Rust HashMap
-    pub fn new(object: xpc_object_t) -> Result<XPCDictionary, XPCDictionaryError> {
-        let object_type: XPCType = unsafe { XPCType(xpc_get_type(object)) };
-        if object_type != *objects::types::Dictionary {
+    pub fn new(object: XPCObject) -> Result<XPCDictionary, XPCDictionaryError> {
+        if object.get_type() != *objects::types::Dictionary {
             return Err(XPCDictionaryError(
                 "Only XPC_TYPE_DICTIONARY allowed".to_string(),
             ));
@@ -46,12 +45,12 @@ impl XPCDictionary {
         });
         let block = block.copy();
 
-        let ok = unsafe { xpc_dictionary_apply(object, &block as *const _ as *mut _) };
+        let ok = unsafe { xpc_dictionary_apply(object.as_ptr(), &block as *const _ as *mut _) };
 
         if ok {
             let mut hm: HashMap<String, XPCObject> = HashMap::new();
             for (k, v) in map.borrow().deref() {
-                hm.insert(k.clone(), XPCObject(v.0));
+                hm.insert(k.clone(), XPCObject(v.as_ptr()));
             }
             Ok(XPCDictionary(hm))
         } else {

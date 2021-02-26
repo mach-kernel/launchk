@@ -36,6 +36,18 @@ pub struct XPCPipe(pub xpc_pipe_t);
 unsafe impl Send for XPCPipe {}
 unsafe impl Sync for XPCPipe {}
 
+impl XPCObject {
+    pub fn get_type(&self) -> XPCType {
+        let XPCObject(object_ptr) = self;
+        unsafe { XPCType(xpc_get_type(*object_ptr)) }
+    }
+
+    pub fn as_ptr(&self) -> xpc_object_t {
+        let XPCObject(object_ptr) = self;
+        *object_ptr
+    }
+}
+
 impl fmt::Display for XPCObject {
     /// Use xpc_copy_description to get an easy snapshot of a dictionary
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
