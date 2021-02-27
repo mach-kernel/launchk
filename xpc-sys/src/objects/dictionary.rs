@@ -1,12 +1,13 @@
 use crate::objects;
-use crate::objects::types::{XPCObject};
+use crate::objects::types::XPCObject;
 use crate::{
     xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_get_type,
     xpc_object_t, xpc_type_t,
 };
 use block::ConcreteBlock;
-use std::cell::{RefCell};
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::error::Error;
 use std::ffi::{CStr, CString};
 use std::fmt::{Display, Formatter};
@@ -14,6 +15,7 @@ use std::ops::Deref;
 use std::os::raw::c_char;
 use std::ptr::{null, null_mut};
 use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct XPCDictionaryError(String);
@@ -41,7 +43,9 @@ impl XPCDictionary {
 
         let block = ConcreteBlock::new(move |key: *const c_char, value: xpc_object_t| {
             let str_key = unsafe { CStr::from_ptr(key).to_string_lossy().to_string() };
-            map_rc_clone.borrow_mut().insert(str_key, XPCObject(value));
+            map_rc_clone
+                .borrow_mut()
+                .insert(str_key, XPCObject(Arc::new(value)));
         });
         let block = block.copy();
 
@@ -51,7 +55,7 @@ impl XPCDictionary {
             println!("OK!!!");
             let mut hm: HashMap<String, XPCObject> = HashMap::new();
             for (k, v) in map.borrow().deref() {
-                hm.insert(k.clone(), XPCObject(v.as_ptr()));
+                hm.insert(k.clone(), v.clone());
             }
             Ok(XPCDictionary(hm))
         } else {
@@ -59,6 +63,15 @@ impl XPCDictionary {
                 "xpc_dictionary_apply failed".to_string(),
             ))
         }
+    }
+}
+
+impl TryFrom<xpc_object_t> for XPCDictionary {
+    type Error = XPCDictionaryError;
+
+    fn try_from(value: xpc_object_t) -> Result<XPCDictionary, XPCDictionaryError> {
+        let obj: XPCObject = value.into();
+        XPCDictionary::new(obj)
     }
 }
 
@@ -73,10 +86,10 @@ impl From<HashMap<&str, XPCObject>> for XPCObject {
         for (k, v) in message {
             unsafe {
                 let cstr = CString::new(k);
-                xpc_dictionary_set_value(dict, cstr.unwrap().as_ptr(), v.0);
+                xpc_dictionary_set_value(dict, cstr.unwrap().as_ptr(), v.as_ptr());
             }
         }
 
-        XPCObject(dict)
+        dict.into()
     }
 }

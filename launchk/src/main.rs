@@ -3,14 +3,9 @@ use std::ptr::null_mut;
 use xpc_sys;
 use xpc_sys::*;
 
-
-
-
-
-
-
+use std::convert::TryInto;
+use xpc_sys::objects::dictionary::{XPCDictionary, XPCDictionaryError};
 use xpc_sys::objects::types::XPCObject;
-use xpc_sys::objects::dictionary::XPCDictionary;
 
 // struct ServiceListView {
 //     services: Vec<String>,
@@ -38,15 +33,22 @@ fn main() {
     let bootstrap_pipe = get_xpc_bootstrap_pipe();
     let mut reply: xpc_object_t = null_mut();
 
-    let response =
-        unsafe { xpc_pipe_routine(bootstrap_pipe, XPCObject::from(message).0, &mut reply) };
+    let send = unsafe {
+        xpc_pipe_routine(
+            bootstrap_pipe,
+            XPCObject::from(message).as_ptr(),
+            &mut reply,
+        )
+    };
 
-    if response != 0 {
+    if send != 0 {
         panic!("XPC query failed!")
     }
 
-    let lift = XPCObject(reply);
-    println!("Response {}", lift);
+    let _as_obj: Result<XPCDictionary, XPCDictionaryError> = reply.try_into();
+
+    // let as_dict = XPCDictionary::new(XPCObject::new(reply));
+    // println!("Response {}", XPCObject(reply)z);
 
     // let siv = cursive::default();
 }
