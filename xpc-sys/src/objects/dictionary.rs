@@ -38,31 +38,34 @@ impl XPCDictionary {
             ));
         }
 
-        let map: Rc<RefCell<HashMap<String, XPCObject>>> = Rc::new(RefCell::new(HashMap::new()));
+        let mut map: Rc<RefCell<HashMap<String, XPCObject>>> =
+            Rc::new(RefCell::new(HashMap::new()));
         let map_rc_clone = map.clone();
 
         let block = ConcreteBlock::new(move |key: *const c_char, value: xpc_object_t| {
             let str_key = unsafe { CStr::from_ptr(key).to_string_lossy().to_string() };
-            map_rc_clone
-                .borrow_mut()
-                .insert(str_key, XPCObject(Arc::new(value)));
+            map_rc_clone.borrow_mut().insert(str_key, value.into());
         });
         let block = block.copy();
 
         let ok = unsafe { xpc_dictionary_apply(object.as_ptr(), &*block as *const _ as *mut _) };
 
         if ok {
-            println!("OK!!!");
-            let mut hm: HashMap<String, XPCObject> = HashMap::new();
-            for (k, v) in map.borrow().deref() {
-                hm.insert(k.clone(), v.clone());
+            match Rc::try_unwrap(map) {
+                Ok(cell) => Ok(XPCDictionary(cell.into_inner())),
+                Err(_) => Err(XPCDictionaryError("Unable to unwrap Rc".to_string())),
             }
-            Ok(XPCDictionary(hm))
         } else {
             Err(XPCDictionaryError(
                 "xpc_dictionary_apply failed".to_string(),
             ))
         }
+    }
+}
+
+impl From<HashMap<String, XPCObject>> for XPCDictionary {
+    fn from(dict: HashMap<String, XPCObject>) -> XPCDictionary {
+        XPCDictionary(dict)
     }
 }
 

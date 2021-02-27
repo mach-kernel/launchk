@@ -121,9 +121,10 @@ impl Drop for XPCObject {
         }
 
         let refs = Arc::strong_count(arc);
-        println!("{} I have {} refs", **arc as u64, refs);
+        println!("{:p} I have {} refs", **arc, refs);
+
         if refs <= 1 {
-            unsafe { xpc_release(**arc) }
+            // unsafe { xpc_release(**arc) }
         }
     }
 }
