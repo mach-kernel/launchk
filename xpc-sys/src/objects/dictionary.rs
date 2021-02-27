@@ -103,3 +103,30 @@ impl From<HashMap<&str, XPCObject>> for XPCObject {
         dict.into()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{xpc_dictionary_create, xpc_int64_create, xpc_dictionary_set_int64, xpc_int64_get_value};
+    use std::ptr::{null, null_mut};
+    use std::ffi::CString;
+    use crate::objects::dictionary::{XPCDictionary, XPCDictionaryError};
+    use std::convert::TryInto;
+    use crate::objects::types::XPCObject;
+
+    #[test]
+    fn raw_to_hashmap() {
+        let raw_dict = unsafe { xpc_dictionary_create(null(), null_mut(), 0) };
+        let key = CString::new("test").unwrap();
+        let value: i64 = 42;
+
+        unsafe { xpc_dictionary_set_int64(raw_dict, key.as_ptr(), value) };
+
+        let XPCDictionary(map) = raw_dict.try_into().unwrap();
+        if let Some(XPCObject(data)) = map.get("test") {
+            let retrieved = unsafe { xpc_int64_get_value(**data) };
+            assert_eq!(retrieved, value);
+        } else {
+            panic!("Unable to get value from map");
+        }
+    }
+}
