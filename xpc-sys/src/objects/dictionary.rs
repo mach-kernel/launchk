@@ -45,9 +45,10 @@ impl XPCDictionary {
         });
         let block = block.copy();
 
-        let ok = unsafe { xpc_dictionary_apply(object.as_ptr(), &block as *const _ as *mut _) };
+        let ok = unsafe { xpc_dictionary_apply(object.as_ptr(), &*block as *const _ as *mut _) };
 
         if ok {
+            println!("OK!!!");
             let mut hm: HashMap<String, XPCObject> = HashMap::new();
             for (k, v) in map.borrow().deref() {
                 hm.insert(k.clone(), XPCObject(v.as_ptr()));

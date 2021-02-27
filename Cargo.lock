@@ -83,7 +83,8 @@ checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 [[package]]
 name = "block"
 version = "0.1.6"
-source = "git+https://github.com/adamnemecek/rust-block.git?branch=fnmut#d4d3dee2520804e5accb0badeba88552fc61c52f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
 
 [[package]]
 name = "cc"

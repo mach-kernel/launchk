@@ -93,6 +93,8 @@ impl From<&str> for XPCObject {
     }
 }
 
+/// TODO: If there is more than one XPCObject with the same pointer
+/// value and it is dropped -- then that pointer gets released.
 impl Drop for XPCObject {
     fn drop(&mut self) {
         if self.0 == null_mut() {

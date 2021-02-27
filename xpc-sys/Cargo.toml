@@ -8,7 +8,8 @@ edition = "2018"
 
 [dependencies]
 # https://github.com/SSheldon/rust-block/pull/12
-block = { git = "https://github.com/adamnemecek/rust-block.git", branch = "fnmut" }
+#block = { git = "https://github.com/adamnemecek/rust-block.git", branch = "fnmut" }
+block = "0.1.6"
 lazy_static = "1.4.0"
 
 [build-dependencies]

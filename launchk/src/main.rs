@@ -10,6 +10,7 @@ use xpc_sys::*;
 
 
 use xpc_sys::objects::types::XPCObject;
+use xpc_sys::objects::dictionary::XPCDictionary;
 
 // struct ServiceListView {
 //     services: Vec<String>,
