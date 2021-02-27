@@ -1,5 +1,5 @@
-use crate::objects;
 use crate::objects::types::XPCObject;
+use crate::{objects, xpc_retain};
 use crate::{
     xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_get_type,
     xpc_object_t, xpc_type_t,
@@ -11,11 +11,10 @@ use std::convert::TryFrom;
 use std::error::Error;
 use std::ffi::{CStr, CString};
 use std::fmt::{Display, Formatter};
-use std::ops::Deref;
+
 use std::os::raw::c_char;
 use std::ptr::{null, null_mut};
 use std::rc::Rc;
-use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct XPCDictionaryError(String);
@@ -38,11 +37,13 @@ impl XPCDictionary {
             ));
         }
 
-        let mut map: Rc<RefCell<HashMap<String, XPCObject>>> =
-            Rc::new(RefCell::new(HashMap::new()));
+        let map: Rc<RefCell<HashMap<String, XPCObject>>> = Rc::new(RefCell::new(HashMap::new()));
         let map_rc_clone = map.clone();
 
         let block = ConcreteBlock::new(move |key: *const c_char, value: xpc_object_t| {
+            // Prevent xpc_release() collection on block exit
+            unsafe { xpc_retain(value) };
+
             let str_key = unsafe { CStr::from_ptr(key).to_string_lossy().to_string() };
             map_rc_clone.borrow_mut().insert(str_key, value.into());
         });

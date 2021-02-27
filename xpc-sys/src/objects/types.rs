@@ -110,21 +110,27 @@ impl From<xpc_object_t> for XPCObject {
     }
 }
 
-/// TODO: If there is more than one XPCObject with the same pointer
-/// value and it is dropped -- then that pointer gets released.
+/// Cloning an XPC object will clone the underlying Arc -- we will
+/// call xpc_release() only if we are the last valid reference
+/// (and underlying data is not null)
+///
+/// NOTE: If using with obj-c blocks crate (blocks::ConcreteBlock),
+/// make sure to invoke xpc_retain() to avoid the Obj-C runtime from
+/// releasing your xpc_object_t after the block leaves scope. This
+/// drop trait will then cause a segfault!
+///
+/// TODO: Is there a way to check if an xpc_release() was already invoked?
 impl Drop for XPCObject {
     fn drop(&mut self) {
         let XPCObject(arc) = self;
         if **arc == null_mut() {
-            println!("I'm null!");
             return;
         }
 
         let refs = Arc::strong_count(arc);
-        println!("{:p} I have {} refs", **arc, refs);
 
         if refs <= 1 {
-            // unsafe { xpc_release(**arc) }
+            unsafe { xpc_release(**arc) }
         }
     }
 }
