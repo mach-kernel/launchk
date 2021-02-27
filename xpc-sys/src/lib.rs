@@ -2,17 +2,18 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-use std::ffi::CStr;
-
-use std::os::raw::{c_char, c_int, c_long, c_void};
-use std::ptr::null_mut;
-
 #[macro_use]
 extern crate lazy_static;
 
-pub mod objects;
+use std::ffi::CStr;
+use std::os::raw::{c_char, c_int, c_long, c_void};
+use std::ptr::null_mut;
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
+//
+pub mod object;
+//
 
 pub type xpc_pipe_t = *mut c_void;
 

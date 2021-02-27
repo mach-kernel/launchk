@@ -4,8 +4,8 @@ use xpc_sys;
 use xpc_sys::*;
 
 use std::convert::TryInto;
-use xpc_sys::objects::dictionary::XPCDictionary;
-use xpc_sys::objects::types::XPCObject;
+use xpc_sys::object::xpc_dictionary::XPCDictionary;
+use xpc_sys::object::xpc_object::XPCObject;
 
 // struct ServiceListView {
 //     services: Vec<String>,

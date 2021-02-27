@@ -1,5 +1,4 @@
-use crate::objects::types::XPCObject;
-use crate::{objects, xpc_retain};
+use crate::{object, xpc_retain};
 use crate::{
     xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_get_type,
     xpc_object_t, xpc_type_t,
@@ -12,6 +11,7 @@ use std::error::Error;
 use std::ffi::{CStr, CString};
 use std::fmt::{Display, Formatter};
 
+use crate::object::xpc_object::XPCObject;
 use std::os::raw::c_char;
 use std::ptr::{null, null_mut};
 use std::rc::Rc;
@@ -31,7 +31,7 @@ pub struct XPCDictionary(pub HashMap<String, XPCObject>);
 impl XPCDictionary {
     /// Reify xpc_object_t dictionary as a Rust HashMap
     pub fn new(object: XPCObject) -> Result<XPCDictionary, XPCDictionaryError> {
-        if object.get_type() != *objects::types::Dictionary {
+        if object.get_type() != *object::xpc_type::Dictionary {
             return Err(XPCDictionaryError(
                 "Only XPC_TYPE_DICTIONARY allowed".to_string(),
             ));
@@ -106,12 +106,12 @@ impl From<HashMap<&str, XPCObject>> for XPCObject {
 
 #[cfg(test)]
 mod tests {
-    use crate::{xpc_dictionary_create, xpc_int64_create, xpc_dictionary_set_int64, xpc_int64_get_value};
-    use std::ptr::{null, null_mut};
-    use std::ffi::CString;
-    use crate::objects::dictionary::{XPCDictionary, XPCDictionaryError};
+    use crate::object::xpc_dictionary::XPCDictionary;
+    use crate::object::xpc_object::XPCObject;
+    use crate::{xpc_dictionary_create, xpc_dictionary_set_int64, xpc_int64_get_value};
     use std::convert::TryInto;
-    use crate::objects::types::XPCObject;
+    use std::ffi::CString;
+    use std::ptr::{null, null_mut};
 
     #[test]
     fn raw_to_hashmap() {

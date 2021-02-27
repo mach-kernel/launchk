@@ -1,26 +1,13 @@
+use crate::object::xpc_type::XPCType;
 use crate::{
-    mach_port_t, xpc_bool_create, xpc_copy_description, xpc_dictionary_create, xpc_get_type,
-    xpc_int64_create, xpc_mach_send_create, xpc_object_t, xpc_pipe_t, xpc_release,
-    xpc_string_create, xpc_type_t, xpc_uint64_create,
+    mach_port_t, xpc_bool_create, xpc_copy_description, xpc_get_type, xpc_int64_create,
+    xpc_mach_send_create, xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
 };
 use std::ffi::{CStr, CString};
-use std::fmt;
-use std::ptr::{null, null_mut};
-
+use std::ptr::null_mut;
 use std::sync::Arc;
 
-#[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Eq)]
-/// Newtype for xpc_type_t
-pub struct XPCType(pub xpc_type_t);
-
-unsafe impl Send for XPCType {}
-unsafe impl Sync for XPCType {}
-
-lazy_static! {
-    pub static ref Dictionary: XPCType =
-        unsafe { XPCType(xpc_get_type(xpc_dictionary_create(null(), null_mut(), 0))) };
-}
+use std::fmt;
 
 #[derive(Clone, PartialEq, Eq)]
 /// Newtype for xpc_object_t
@@ -28,14 +15,6 @@ pub struct XPCObject(pub Arc<xpc_object_t>);
 
 unsafe impl Send for XPCObject {}
 unsafe impl Sync for XPCObject {}
-
-#[repr(transparent)]
-#[derive(Clone, PartialEq, Eq)]
-/// Newtype for xpc_pipe_t
-pub struct XPCPipe(pub xpc_pipe_t);
-
-unsafe impl Send for XPCPipe {}
-unsafe impl Sync for XPCPipe {}
 
 impl XPCObject {
     pub fn new(value: xpc_object_t) -> Self {
