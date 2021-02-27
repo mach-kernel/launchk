@@ -27,7 +27,7 @@ impl Display for XPCDictionaryError {
 
 impl Error for XPCDictionaryError {}
 
-pub struct XPCDictionary(HashMap<String, XPCObject>);
+pub struct XPCDictionary(pub HashMap<String, XPCObject>);
 impl XPCDictionary {
     /// Reify xpc_object_t dictionary as a Rust HashMap
     pub fn new(object: XPCObject) -> Result<XPCDictionary, XPCDictionaryError> {
@@ -51,6 +51,10 @@ impl XPCDictionary {
 
         let ok = unsafe { xpc_dictionary_apply(object.as_ptr(), &*block as *const _ as *mut _) };
 
+        // Explicitly drop the block so map is the only live reference
+        // so we can collect it below
+        std::mem::drop(block);
+
         if ok {
             match Rc::try_unwrap(map) {
                 Ok(cell) => Ok(XPCDictionary(cell.into_inner())),
@@ -73,6 +77,8 @@ impl From<HashMap<String, XPCObject>> for XPCDictionary {
 impl TryFrom<xpc_object_t> for XPCDictionary {
     type Error = XPCDictionaryError;
 
+    /// Creates a XPC dictionary from an xpc_object_t pointer. Errors are generally
+    /// related to passing in objects other than XPC_TYPE_DICTIONARY
     fn try_from(value: xpc_object_t) -> Result<XPCDictionary, XPCDictionaryError> {
         let obj: XPCObject = value.into();
         XPCDictionary::new(obj)

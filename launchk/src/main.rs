@@ -4,7 +4,7 @@ use xpc_sys;
 use xpc_sys::*;
 
 use std::convert::TryInto;
-use xpc_sys::objects::dictionary::{XPCDictionary, XPCDictionaryError};
+use xpc_sys::objects::dictionary::XPCDictionary;
 use xpc_sys::objects::types::XPCObject;
 
 // struct ServiceListView {
@@ -45,10 +45,11 @@ fn main() {
         panic!("XPC query failed!")
     }
 
-    let _as_obj: Result<XPCDictionary, XPCDictionaryError> = reply.try_into();
-
-    // let as_dict = XPCDictionary::new(XPCObject::new(reply));
-    // println!("Response {}", XPCObject(reply)z);
+    if let Ok(XPCDictionary(reply_dict)) = reply.try_into() {
+        for (k, v) in reply_dict {
+            println!("{}: {}", k, v);
+        }
+    }
 
     // let siv = cursive::default();
 }
