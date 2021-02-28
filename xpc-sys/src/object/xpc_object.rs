@@ -1,15 +1,13 @@
 use crate::object::xpc_type::XPCType;
 use crate::{
-    mach_port_t, xpc_bool_create, xpc_copy_description, xpc_get_type, xpc_int64_create,
-    xpc_mach_send_create, xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
+    mach_port_t, xpc_bool_create, xpc_copy_description, xpc_int64_create, xpc_mach_send_create,
+    xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
 };
 use std::ffi::{CStr, CString};
 use std::ptr::null_mut;
 use std::sync::Arc;
 
 use std::fmt;
-use crate::object::xpc_value::XPCValue;
-use std::marker::PhantomData;
 
 #[derive(Clone, PartialEq, Eq)]
 /// Newtype for xpc_object_t
@@ -26,10 +24,6 @@ impl XPCObject {
     pub fn xpc_type(&self) -> XPCType {
         let XPCObject(_, xpc_type) = self;
         *xpc_type
-    }
-
-    pub fn get_type(object: xpc_object_t) -> XPCType {
-        XPCType(unsafe { xpc_get_type(object) })
     }
 
     pub fn as_ptr(&self) -> xpc_object_t {
@@ -55,7 +49,7 @@ impl fmt::Display for XPCObject {
 
 impl From<xpc_object_t> for XPCObject {
     fn from(value: xpc_object_t) -> Self {
-        XPCObject(Arc::new(value), XPCObject::get_type(value))
+        XPCObject(Arc::new(value), XPCType::new(value))
     }
 }
 

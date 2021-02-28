@@ -111,9 +111,11 @@ impl From<HashMap<&str, XPCObject>> for XPCObject {
 mod tests {
     use crate::object::xpc_dictionary::XPCDictionary;
     use crate::object::xpc_object::XPCObject;
-    use crate::{xpc_dictionary_create, xpc_dictionary_set_int64, xpc_int64_get_value};
+    use crate::object::xpc_value::XPCValue;
+    use crate::{xpc_dictionary_create, xpc_dictionary_get_string, xpc_dictionary_set_int64};
+    use std::collections::HashMap;
     use std::convert::TryInto;
-    use std::ffi::CString;
+    use std::ffi::{CStr, CString};
     use std::ptr::{null, null_mut};
 
     #[test]
@@ -125,11 +127,27 @@ mod tests {
         unsafe { xpc_dictionary_set_int64(raw_dict, key.as_ptr(), value) };
 
         let XPCDictionary(map) = raw_dict.try_into().unwrap();
-        if let Some(XPCObject(data)) = map.get("test") {
-            let retrieved = unsafe { xpc_int64_get_value(**data) };
-            assert_eq!(retrieved, value);
+        if let Some(xpc_object) = map.get("test") {
+            assert_eq!(value, xpc_object.xpc_value());
         } else {
             panic!("Unable to get value from map");
         }
+    }
+
+    #[test]
+    fn hashmap_to_raw() {
+        let mut hm: HashMap<&str, XPCObject> = HashMap::new();
+        let value = "foo";
+        hm.insert("test", XPCObject::from(value));
+
+        let xpc_object = XPCObject::from(hm);
+        let cstr = unsafe {
+            CStr::from_ptr(xpc_dictionary_get_string(
+                xpc_object.as_ptr(),
+                CString::new("test").unwrap().as_ptr(),
+            ))
+        };
+
+        assert_eq!(cstr.to_str().unwrap(), value);
     }
 }

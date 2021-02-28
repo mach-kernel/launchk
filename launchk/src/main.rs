@@ -6,8 +6,6 @@ use xpc_sys::*;
 use std::convert::TryInto;
 use xpc_sys::object::xpc_dictionary::XPCDictionary;
 use xpc_sys::object::xpc_object::XPCObject;
-use xpc_sys::object::xpc_value::XPCValue;
-use xpc_sys::object::xpc_type::XPCType;
 
 // struct ServiceListView {
 //     services: Vec<String>,
@@ -19,8 +17,6 @@ use xpc_sys::object::xpc_type::XPCType;
 // }
 
 fn main() {
-    let z = XPCObject::from(0 as i64);
-
     // "launchctl list com.apple.Spotlight"
     let mut message: HashMap<&str, XPCObject> = HashMap::new();
     message.insert("type", XPCObject::from(1 as u64));
