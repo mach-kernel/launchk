@@ -21,6 +21,11 @@ impl XPCObject {
         value.into()
     }
 
+    pub fn is_xpc_type(&self, other: &XPCType) -> bool {
+        let XPCObject(_, xpc_type) = self;
+        *xpc_type == *other
+    }
+
     pub fn xpc_type(&self) -> XPCType {
         let XPCObject(_, xpc_type) = self;
         *xpc_type
@@ -49,7 +54,7 @@ impl fmt::Display for XPCObject {
 
 impl From<xpc_object_t> for XPCObject {
     fn from(value: xpc_object_t) -> Self {
-        XPCObject(Arc::new(value), XPCType::new(value))
+        XPCObject(Arc::new(value), value.into())
     }
 }
 
