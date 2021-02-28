@@ -6,8 +6,8 @@ use xpc_sys::*;
 use std::convert::TryInto;
 use xpc_sys::object::xpc_dictionary::XPCDictionary;
 use xpc_sys::object::xpc_object::XPCObject;
-use cursive::views::{LinearLayout, SelectView};
-use cursive::view::Scrollable;
+
+use crate::tui::list_services;
 
 mod tui;
 
@@ -40,21 +40,15 @@ fn main() {
         panic!("XPC query failed!")
     }
 
+    let mut siv = cursive::default();
+
     if let Ok(XPCDictionary(reply_dict)) = reply.try_into() {
-        let mut siv = cursive::default();
-        let mut sv: SelectView<XPCObject> = SelectView::new();
+        let services = reply_dict
+            .get("services")
+            .and_then(|o: &XPCObject| XPCDictionary::new(o).ok());
 
-        let services = reply_dict.get("services").unwrap();
-        if let Ok(XPCDictionary(svc_dict)) = XPCDictionary::new(services) {
-            for (k, v) in svc_dict {
-                sv.add_item(k, v);
-            }
-        }
-
-        siv.add_layer(LinearLayout::horizontal().child(
-            sv.scrollable()
-        ));
-
+        let XPCDictionary(service_dict) = services.unwrap();
+        list_services(&mut siv, &service_dict);
         siv.run()
     }
 }

@@ -1,2 +1,4 @@
 # launchk
-A small ncurses utility to manage Apple launchd. Who are we kidding! Hopefully it eventually shows a list of services ;)
+A small and WIP ncurses UI around XPC launchd queries. It shows a list of services, or something!
+
+![](https://i.imgur.com/6GHmY5M.png)
