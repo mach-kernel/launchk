@@ -6,15 +6,10 @@ use xpc_sys::*;
 use std::convert::TryInto;
 use xpc_sys::object::xpc_dictionary::XPCDictionary;
 use xpc_sys::object::xpc_object::XPCObject;
+use cursive::views::{LinearLayout, SelectView};
+use cursive::view::Scrollable;
 
-// struct ServiceListView {
-//     services: Vec<String>,
-// }
-
-// impl View for ServiceListView {
-//     fn draw(&self, printer: &Printer) {
-//     }
-// }
+mod tui;
 
 fn main() {
     // "launchctl list com.apple.Spotlight"
@@ -46,10 +41,20 @@ fn main() {
     }
 
     if let Ok(XPCDictionary(reply_dict)) = reply.try_into() {
-        for (k, v) in reply_dict {
-            println!("{}: {}", k, v);
-        }
-    }
+        let mut siv = cursive::default();
+        let mut sv: SelectView<XPCObject> = SelectView::new();
 
-    // let siv = cursive::default();
+        let services = reply_dict.get("services").unwrap();
+        if let Ok(XPCDictionary(svc_dict)) = XPCDictionary::new(services) {
+            for (k, v) in svc_dict {
+                sv.add_item(k, v);
+            }
+        }
+
+        siv.add_layer(LinearLayout::horizontal().child(
+            sv.scrollable()
+        ));
+
+        siv.run()
+    }
 }

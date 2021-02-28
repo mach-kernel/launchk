@@ -31,8 +31,8 @@ pub struct XPCDictionary(pub HashMap<String, XPCObject>);
 
 impl XPCDictionary {
     /// Reify xpc_object_t dictionary as a Rust HashMap
-    pub fn new(object: XPCObject) -> Result<XPCDictionary, XPCDictionaryError> {
-        let XPCObject(_, object_type) = object;
+    pub fn new(object: &XPCObject) -> Result<XPCDictionary, XPCDictionaryError> {
+        let XPCObject(_, object_type) = *object;
 
         if object_type != *object::xpc_type::Dictionary {
             return Err(XPCDictionaryError(
@@ -84,7 +84,7 @@ impl TryFrom<xpc_object_t> for XPCDictionary {
     /// related to passing in objects other than XPC_TYPE_DICTIONARY
     fn try_from(value: xpc_object_t) -> Result<XPCDictionary, XPCDictionaryError> {
         let obj: XPCObject = value.into();
-        XPCDictionary::new(obj)
+        XPCDictionary::new(&obj)
     }
 }
 
