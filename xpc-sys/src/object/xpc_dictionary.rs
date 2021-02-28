@@ -28,10 +28,13 @@ impl Display for XPCDictionaryError {
 impl Error for XPCDictionaryError {}
 
 pub struct XPCDictionary(pub HashMap<String, XPCObject>);
+
 impl XPCDictionary {
     /// Reify xpc_object_t dictionary as a Rust HashMap
     pub fn new(object: XPCObject) -> Result<XPCDictionary, XPCDictionaryError> {
-        if object.get_type() != *object::xpc_type::Dictionary {
+        let XPCObject(_, object_type) = object;
+
+        if object_type != *object::xpc_type::Dictionary {
             return Err(XPCDictionaryError(
                 "Only XPC_TYPE_DICTIONARY allowed".to_string(),
             ));

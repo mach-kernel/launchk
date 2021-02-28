@@ -8,10 +8,12 @@ use std::ptr::null_mut;
 use std::sync::Arc;
 
 use std::fmt;
+use crate::object::xpc_value::XPCValue;
+use std::marker::PhantomData;
 
 #[derive(Clone, PartialEq, Eq)]
 /// Newtype for xpc_object_t
-pub struct XPCObject(pub Arc<xpc_object_t>);
+pub struct XPCObject(pub Arc<xpc_object_t>, pub XPCType);
 
 unsafe impl Send for XPCObject {}
 unsafe impl Sync for XPCObject {}
@@ -21,13 +23,17 @@ impl XPCObject {
         value.into()
     }
 
-    pub fn get_type(&self) -> XPCType {
-        let XPCObject(object_ptr) = self;
-        unsafe { XPCType(xpc_get_type(**object_ptr)) }
+    pub fn xpc_type(&self) -> XPCType {
+        let XPCObject(_, xpc_type) = self;
+        *xpc_type
+    }
+
+    pub fn get_type(object: xpc_object_t) -> XPCType {
+        XPCType(unsafe { xpc_get_type(object) })
     }
 
     pub fn as_ptr(&self) -> xpc_object_t {
-        let XPCObject(object_ptr) = self;
+        let XPCObject(object_ptr, _) = self;
         **object_ptr
     }
 }
@@ -35,7 +41,7 @@ impl XPCObject {
 impl fmt::Display for XPCObject {
     /// Use xpc_copy_description to get an easy snapshot of a dictionary
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let XPCObject(arc) = self;
+        let XPCObject(arc, _) = self;
 
         if **arc == null_mut() {
             write!(f, "XPCObject is NULL")
@@ -44,6 +50,12 @@ impl fmt::Display for XPCObject {
             let cstr = unsafe { CStr::from_ptr(xpc_desc) };
             write!(f, "{}", cstr.to_string_lossy())
         }
+    }
+}
+
+impl From<xpc_object_t> for XPCObject {
+    fn from(value: xpc_object_t) -> Self {
+        XPCObject(Arc::new(value), XPCObject::get_type(value))
     }
 }
 
@@ -83,12 +95,6 @@ impl From<&str> for XPCObject {
     }
 }
 
-impl From<xpc_object_t> for XPCObject {
-    fn from(value: xpc_object_t) -> Self {
-        XPCObject(Arc::new(value))
-    }
-}
-
 /// Cloning an XPC object will clone the underlying Arc -- we will
 /// call xpc_release() only if we are the last valid reference
 /// (and underlying data is not null)
@@ -101,7 +107,7 @@ impl From<xpc_object_t> for XPCObject {
 /// TODO: Is there a way to check if an xpc_release() was already invoked?
 impl Drop for XPCObject {
     fn drop(&mut self) {
-        let XPCObject(arc) = self;
+        let XPCObject(arc, _) = self;
         if **arc == null_mut() {
             return;
         }
