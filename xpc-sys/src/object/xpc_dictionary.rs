@@ -77,6 +77,22 @@ impl From<HashMap<String, XPCObject>> for XPCDictionary {
     }
 }
 
+impl TryFrom<&XPCObject> for XPCDictionary {
+    type Error = XPCDictionaryError;
+
+    fn try_from(value: &XPCObject) -> Result<XPCDictionary, XPCDictionaryError> {
+        XPCDictionary::new(value)
+    }
+}
+
+impl TryFrom<XPCObject> for XPCDictionary {
+    type Error = XPCDictionaryError;
+
+    fn try_from(value: XPCObject) -> Result<XPCDictionary, XPCDictionaryError> {
+        XPCDictionary::new(&value)
+    }
+}
+
 impl TryFrom<xpc_object_t> for XPCDictionary {
     type Error = XPCDictionaryError;
 

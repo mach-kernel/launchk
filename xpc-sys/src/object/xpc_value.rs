@@ -2,10 +2,13 @@
 
 use crate::object::xpc_object::XPCObject;
 use crate::object::xpc_type;
-use crate::{mach_port_t, xpc_bool_get_value, xpc_int64_get_value, xpc_object_t, xpc_string_get_string_ptr, xpc_uint64_get_value, xpc_type_get_name};
+use crate::{
+    mach_port_t, xpc_bool_get_value, xpc_int64_get_value, xpc_object_t, xpc_string_get_string_ptr,
+    xpc_type_get_name, xpc_uint64_get_value,
+};
 use std::ffi::CStr;
 use std::fmt::{Display, Formatter};
-use std::error::Error;
+
 use crate::object::xpc_type::XPCType;
 
 /// Implement to get data out of xpc_type_t and into
@@ -23,24 +26,30 @@ impl Display for XPCValueError {
     }
 }
 
-
 fn check_xpc_type(object: &XPCObject, xpc_type: &XPCType) -> Result<(), XPCValueError> {
     let XPCObject(_, obj_type) = object;
     if *obj_type == *xpc_type {
-        return Ok(())
+        return Ok(());
     }
 
     let obj_str = unsafe {
         let XPCType(ptr) = object.xpc_type();
-        CStr::from_ptr(xpc_type_get_name(ptr)).to_string_lossy().to_string()
+        CStr::from_ptr(xpc_type_get_name(ptr))
+            .to_string_lossy()
+            .to_string()
     };
 
     let req_str = unsafe {
         let XPCType(ptr) = xpc_type;
-        CStr::from_ptr(xpc_type_get_name(*ptr)).to_string_lossy().to_string()
+        CStr::from_ptr(xpc_type_get_name(*ptr))
+            .to_string_lossy()
+            .to_string()
     };
 
-    Err(XPCValueError(format!("Cannot get {} as {}", obj_str, req_str)))
+    Err(XPCValueError(format!(
+        "Cannot get {} as {}",
+        obj_str, req_str
+    )))
 }
 
 impl TryXPCValue<i64> for XPCObject {
@@ -88,12 +97,15 @@ impl TryXPCValue<bool> for XPCObject {
 #[cfg(test)]
 mod tests {
     use crate::object::xpc_object::XPCObject;
-    use crate::object::xpc_value::{XPCValueError, TryXPCValue};
+    use crate::object::xpc_value::{TryXPCValue, XPCValueError};
 
     #[test]
     fn deserialize_as_wrong_type() {
         let an_i64 = XPCObject::from(42 as i64);
         let as_u64: Result<u64, XPCValueError> = an_i64.xpc_value();
-        assert_eq!(as_u64.err().unwrap(), XPCValueError("Cannot get int64 as uint64".to_string()));
+        assert_eq!(
+            as_u64.err().unwrap(),
+            XPCValueError("Cannot get int64 as uint64".to_string())
+        );
     }
 }

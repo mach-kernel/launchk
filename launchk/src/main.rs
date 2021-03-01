@@ -12,14 +12,17 @@ use crate::tui::list_services;
 mod tui;
 
 fn main() {
-    // "launchctl list com.apple.Spotlight"
+    // "launchctl list" (all by default)
     let mut message: HashMap<&str, XPCObject> = HashMap::new();
     message.insert("type", XPCObject::from(1 as u64));
     message.insert("handle", XPCObject::from(0 as u64));
     message.insert("subsystem", XPCObject::from(3 as u64));
     message.insert("routine", XPCObject::from(815 as u64));
     message.insert("legacy", XPCObject::from(true));
+
+    // "list com.apple.Spotlight" (if specified)
     // message.insert("name", XPCObject::from("com.apple.Spotlight"));
+
     message.insert(
         "domain-port",
         XPCObject::from(get_bootstrap_port() as mach_port_t),
@@ -42,13 +45,12 @@ fn main() {
 
     let mut siv = cursive::default();
 
-    if let Ok(XPCDictionary(reply_dict)) = reply.try_into() {
-        let services = reply_dict
-            .get("services")
-            .and_then(|o: &XPCObject| XPCDictionary::new(o).ok());
+    let reply_dict: Option<XPCDictionary> = reply.try_into().ok();
+    let services_hm: Option<HashMap<String, XPCObject>> = reply_dict
+        .and_then(|XPCDictionary(hm)| Some(hm.get("services").unwrap().clone()))
+        .and_then(|o| o.try_into().ok())
+        .and_then(|XPCDictionary(hm)| Some(hm));
 
-        let XPCDictionary(service_dict) = services.unwrap();
-        list_services(&mut siv, &service_dict);
-        siv.run()
-    }
+    list_services(&mut siv, &services_hm.unwrap());
+    siv.run();
 }

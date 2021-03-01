@@ -1,5 +1,8 @@
 use crate::object::xpc_type::XPCType;
-use crate::{mach_port_t, xpc_bool_create, xpc_copy_description, xpc_int64_create, xpc_mach_send_create, xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create, xpc_double_create};
+use crate::{
+    mach_port_t, xpc_bool_create, xpc_copy_description, xpc_double_create, xpc_int64_create,
+    xpc_mach_send_create, xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
+};
 use std::ffi::{CStr, CString};
 use std::ptr::null_mut;
 use std::sync::Arc;
@@ -65,7 +68,9 @@ impl From<u64> for XPCObject {
 
 impl From<f64> for XPCObject {
     /// Create XPCObject via xpc_double_create
-    fn from(value: f64) -> Self { unsafe { XPCObject::new(xpc_double_create(value)) } }
+    fn from(value: f64) -> Self {
+        unsafe { XPCObject::new(xpc_double_create(value)) }
+    }
 }
 
 impl From<mach_port_t> for XPCObject {

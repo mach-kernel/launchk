@@ -38,23 +38,23 @@ impl From<XPCObject> for XPCType {
 // pub static ref Dictionary: XPCType = unsafe { _xpc_type_dictionary.into() };
 
 /*
-    All _xpc_type_* from bindings.rs
+   All _xpc_type_* from bindings.rs
 
-    pub static _xpc_bool_true: _xpc_bool_s;
-    pub static _xpc_bool_false: _xpc_bool_s;
-    pub static _xpc_type_int64: _xpc_type_s;
-    pub static _xpc_type_uint64: _xpc_type_s;
-    pub static _xpc_type_double: _xpc_type_s;
-    pub static _xpc_type_date: _xpc_type_s;
-    pub static _xpc_type_data: _xpc_type_s;
-    pub static _xpc_type_string: _xpc_type_s;
-    pub static _xpc_type_uuid: _xpc_type_s;
-    pub static _xpc_type_fd: _xpc_type_s;
-    pub static _xpc_type_shmem: _xpc_type_s;
-    pub static _xpc_type_array: _xpc_type_s;
-    pub static _xpc_type_dictionary: _xpc_type_s;
-    pub static _xpc_type_error: _xpc_type_s;
- */
+   pub static _xpc_bool_true: _xpc_bool_s;
+   pub static _xpc_bool_false: _xpc_bool_s;
+   pub static _xpc_type_int64: _xpc_type_s;
+   pub static _xpc_type_uint64: _xpc_type_s;
+   pub static _xpc_type_double: _xpc_type_s;
+   pub static _xpc_type_date: _xpc_type_s;
+   pub static _xpc_type_data: _xpc_type_s;
+   pub static _xpc_type_string: _xpc_type_s;
+   pub static _xpc_type_uuid: _xpc_type_s;
+   pub static _xpc_type_fd: _xpc_type_s;
+   pub static _xpc_type_shmem: _xpc_type_s;
+   pub static _xpc_type_array: _xpc_type_s;
+   pub static _xpc_type_dictionary: _xpc_type_s;
+   pub static _xpc_type_error: _xpc_type_s;
+*/
 
 lazy_static! {
     pub static ref Dictionary: XPCType = unsafe {
