@@ -6,11 +6,13 @@ A small and WIP ncurses/cursive TUI around launchctl for managing Apple launchd.
 
 Should work on macOS 10.10+ according to the availability sec. [in the docs](https://developer.apple.com/documentation/xpc?language=objc).
 
-![](https://i.imgur.com/ly791YJ.gif)
+<img src="https://i.imgur.com/ly791YJ.gif" width="600">
 
 ### xpc-sys crate
 
 There is some "convenience glue" for dealing with XPC objects. Eventually, this will be broken out into its own crate. Most of the tests (for now) are written around not breaking data going across the FFI barrier.
+
+XPCObject wraps `xpc_object_t` in an `Arc`. `Drop` will invoke `xpc_release()` on objects being dropped with no other [strong refs](https://doc.rust-lang.org/std/sync/struct.Arc.html#method.strong_count).  
 
 #### Dictionary
 
