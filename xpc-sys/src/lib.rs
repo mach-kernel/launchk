@@ -2,23 +2,25 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-use std::collections::HashMap;
-use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_int, c_long, c_void};
-use std::ptr::{null_mut};
+#[macro_use]
+extern crate lazy_static;
 
-use std::{fmt};
+use std::ffi::CStr;
+use std::os::raw::{c_char, c_int, c_long, c_void};
+use std::ptr::null_mut;
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-type xpc_pipe_t = *mut c_void;
+//
+pub mod object;
+//
 
-/**
- * Some extra private API definitions. Thanks:
- *
- * https://developer.apple.com/documentation/kernel/mach
- * https://chromium.googlesource.com/chromium/src.git/+/47.0.2507.2/sandbox/mac/xpc_private_stubs.sig
- */
+pub type xpc_pipe_t = *mut c_void;
+
+/// Some extra private API definitions. Thanks:
+///
+/// https://developer.apple.com/documentation/kernel/mach
+/// https://chromium.googlesource.com/chromium/src.git/+/47.0.2507.2/sandbox/mac/xpc_private_stubs.sig
 extern "C" {
     // Seems to give same output as strerror ¯\_(ツ)_/¯
     pub fn xpc_strerror(err: c_int) -> *const c_char;
@@ -46,12 +48,6 @@ extern "C" {
     pub static _os_alloc_once_table: [_os_alloc_once_s; 10];
 }
 
-/// newtype for xpc_object_t
-#[repr(C)]
-pub struct XPCObject {
-    pub data: xpc_object_t,
-}
-
 #[repr(C)]
 pub struct _os_alloc_once_s {
     pub once: c_long,
@@ -64,92 +60,6 @@ pub struct xpc_global_data {
     pub xpc_flags: u_int64_t,
     pub task_bootstrap_port: mach_port_t,
     pub xpc_bootstrap_pipe: xpc_pipe_t,
-}
-
-impl fmt::Display for XPCObject {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let xpc_desc = unsafe { xpc_copy_description(self.data) };
-        let cstr = unsafe { CStr::from_ptr(xpc_desc) };
-        write!(f, "{}", cstr.to_string_lossy())
-    }
-}
-
-impl From<xpc_object_t> for XPCObject {
-    fn from(value: xpc_object_t) -> Self {
-        XPCObject { data: value }
-    }
-}
-
-impl From<i64> for XPCObject {
-    /// Create XPCObject via xpc_int64_create
-    fn from(value: i64) -> Self {
-        unsafe {
-            XPCObject {
-                data: xpc_int64_create(value),
-            }
-        }
-    }
-}
-
-impl From<u64> for XPCObject {
-    /// Create XPCObject via xpc_uint64_create
-    fn from(value: u64) -> Self {
-        unsafe {
-            XPCObject {
-                data: xpc_uint64_create(value),
-            }
-        }
-    }
-}
-
-impl From<mach_port_t> for XPCObject {
-    /// Create XPCObject via xpc_uint64_create
-    fn from(value: mach_port_t) -> Self {
-        unsafe {
-            XPCObject {
-                data: xpc_mach_send_create(value),
-            }
-        }
-    }
-}
-
-impl From<bool> for XPCObject {
-    /// Create XPCObject via xpc_bool_create
-    fn from(value: bool) -> Self {
-        unsafe {
-            XPCObject {
-                data: xpc_bool_create(value),
-            }
-        }
-    }
-}
-
-impl From<&str> for XPCObject {
-    /// Create XPCObject via xpc_string_create
-    fn from(slice: &str) -> Self {
-        let cstr = CString::new(slice).unwrap();
-        unsafe {
-            return XPCObject {
-                data: xpc_string_create(cstr.into_boxed_c_str().as_ptr()),
-            };
-        }
-    }
-}
-
-impl From<HashMap<&str, XPCObject>> for XPCObject {
-    /// Create an XPC dictionary from HashMap<String, XPCObject>
-    fn from(message: HashMap<&str, XPCObject>) -> Self {
-        let dict = unsafe { xpc_dictionary_create(null_mut(), null_mut(), 0) };
-
-        for (k, v) in message {
-            unsafe {
-                let cstr = CString::new(k);
-                xpc_dictionary_set_value(dict, cstr.unwrap().as_ptr(), v.data);
-            }
-        }
-
-        XPCObject { data: dict }
-    }
 }
 
 /// Look up bootstrap port for mach_task_self

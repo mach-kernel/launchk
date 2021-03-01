@@ -6,6 +6,12 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[dependencies]
+# https://github.com/SSheldon/rust-block/pull/12
+#block = { git = "https://github.com/adamnemecek/rust-block.git", branch = "fnmut" }
+block = "0.1.6"
+lazy_static = "1.4.0"
+
 [build-dependencies]
 bindgen = "0.53.1"
 xcrun = "1.0.4"
