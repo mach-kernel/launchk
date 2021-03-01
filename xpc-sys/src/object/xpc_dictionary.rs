@@ -111,7 +111,7 @@ impl From<HashMap<&str, XPCObject>> for XPCObject {
 mod tests {
     use crate::object::xpc_dictionary::XPCDictionary;
     use crate::object::xpc_object::XPCObject;
-    use crate::object::xpc_value::XPCValue;
+    use crate::object::xpc_value::TryXPCValue;
     use crate::{xpc_dictionary_create, xpc_dictionary_get_string, xpc_dictionary_set_int64};
     use std::collections::HashMap;
     use std::convert::TryInto;
@@ -128,7 +128,7 @@ mod tests {
 
         let XPCDictionary(map) = raw_dict.try_into().unwrap();
         if let Some(xpc_object) = map.get("test") {
-            assert_eq!(value, xpc_object.xpc_value());
+            assert_eq!(value, xpc_object.xpc_value().unwrap());
         } else {
             panic!("Unable to get value from map");
         }

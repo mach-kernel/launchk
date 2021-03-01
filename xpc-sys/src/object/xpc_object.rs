@@ -1,8 +1,5 @@
 use crate::object::xpc_type::XPCType;
-use crate::{
-    mach_port_t, xpc_bool_create, xpc_copy_description, xpc_int64_create, xpc_mach_send_create,
-    xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
-};
+use crate::{mach_port_t, xpc_bool_create, xpc_copy_description, xpc_int64_create, xpc_mach_send_create, xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create, xpc_double_create};
 use std::ffi::{CStr, CString};
 use std::ptr::null_mut;
 use std::sync::Arc;
@@ -10,7 +7,6 @@ use std::sync::Arc;
 use std::fmt;
 
 #[derive(Clone, PartialEq, Eq)]
-/// Newtype for xpc_object_t
 pub struct XPCObject(pub Arc<xpc_object_t>, pub XPCType);
 
 unsafe impl Send for XPCObject {}
@@ -19,11 +15,6 @@ unsafe impl Sync for XPCObject {}
 impl XPCObject {
     pub fn new(value: xpc_object_t) -> Self {
         value.into()
-    }
-
-    pub fn is_xpc_type(&self, other: &XPCType) -> bool {
-        let XPCObject(_, xpc_type) = self;
-        *xpc_type == *other
     }
 
     pub fn xpc_type(&self) -> XPCType {
@@ -70,6 +61,11 @@ impl From<u64> for XPCObject {
     fn from(value: u64) -> Self {
         unsafe { XPCObject::new(xpc_uint64_create(value)) }
     }
+}
+
+impl From<f64> for XPCObject {
+    /// Create XPCObject via xpc_double_create
+    fn from(value: f64) -> Self { unsafe { XPCObject::new(xpc_double_create(value)) } }
 }
 
 impl From<mach_port_t> for XPCObject {
