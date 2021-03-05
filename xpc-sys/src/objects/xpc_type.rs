@@ -3,7 +3,7 @@ use crate::{
     xpc_type_t, xpc_uint64_create,
 };
 
-use crate::object::xpc_object::XPCObject;
+use crate::objects::xpc_object::XPCObject;
 use std::collections::HashMap;
 
 #[repr(transparent)]

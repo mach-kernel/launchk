@@ -1,56 +1,36 @@
+#[macro_use]
+extern crate lazy_static;
+
 use std::collections::HashMap;
 use std::ptr::null_mut;
 use xpc_sys;
 use xpc_sys::*;
 
 use std::convert::TryInto;
-use xpc_sys::object::xpc_dictionary::XPCDictionary;
-use xpc_sys::object::xpc_object::XPCObject;
+use xpc_sys::objects::xpc_dictionary::{XPCDictionary, XPCDictionaryError};
+use xpc_sys::objects::xpc_object::XPCObject;
 
 use crate::tui::list_services;
+use xpc_sys::traits::xpc_pipeable::{XPCPipeable, XPCPipeError};
+use crate::launchd::messages::from_msg;
 
 mod tui;
+mod state;
+mod launchd;
 
 fn main() {
-    // "launchctl list" (all by default)
-    let mut message: HashMap<&str, XPCObject> = HashMap::new();
-    message.insert("type", XPCObject::from(1 as u64));
-    message.insert("handle", XPCObject::from(0 as u64));
-    message.insert("subsystem", XPCObject::from(3 as u64));
-    message.insert("routine", XPCObject::from(815 as u64));
-    message.insert("legacy", XPCObject::from(true));
+    let mut message: HashMap<&str, XPCObject> = from_msg(&launchd::messages::LIST_SERVICES);
 
-    // "list com.apple.Spotlight" (if specified)
-    // message.insert("name", XPCObject::from("com.apple.Spotlight"));
-
-    message.insert(
-        "domain-port",
-        XPCObject::from(get_bootstrap_port() as mach_port_t),
-    );
-
-    let bootstrap_pipe = get_xpc_bootstrap_pipe();
-    let mut reply: xpc_object_t = null_mut();
-
-    let send = unsafe {
-        xpc_pipe_routine(
-            bootstrap_pipe,
-            XPCObject::from(message).as_ptr(),
-            &mut reply,
-        )
-    };
-
-    if send != 0 {
-        panic!("XPC query failed!")
-    }
-
+    let xpc_object: XPCObject = message.into();
     let mut siv = cursive::default();
 
-    let reply_dict: Option<XPCDictionary> = reply.try_into().ok();
-    let services_hm: Option<HashMap<String, XPCObject>> = reply_dict
-        .and_then(|XPCDictionary(hm)| Some(hm.get("services").unwrap().clone()))
-        .and_then(|o| o.try_into().ok())
+    let services = xpc_object.pipe_routine()
+        .ok()
+        .and_then(|reply| reply.try_into().ok())
+        .and_then(|XPCDictionary(hm)| hm.get("services").map(|s| s.clone()))
+        .and_then(|svcs| svcs.try_into().ok())
         .and_then(|XPCDictionary(hm)| Some(hm));
 
-    list_services(&mut siv, &services_hm.unwrap());
+    list_services(&mut siv, &services.unwrap());
     siv.run();
 }

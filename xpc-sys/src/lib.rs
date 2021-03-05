@@ -5,14 +5,15 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_long, c_void};
 use std::ptr::null_mut;
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 //
-pub mod object;
+pub mod objects;
+pub mod traits;
 //
 
 pub type xpc_pipe_t = *mut c_void;
@@ -131,12 +132,36 @@ pub fn read_xpc_global_data() -> Option<&'static xpc_global_data> {
     unsafe { gd.as_ref() }
 }
 
-pub fn print_errno(err: Option<i32>) {
+pub fn str_errno(err: Option<i32>) -> String {
+    let unwrapped = err.unwrap_or(unsafe { errno });
     unsafe {
-        let unwrapped = err.unwrap_or(errno);
-        let error = CStr::from_ptr(strerror(unwrapped));
-        println!("Error {}: {}", unwrapped, error.to_str().unwrap());
+        CStr::from_ptr(strerror(unwrapped)).to_string_lossy().to_string()
     }
+}
+
+pub fn print_errno(err: Option<i32>) {
+    println!("Error {}: {}", err.unwrap_or(unsafe { errno }), str_errno(err));
+}
+
+pub fn sysctlbyname_string(name: &str) -> Option<String> {
+    let sysctlname = CString::new(name).unwrap();
+    let mut ret_buf: [c_char; 256] = [0; 256];
+    let mut size = ret_buf.len() as u64;
+
+    let err = unsafe {
+        sysctlbyname(
+            sysctlname.as_ptr(),
+            ret_buf.as_mut_ptr() as *mut _,
+            &mut size,
+            null_mut(),
+            0
+        )
+    };
+
+    if err != 0 { return None };
+
+    let ret_cstr = unsafe { CStr::from_ptr(ret_buf.as_ptr()) };
+    Some(ret_cstr.to_string_lossy().to_string())
 }
 
 #[cfg(test)]

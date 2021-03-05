@@ -1,8 +1,10 @@
+mod service_list;
+
 use cursive::view::{Resizable, Scrollable};
 use cursive::views::{DummyView, LinearLayout, Panel, SelectView};
 use cursive::Cursive;
 use std::collections::HashMap;
-use xpc_sys::object::xpc_object::XPCObject;
+use xpc_sys::objects::xpc_object::XPCObject;
 
 pub fn list_services(siv: &mut Cursive, services: &HashMap<String, XPCObject>) {
     let mut layout = LinearLayout::vertical();

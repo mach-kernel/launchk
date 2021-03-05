@@ -1,4 +1,4 @@
-use crate::{object, xpc_retain};
+use crate::{objects, xpc_retain};
 use crate::{
     xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_get_type,
     xpc_object_t, xpc_type_t,
@@ -11,7 +11,7 @@ use std::error::Error;
 use std::ffi::{CStr, CString};
 use std::fmt::{Display, Formatter};
 
-use crate::object::xpc_object::XPCObject;
+use crate::objects::xpc_object::XPCObject;
 use std::os::raw::c_char;
 use std::ptr::{null, null_mut};
 use std::rc::Rc;
@@ -34,7 +34,7 @@ impl XPCDictionary {
     pub fn new(object: &XPCObject) -> Result<XPCDictionary, XPCDictionaryError> {
         let XPCObject(_, object_type) = *object;
 
-        if object_type != *object::xpc_type::Dictionary {
+        if object_type != *objects::xpc_type::Dictionary {
             return Err(XPCDictionaryError(
                 "Only XPC_TYPE_DICTIONARY allowed".to_string(),
             ));

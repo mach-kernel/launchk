@@ -9,5 +9,3 @@ pub mod xpc_type;
 
 /// xpc_pipe_t
 pub mod xpc_pipe;
-
-pub mod xpc_value;

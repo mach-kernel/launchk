@@ -1,7 +1,7 @@
 #![feature(bool_to_option)]
 
-use crate::object::xpc_object::XPCObject;
-use crate::object::xpc_type;
+use crate::objects::xpc_object::XPCObject;
+use crate::objects::xpc_type;
 use crate::{
     mach_port_t, xpc_bool_get_value, xpc_int64_get_value, xpc_object_t, xpc_string_get_string_ptr,
     xpc_type_get_name, xpc_uint64_get_value,
@@ -9,7 +9,7 @@ use crate::{
 use std::ffi::CStr;
 use std::fmt::{Display, Formatter};
 
-use crate::object::xpc_type::XPCType;
+use crate::objects::xpc_type::XPCType;
 
 /// Implement to get data out of xpc_type_t and into
 /// a Rust native data type

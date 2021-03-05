@@ -1,4 +1,4 @@
-use crate::object::xpc_type::XPCType;
+use crate::objects::xpc_type::XPCType;
 use crate::{
     mach_port_t, xpc_bool_create, xpc_copy_description, xpc_double_create, xpc_int64_create,
     xpc_mach_send_create, xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
