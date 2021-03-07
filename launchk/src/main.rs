@@ -15,7 +15,6 @@ use xpc_sys::traits::xpc_pipeable::{XPCPipeable, XPCPipeError};
 use crate::launchd::messages::from_msg;
 
 mod tui;
-mod state;
 mod launchd;
 
 fn main() {
