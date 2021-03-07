@@ -3,6 +3,7 @@ use crate::{xpc_object_t, get_bootstrap_port, xpc_pipe_routine, get_xpc_bootstra
 use crate::objects::xpc_object::XPCObject;
 use std::ptr::null_mut;
 use std::error::Error;
+use crate::objects::xpc_dictionary::XPCDictionary;
 
 #[derive(Debug)]
 pub struct XPCPipeError(pub String);
@@ -39,8 +40,6 @@ impl XPCPipeable for XPCObject {
             xpc_pipe_routine(get_xpc_bootstrap_pipe(), **arc, &mut reply)
         };
 
-        println!("err {}", err);
-
         Self::handle_pipe_routine(reply, err)
     }
 
@@ -53,5 +52,17 @@ impl XPCPipeable for XPCObject {
         };
 
         Self::handle_pipe_routine(reply, err)
+    }
+}
+
+impl XPCPipeable for XPCDictionary {
+    fn pipe_routine(&self) -> XPCPipeResult {
+        let xpc_object: XPCObject = self.into();
+        xpc_object.pipe_routine()
+    }
+
+    fn pipe_routine_with_flags(&self, flags: u64) -> XPCPipeResult {
+        let xpc_object: XPCObject = self.into();
+        xpc_object.pipe_routine_with_flags(flags)
     }
 }

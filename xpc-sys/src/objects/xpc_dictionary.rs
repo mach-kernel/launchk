@@ -104,22 +104,29 @@ impl TryFrom<xpc_object_t> for XPCDictionary {
     }
 }
 
-impl From<HashMap<&str, XPCObject>> for XPCObject {
+impl<S> From<HashMap<S, XPCObject>> for XPCObject where S: Into<String> {
     /// Creates a XPC dictionary
     ///
     /// Values must be XPCObject newtype but can encapsulate any
     /// valid xpc_object_t
-    fn from(message: HashMap<&str, XPCObject>) -> Self {
+    fn from(message: HashMap<S, XPCObject>) -> Self {
         let dict = unsafe { xpc_dictionary_create(null(), null_mut(), 0) };
 
         for (k, v) in message {
             unsafe {
-                let cstr = CString::new(k);
+                let as_str: String = k.into();
+                let cstr = CString::new(as_str);
                 xpc_dictionary_set_value(dict, cstr.unwrap().as_ptr(), v.as_ptr());
             }
         }
 
         dict.into()
+    }
+}
+
+impl From<&XPCDictionary> for XPCObject {
+    fn from(XPCDictionary(map): &XPCDictionary) -> Self {
+        map.clone().into()
     }
 }
 
