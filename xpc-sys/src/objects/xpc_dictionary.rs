@@ -11,31 +11,22 @@ use std::error::Error;
 use std::ffi::{CStr, CString};
 use std::fmt::{Display, Formatter};
 
+use crate::objects::xpc_error::XPCError;
+use crate::objects::xpc_error::XPCError::DictionaryError;
 use crate::objects::xpc_object::XPCObject;
 use std::os::raw::c_char;
 use std::ptr::{null, null_mut};
 use std::rc::Rc;
 
-#[derive(Debug)]
-pub struct XPCDictionaryError(String);
-
-impl Display for XPCDictionaryError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl Error for XPCDictionaryError {}
-
 pub struct XPCDictionary(pub HashMap<String, XPCObject>);
 
 impl XPCDictionary {
     /// Reify xpc_object_t dictionary as a Rust HashMap
-    pub fn new(object: &XPCObject) -> Result<XPCDictionary, XPCDictionaryError> {
+    pub fn new(object: &XPCObject) -> Result<XPCDictionary, XPCError> {
         let XPCObject(_, object_type) = *object;
 
         if object_type != *objects::xpc_type::Dictionary {
-            return Err(XPCDictionaryError(
+            return Err(DictionaryError(
                 "Only XPC_TYPE_DICTIONARY allowed".to_string(),
             ));
         }
@@ -61,12 +52,10 @@ impl XPCDictionary {
         if ok {
             match Rc::try_unwrap(map) {
                 Ok(cell) => Ok(XPCDictionary(cell.into_inner())),
-                Err(_) => Err(XPCDictionaryError("Unable to unwrap Rc".to_string())),
+                Err(_) => Err(DictionaryError("Unable to unwrap Rc".to_string())),
             }
         } else {
-            Err(XPCDictionaryError(
-                "xpc_dictionary_apply failed".to_string(),
-            ))
+            Err(DictionaryError("xpc_dictionary_apply failed".to_string()))
         }
     }
 }
@@ -78,33 +67,36 @@ impl From<HashMap<String, XPCObject>> for XPCDictionary {
 }
 
 impl TryFrom<&XPCObject> for XPCDictionary {
-    type Error = XPCDictionaryError;
+    type Error = XPCError;
 
-    fn try_from(value: &XPCObject) -> Result<XPCDictionary, XPCDictionaryError> {
+    fn try_from(value: &XPCObject) -> Result<XPCDictionary, XPCError> {
         XPCDictionary::new(value)
     }
 }
 
 impl TryFrom<XPCObject> for XPCDictionary {
-    type Error = XPCDictionaryError;
+    type Error = XPCError;
 
-    fn try_from(value: XPCObject) -> Result<XPCDictionary, XPCDictionaryError> {
+    fn try_from(value: XPCObject) -> Result<XPCDictionary, XPCError> {
         XPCDictionary::new(&value)
     }
 }
 
 impl TryFrom<xpc_object_t> for XPCDictionary {
-    type Error = XPCDictionaryError;
+    type Error = XPCError;
 
     /// Creates a XPC dictionary from an xpc_object_t pointer. Errors are generally
     /// related to passing in objects other than XPC_TYPE_DICTIONARY
-    fn try_from(value: xpc_object_t) -> Result<XPCDictionary, XPCDictionaryError> {
+    fn try_from(value: xpc_object_t) -> Result<XPCDictionary, XPCError> {
         let obj: XPCObject = value.into();
         XPCDictionary::new(&obj)
     }
 }
 
-impl<S> From<HashMap<S, XPCObject>> for XPCObject where S: Into<String> {
+impl<S> From<HashMap<S, XPCObject>> for XPCObject
+where
+    S: Into<String>,
+{
     /// Creates a XPC dictionary
     ///
     /// Values must be XPCObject newtype but can encapsulate any
@@ -135,6 +127,9 @@ mod tests {
     use crate::object::xpc_dictionary::XPCDictionary;
     use crate::object::xpc_object::XPCObject;
     use crate::object::xpc_value::TryXPCValue;
+    use crate::objects::xpc_dictionary::XPCDictionary;
+    use crate::objects::xpc_object::XPCObject;
+    use crate::traits::xpc_value::TryXPCValue;
     use crate::{xpc_dictionary_create, xpc_dictionary_get_string, xpc_dictionary_set_int64};
     use std::collections::HashMap;
     use std::convert::TryInto;

@@ -31,6 +31,12 @@ impl XPCObject {
     }
 }
 
+impl Default for XPCObject {
+    fn default() -> Self {
+        Self(Arc::new(null_mut()), XPCType(null_mut()))
+    }
+}
+
 impl fmt::Display for XPCObject {
     /// Use xpc_copy_description to get an easy snapshot of a dictionary
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

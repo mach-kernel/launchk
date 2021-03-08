@@ -1,22 +1,16 @@
-use std::fmt::{Display, Formatter};
-use crate::{xpc_object_t, get_bootstrap_port, xpc_pipe_routine, get_xpc_bootstrap_pipe, str_errno, xpc_pipe_routine_with_flags};
-use crate::objects::xpc_object::XPCObject;
-use std::ptr::null_mut;
-use std::error::Error;
 use crate::objects::xpc_dictionary::XPCDictionary;
+use crate::objects::xpc_error::XPCError;
+use crate::objects::xpc_error::XPCError::PipeError;
+use crate::objects::xpc_object::XPCObject;
+use crate::{
+    get_bootstrap_port, get_xpc_bootstrap_pipe, str_errno, xpc_object_t, xpc_pipe_routine,
+    xpc_pipe_routine_with_flags,
+};
+use std::error::Error;
+use std::fmt::{Display, Formatter};
+use std::ptr::null_mut;
 
-#[derive(Debug)]
-pub struct XPCPipeError(pub String);
-
-impl Display for XPCPipeError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl Error for XPCPipeError {}
-
-pub type XPCPipeResult = Result<XPCObject, XPCPipeError>;
+pub type XPCPipeResult = Result<XPCObject, XPCError>;
 
 pub trait XPCPipeable {
     fn pipe_routine(&self) -> XPCPipeResult;
@@ -26,7 +20,7 @@ pub trait XPCPipeable {
         if errno == 0 {
             Ok(ptr.into())
         } else {
-            Err(XPCPipeError(str_errno(Some(errno))))
+            Err(PipeError(str_errno(Some(errno))))
         }
     }
 }
@@ -36,9 +30,7 @@ impl XPCPipeable for XPCObject {
         let XPCObject(arc, _) = self;
         let mut reply: xpc_object_t = null_mut();
 
-        let err = unsafe {
-            xpc_pipe_routine(get_xpc_bootstrap_pipe(), **arc, &mut reply)
-        };
+        let err = unsafe { xpc_pipe_routine(get_xpc_bootstrap_pipe(), **arc, &mut reply) };
 
         Self::handle_pipe_routine(reply, err)
     }

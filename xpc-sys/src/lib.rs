@@ -76,6 +76,8 @@ pub fn lookup_bootstrap_port() -> mach_port_t {
     }
 
     let ret_port: mach_port_t = unsafe { *found_ports.offset(0) };
+
+    #[cfg(feature = "log")]
     println!(
         "{} ports for mach_task_self_, taking first: mach_port_t {}",
         num_ports, ret_port
@@ -98,9 +100,11 @@ pub fn lookup_bootstrap_port() -> mach_port_t {
 pub fn get_bootstrap_port() -> mach_port_t {
     unsafe {
         if bootstrap_port == MACH_PORT_NULL {
+            #[cfg(feature = "log")]
             println!("Bootstrap port is null! Querying for port");
             lookup_bootstrap_port()
         } else {
+            #[cfg(feature = "log")]
             println!("Found bootstrap port {}", bootstrap_port);
             bootstrap_port
         }
@@ -112,10 +116,12 @@ pub fn get_xpc_bootstrap_pipe() -> xpc_pipe_t {
     match read_xpc_global_data() {
         Some(xpcgd) => {
             unsafe {
+                #[cfg(feature = "log")]
                 println!(
                     "Found _os_alloc_once_table: {:?}",
                     &_os_alloc_once_table as *const _
                 );
+                #[cfg(feature = "log")]
                 println!("Found xpc_bootstrap_pipe: {:?}", xpcgd.xpc_bootstrap_pipe);
             }
             xpcgd.xpc_bootstrap_pipe
@@ -135,12 +141,18 @@ pub fn read_xpc_global_data() -> Option<&'static xpc_global_data> {
 pub fn str_errno(err: Option<i32>) -> String {
     let unwrapped = err.unwrap_or(unsafe { errno });
     unsafe {
-        CStr::from_ptr(strerror(unwrapped)).to_string_lossy().to_string()
+        CStr::from_ptr(strerror(unwrapped))
+            .to_string_lossy()
+            .to_string()
     }
 }
 
 pub fn print_errno(err: Option<i32>) {
-    println!("Error {}: {}", err.unwrap_or(unsafe { errno }), str_errno(err));
+    println!(
+        "Error {}: {}",
+        err.unwrap_or(unsafe { errno }),
+        str_errno(err)
+    );
 }
 
 pub fn sysctlbyname_string(name: &str) -> Option<String> {
@@ -154,11 +166,13 @@ pub fn sysctlbyname_string(name: &str) -> Option<String> {
             ret_buf.as_mut_ptr() as *mut _,
             &mut size,
             null_mut(),
-            0
+            0,
         )
     };
 
-    if err != 0 { return None };
+    if err != 0 {
+        return None;
+    };
 
     let ret_cstr = unsafe { CStr::from_ptr(ret_buf.as_ptr()) };
     Some(ret_cstr.to_string_lossy().to_string())
