@@ -1,44 +1,50 @@
-mod service_list;
+mod service;
 
+use crate::tui::service::ServiceView;
 use cursive::view::{Resizable, Scrollable};
-use cursive::views::{DummyView, LinearLayout, Panel, SelectView, Dialog};
+use cursive::views::{Dialog, DummyView, LinearLayout, Panel, SelectView};
 use cursive::Cursive;
 use std::collections::HashMap;
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::time::Duration;
+use tokio::runtime::{Handle, Runtime};
+use tokio::time::interval;
 use xpc_sys::objects::xpc_object::XPCObject;
-use crate::tui::service_list::{ServiceListItem, ServiceListView};
 
-pub fn list_services(siv: &mut Cursive, services: &HashMap<String, XPCObject>) {
-    let mut layout = LinearLayout::vertical();
-    let mut sv: SelectView<XPCObject> = SelectView::<XPCObject>::new().on_submit(|s, item| {
-        let mut d = Dialog::text(item.to_string());
-        d.add_button("OK", |s| { s.pop_layer(); });
-        s.add_layer(d);
+pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
+
+/// Cursive uses a different crate for its channel, so this is some glue
+pub fn cbsink_channel(siv: &mut Cursive, handle: &Handle) -> Sender<CbSinkMessage> {
+    let (tx, rx): (Sender<CbSinkMessage>, Receiver<CbSinkMessage>) = channel();
+    let sink = siv.cb_sink().clone();
+
+    handle.spawn(async move {
+        let mut interval = interval(Duration::from_millis(500));
+
+        loop {
+            interval.tick().await;
+
+            if let Ok(cb_sink_msg) = rx.recv() {
+                sink.send(cb_sink_msg).unwrap();
+            }
+        }
     });
 
-    for (name, obj) in services {
-        sv.add_item(name, obj.clone())
-    }
+    tx.clone()
+}
+
+pub fn list_services(siv: &mut Cursive, handle: Handle) {
+    let mut layout = LinearLayout::vertical();
+    let tx = cbsink_channel(siv, &handle);
+    let sl = ServiceView::new(handle, tx.clone());
 
     layout.add_child(
-        Panel::new(DummyView)
+        Panel::new(sl)
             .title("launchk")
+            .full_height()
             .full_width()
-            .min_height(5),
+            .scrollable(),
     );
-
-    layout.add_child(
-        Panel::new(sv.scrollable())
-            .title("services")
-            .full_width()
-            .full_height(),
-    );
-
-
-    // let items = services.iter().map(|(name, obj)| ServiceListItem {
-    //     name: name.clone(),
-    //     object: obj.clone()
-    // });
-    // layout.add_child(ServiceListView::new(items).full_width().full_height().scrollable());
 
     siv.add_layer(layout);
 }
