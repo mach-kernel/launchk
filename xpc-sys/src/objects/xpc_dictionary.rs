@@ -7,9 +7,9 @@ use block::ConcreteBlock;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::error::Error;
+
 use std::ffi::{CStr, CString};
-use std::fmt::{Display, Formatter};
+
 
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::DictionaryError;
@@ -124,9 +124,6 @@ impl From<&XPCDictionary> for XPCObject {
 
 #[cfg(test)]
 mod tests {
-    use crate::object::xpc_dictionary::XPCDictionary;
-    use crate::object::xpc_object::XPCObject;
-    use crate::object::xpc_value::TryXPCValue;
     use crate::objects::xpc_dictionary::XPCDictionary;
     use crate::objects::xpc_object::XPCObject;
     use crate::traits::xpc_value::TryXPCValue;

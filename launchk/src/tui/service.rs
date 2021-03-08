@@ -1,21 +1,20 @@
 use crate::launchd;
 use crate::launchd::messages::from_msg;
 use crate::tui::CbSinkMessage;
-use cursive::direction::Orientation;
+
 use cursive::view::ViewWrapper;
 use cursive::views::SelectView;
 use cursive::{Cursive, Printer, Vec2, View};
-use futures::future::{AbortHandle, Abortable};
-use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+
+use std::collections::{HashMap};
 use std::convert::TryInto;
-use std::iter::FromIterator;
+
 use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex, RwLock};
-use std::thread::sleep;
+use std::sync::{Arc, RwLock};
+
 use std::time::{Duration, SystemTime};
 use tokio::runtime::Handle;
-use tokio::task::JoinHandle;
+
 use tokio::time::interval;
 use xpc_sys::objects::xpc_dictionary::XPCDictionary;
 use xpc_sys::objects::xpc_error::XPCError::StandardError;
@@ -47,7 +46,7 @@ async fn poll_services(
             continue;
         }
 
-        let mut svc_write = svcs.try_write();
+        let svc_write = svcs.try_write();
         if svc_write.is_err() {
             continue;
         }

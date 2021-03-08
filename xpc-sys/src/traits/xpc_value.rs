@@ -7,26 +7,19 @@ use crate::{
     xpc_type_get_name, xpc_uint64_get_value,
 };
 use std::ffi::CStr;
-use std::fmt::{Display, Formatter};
+
 
 use crate::objects::xpc_type::XPCType;
+use crate::objects::xpc_error::XPCError;
+use crate::objects::xpc_error::XPCError::ValueError;
 
 /// Implement to get data out of xpc_type_t and into
 /// a Rust native data type
 pub trait TryXPCValue<Out> {
-    fn xpc_value(&self) -> Result<Out, XPCValueError>;
+    fn xpc_value(&self) -> Result<Out, XPCError>;
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub struct XPCValueError(String);
-
-impl Display for XPCValueError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-fn check_xpc_type(object: &XPCObject, xpc_type: &XPCType) -> Result<(), XPCValueError> {
+fn check_xpc_type(object: &XPCObject, xpc_type: &XPCType) -> Result<(), XPCError> {
     let XPCObject(_, obj_type) = object;
     if *obj_type == *xpc_type {
         return Ok(());
@@ -46,14 +39,14 @@ fn check_xpc_type(object: &XPCObject, xpc_type: &XPCType) -> Result<(), XPCValue
             .to_string()
     };
 
-    Err(XPCValueError(format!(
+    Err(ValueError(format!(
         "Cannot get {} as {}",
         obj_str, req_str
     )))
 }
 
 impl TryXPCValue<i64> for XPCObject {
-    fn xpc_value(&self) -> Result<i64, XPCValueError> {
+    fn xpc_value(&self) -> Result<i64, XPCError> {
         check_xpc_type(&self, &xpc_type::Int64)?;
         let XPCObject(obj_pointer, _) = self;
         Ok(unsafe { xpc_int64_get_value(**obj_pointer) })
@@ -61,7 +54,7 @@ impl TryXPCValue<i64> for XPCObject {
 }
 
 impl TryXPCValue<u64> for XPCObject {
-    fn xpc_value(&self) -> Result<u64, XPCValueError> {
+    fn xpc_value(&self) -> Result<u64, XPCError> {
         check_xpc_type(&self, &xpc_type::UInt64)?;
         let XPCObject(obj_pointer, _) = self;
         Ok(unsafe { xpc_uint64_get_value(**obj_pointer) })
@@ -69,7 +62,7 @@ impl TryXPCValue<u64> for XPCObject {
 }
 
 impl TryXPCValue<String> for XPCObject {
-    fn xpc_value(&self) -> Result<String, XPCValueError> {
+    fn xpc_value(&self) -> Result<String, XPCError> {
         check_xpc_type(&self, &xpc_type::String)?;
         let XPCObject(obj_pointer, _) = self;
         let cstr = unsafe { CStr::from_ptr(xpc_string_get_string_ptr(**obj_pointer)) };
@@ -79,7 +72,7 @@ impl TryXPCValue<String> for XPCObject {
 }
 
 impl TryXPCValue<bool> for XPCObject {
-    fn xpc_value(&self) -> Result<bool, XPCValueError> {
+    fn xpc_value(&self) -> Result<bool, XPCError> {
         check_xpc_type(&self, &xpc_type::Bool)?;
         let XPCObject(obj_pointer, _) = self;
         Ok(unsafe { xpc_bool_get_value(**obj_pointer) })
@@ -88,7 +81,7 @@ impl TryXPCValue<bool> for XPCObject {
 
 // TODO: can this be read as just uint?
 // impl TryXPCValue<mach_port_t> for XPCObject {
-//     fn xpc_value(&self) -> Result<mach_port_t, XPCValueError> {
+//     fn xpc_value(&self) -> Result<mach_port_t, XPCError> {
 //         let XPCObject(obj_pointer, _) = self;
 //         unsafe { xpc_mach_send_get_value(**obj_pointer) }
 //     }
@@ -96,16 +89,19 @@ impl TryXPCValue<bool> for XPCObject {
 
 #[cfg(test)]
 mod tests {
-    use crate::object::xpc_object::XPCObject;
-    use crate::object::xpc_value::{TryXPCValue, XPCValueError};
+    use crate::objects::xpc_error::XPCError;
+    use crate::objects::xpc_error::XPCError::ValueError;
+    use crate::objects::xpc_object::XPCObject;
+    use crate::traits::xpc_value::TryXPCValue;
 
     #[test]
     fn deserialize_as_wrong_type() {
         let an_i64 = XPCObject::from(42 as i64);
-        let as_u64: Result<u64, XPCValueError> = an_i64.xpc_value();
+        let as_u64: Result<u64, XPCError> = an_i64.xpc_value();
+        
         assert_eq!(
             as_u64.err().unwrap(),
-            XPCValueError("Cannot get int64 as uint64".to_string())
+            ValueError("Cannot get int64 as uint64".to_string())
         );
     }
 }

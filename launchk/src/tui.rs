@@ -4,12 +4,11 @@ use crate::tui::service::ServiceView;
 use cursive::view::{Resizable, Scrollable};
 use cursive::views::{Dialog, DummyView, LinearLayout, Panel, SelectView};
 use cursive::Cursive;
-use std::collections::HashMap;
+
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
-use tokio::runtime::{Handle, Runtime};
+use tokio::runtime::{Handle};
 use tokio::time::interval;
-use xpc_sys::objects::xpc_object::XPCObject;
 
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 

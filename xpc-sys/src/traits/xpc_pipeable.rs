@@ -3,11 +3,11 @@ use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::PipeError;
 use crate::objects::xpc_object::XPCObject;
 use crate::{
-    get_bootstrap_port, get_xpc_bootstrap_pipe, str_errno, xpc_object_t, xpc_pipe_routine,
+    get_xpc_bootstrap_pipe, str_errno, xpc_object_t, xpc_pipe_routine,
     xpc_pipe_routine_with_flags,
 };
-use std::error::Error;
-use std::fmt::{Display, Formatter};
+
+
 use std::ptr::null_mut;
 
 pub type XPCPipeResult = Result<XPCObject, XPCError>;
