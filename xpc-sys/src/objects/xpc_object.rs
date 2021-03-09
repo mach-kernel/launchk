@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use std::fmt;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XPCObject(pub Arc<xpc_object_t>, pub XPCType);
 
 unsafe impl Send for XPCObject {}

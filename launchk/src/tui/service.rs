@@ -21,6 +21,10 @@ use xpc_sys::objects::xpc_error::XPCError::StandardError;
 use xpc_sys::objects::xpc_object::XPCObject;
 use xpc_sys::traits::xpc_pipeable::XPCPipeable;
 use xpc_sys::pid_t;
+use cursive::event::{Event, EventResult};
+use xpc_sys::traits::xpc_value::TryXPCValue;
+use cursive::utils::markup::StyledString;
+use cursive::theme::{Style, Color, BaseColor, Effect};
 
 async fn poll_services(
     svcs: Arc<RwLock<HashMap<String, XPCObject>>>,
@@ -28,7 +32,7 @@ async fn poll_services(
 ) -> () {
     // launchctl list
     let message: HashMap<&str, XPCObject> = from_msg(&launchd::messages::LIST_SERVICES);
-    let mut interval = interval(Duration::from_secs(2));
+    let mut interval = interval(Duration::from_secs(1));
 
     loop {
         interval.tick().await;
@@ -53,7 +57,8 @@ async fn poll_services(
         }
         *svc_write.unwrap() = services.unwrap();
 
-        cb_sink.send(Box::new(Cursive::noop)).unwrap();
+        // cb_sink.send(Box::new(Cursive::noop)).unwrap();
+        cb_sink.send(Box::new(Cursive::refresh)).unwrap();
     }
 }
 
@@ -71,9 +76,11 @@ impl ServiceView {
             poll_services(ref_clone, cb_sink).await;
         });
 
+        let select_view: SelectView<XPCObject> = SelectView::new().into();
+
         Self {
             services: ref_svc.clone(),
-            select_view: SelectView::new(),
+            select_view,
         }
     }
 }
@@ -81,7 +88,7 @@ impl ServiceView {
 impl ViewWrapper for ServiceView {
     wrap_impl!(self.select_view: SelectView<XPCObject>);
 
-    fn wrap_layout(&mut self, _size: Vec2) {
+    fn wrap_layout(&mut self, size: Vec2) {
         let clone = self.services.clone();
 
         self.with_view_mut(move |v| {
@@ -102,7 +109,13 @@ impl ViewWrapper for ServiceView {
             vec.sort_by(|(k, _), (k1, _)| k.cmp(k1));
 
             for (name, xpc_object) in vec {
-                v.add_item(name.clone(), xpc_object.clone());
+                let XPCDictionary(hm) = xpc_object.try_into().unwrap();
+                let pid: i64 = hm.get("pid").unwrap().xpc_value().unwrap();
+                let pid_str = format!("{}", pid);
+
+                let indent = (size.x / 2) - name.chars().count() + pid_str.chars().count();
+                let fname = format!("{}{:indent$}{}", name, pid, indent=indent);
+                v.add_item(fname, xpc_object.clone());
             }
 
             v.set_selection(sel);

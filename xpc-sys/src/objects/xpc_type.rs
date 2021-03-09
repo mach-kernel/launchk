@@ -7,7 +7,7 @@ use crate::objects::xpc_object::XPCObject;
 use std::collections::HashMap;
 
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct XPCType(pub xpc_type_t);
 
 unsafe impl Send for XPCType {}
