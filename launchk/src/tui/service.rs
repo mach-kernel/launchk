@@ -3,7 +3,7 @@ use crate::launchd::messages::from_msg;
 use crate::tui::CbSinkMessage;
 
 use cursive::view::ViewWrapper;
-use cursive::views::SelectView;
+use cursive::views::{SelectView, LinearLayout};
 use cursive::{Cursive, Printer, Vec2, View};
 
 use std::collections::{HashMap};
@@ -20,6 +20,7 @@ use xpc_sys::objects::xpc_dictionary::XPCDictionary;
 use xpc_sys::objects::xpc_error::XPCError::StandardError;
 use xpc_sys::objects::xpc_object::XPCObject;
 use xpc_sys::traits::xpc_pipeable::XPCPipeable;
+use xpc_sys::pid_t;
 
 async fn poll_services(
     svcs: Arc<RwLock<HashMap<String, XPCObject>>>,
@@ -27,7 +28,7 @@ async fn poll_services(
 ) -> () {
     // launchctl list
     let message: HashMap<&str, XPCObject> = from_msg(&launchd::messages::LIST_SERVICES);
-    let mut interval = interval(Duration::from_secs(5));
+    let mut interval = interval(Duration::from_secs(2));
 
     loop {
         interval.tick().await;
@@ -84,9 +85,10 @@ impl ViewWrapper for ServiceView {
         let clone = self.services.clone();
 
         self.with_view_mut(move |v| {
+            let sel = v.selected_id().unwrap_or(0);
+
             v.clear();
 
-            // TODO
             let tsnow = format!("{:?}", SystemTime::now());
             v.add_item(tsnow, XPCObject::default());
 
@@ -102,6 +104,8 @@ impl ViewWrapper for ServiceView {
             for (name, xpc_object) in vec {
                 v.add_item(name.clone(), xpc_object.clone());
             }
+
+            v.set_selection(sel);
         })
         .unwrap();
     }

@@ -1,4 +1,4 @@
-mod service;
+pub mod service;
 
 use crate::tui::service::ServiceView;
 use cursive::view::{Resizable, Scrollable};
