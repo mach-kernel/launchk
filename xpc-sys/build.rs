@@ -16,6 +16,8 @@ fn main() {
 
     let xpc_path = format!("{}{}/xpc/xpc.h", sdk_path, MACOS_INCLUDE_PATH);
     let bootstrap_path = format!("{}{}/bootstrap.h", sdk_path, MACOS_INCLUDE_PATH);
+    let sys_types = format!("{}{}/sys/types.h", sdk_path, MACOS_INCLUDE_PATH);
+    let sysctl = format!("{}{}/sys/sysctl.h", sdk_path, MACOS_INCLUDE_PATH);
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
@@ -25,6 +27,8 @@ fn main() {
         // bindings for.
         .header(xpc_path)
         .header(bootstrap_path)
+        .header(sys_types)
+        .header(sysctl)
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))

@@ -1,4 +1,4 @@
-use crate::object::xpc_type::XPCType;
+use crate::objects::xpc_type::XPCType;
 use crate::{
     mach_port_t, xpc_bool_create, xpc_copy_description, xpc_double_create, xpc_int64_create,
     xpc_mach_send_create, xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use std::fmt;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XPCObject(pub Arc<xpc_object_t>, pub XPCType);
 
 unsafe impl Send for XPCObject {}
@@ -28,6 +28,12 @@ impl XPCObject {
     pub fn as_ptr(&self) -> xpc_object_t {
         let XPCObject(object_ptr, _) = self;
         **object_ptr
+    }
+}
+
+impl Default for XPCObject {
+    fn default() -> Self {
+        Self(Arc::new(null_mut()), XPCType(null_mut()))
     }
 }
 
