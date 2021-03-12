@@ -18,5 +18,4 @@ fn main() {
     let mut siv = cursive::default();
     list_services(&mut siv, runtime.handle().clone());
     runtime.block_on(async { siv.run() });
-    // siv.run();
 }

@@ -10,7 +10,6 @@ use std::convert::TryFrom;
 
 use std::ffi::{CStr, CString};
 
-
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::DictionaryError;
 use crate::objects::xpc_object::XPCObject;

@@ -6,7 +6,7 @@ A small and WIP ncurses/cursive TUI around launchctl for managing Apple launchd.
 
 Should work on macOS 10.10+ according to the availability sec. [in the docs](https://developer.apple.com/documentation/xpc?language=objc).
 
-<img src="https://i.imgur.com/ly791YJ.gif" width="600">
+<img src="https://i.imgur.com/g9WtkjN.gif" width="600">
 
 ### xpc-sys crate
 

@@ -8,10 +8,9 @@ use crate::{
 };
 use std::ffi::CStr;
 
-
-use crate::objects::xpc_type::XPCType;
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::ValueError;
+use crate::objects::xpc_type::XPCType;
 
 /// Implement to get data out of xpc_type_t and into
 /// a Rust native data type
@@ -39,10 +38,7 @@ fn check_xpc_type(object: &XPCObject, xpc_type: &XPCType) -> Result<(), XPCError
             .to_string()
     };
 
-    Err(ValueError(format!(
-        "Cannot get {} as {}",
-        obj_str, req_str
-    )))
+    Err(ValueError(format!("Cannot get {} as {}", obj_str, req_str)))
 }
 
 impl TryXPCValue<i64> for XPCObject {
@@ -98,7 +94,7 @@ mod tests {
     fn deserialize_as_wrong_type() {
         let an_i64 = XPCObject::from(42 as i64);
         let as_u64: Result<u64, XPCError> = an_i64.xpc_value();
-        
+
         assert_eq!(
             as_u64.err().unwrap(),
             ValueError("Cannot get int64 as uint64".to_string())
