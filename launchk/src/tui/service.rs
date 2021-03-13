@@ -1,6 +1,5 @@
 use crate::launchd;
 use crate::launchd::messages::from_msg;
-use crate::tui::CbSinkMessage;
 
 use cursive::view::ViewWrapper;
 use cursive::views::SelectView;
@@ -25,6 +24,7 @@ use xpc_sys::traits::xpc_value::TryXPCValue;
 
 use cursive::theme::{BaseColor, Color, Effect, Style};
 use std::cell::Cell;
+use crate::tui::root::CbSinkMessage;
 
 async fn poll_services(
     svcs: Arc<RwLock<HashMap<String, XPCObject>>>,
@@ -117,7 +117,12 @@ impl ViewWrapper for ServiceView {
         let tsnow = format!("{:?}", SystemTime::now());
         printer.print(XY::new(0, 1), &tsnow);
 
-        let sub = printer.offset(XY::new(0, 2));
+        // Headers, timestamp
+        let offset = XY::new(0, 2);
+        let sub = printer
+            .offset(offset)
+            .content_offset(offset);
+
         self.select_view.draw(&sub);
     }
 
@@ -145,7 +150,6 @@ impl ViewWrapper for ServiceView {
             }
 
             v.set_selection(current_selection);
-        })
-        .unwrap();
+        });
     }
 }
