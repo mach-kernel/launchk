@@ -22,9 +22,9 @@ use xpc_sys::traits::xpc_pipeable::XPCPipeable;
 
 use xpc_sys::traits::xpc_value::TryXPCValue;
 
+use crate::tui::root::CbSinkMessage;
 use cursive::theme::{BaseColor, Color, Effect, Style};
 use std::cell::Cell;
-use crate::tui::root::CbSinkMessage;
 
 async fn poll_services(
     svcs: Arc<RwLock<HashMap<String, XPCObject>>>,
@@ -108,7 +108,7 @@ impl ViewWrapper for ServiceView {
 
     fn wrap_draw(&self, printer: &Printer<'_, '_>) {
         let middle = self.current_size.get().x / 2;
-        let bold = Style::from(Color::Dark(BaseColor::Black)).combine(Effect::Bold);
+        let bold = Style::from(Color::Dark(BaseColor::Blue)).combine(Effect::Bold);
 
         printer.with_style(bold, |p| p.print(XY::new(0, 0), "Name"));
 
@@ -119,9 +119,7 @@ impl ViewWrapper for ServiceView {
 
         // Headers, timestamp
         let offset = XY::new(0, 2);
-        let sub = printer
-            .offset(offset)
-            .content_offset(offset);
+        let sub = printer.offset(offset).content_offset(offset);
 
         self.select_view.draw(&sub);
     }

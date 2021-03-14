@@ -13,13 +13,13 @@ Gonna go basement shit
   an into() for all views that would perform the registration step
 */
 
-use std::cell::RefCell;
-use cursive::{View, Printer, XY};
-use cursive::event::{Event, EventResult, Key};
 use cursive::direction::Direction;
+use cursive::event::{Event, EventResult, Key};
+use cursive::{Printer, View, XY};
 use std::borrow::Borrow;
-use std::cmp::max;
-use cursive::theme::{Color, BaseColor, Style};
+use std::cell::RefCell;
+
+use cursive::theme::{BaseColor, Color, Style};
 
 #[derive(Debug, Clone)]
 enum OmniboxMode {
@@ -30,7 +30,7 @@ enum OmniboxMode {
 
 pub struct Omnibox {
     content: RefCell<String>,
-    mode: RefCell<OmniboxMode>
+    mode: RefCell<OmniboxMode>,
 }
 
 impl Omnibox {
@@ -46,13 +46,16 @@ impl View for Omnibox {
     fn draw(&self, printer: &Printer<'_, '_>) {
         let current_mode = self.mode.borrow();
         let fmt_mode = match *current_mode {
-            OmniboxMode::Filter => format!("{:?} > ", current_mode),
-            _ => "".into()
+            OmniboxMode::Clear => "".into(),
+            _ => format!("{:?} > ", current_mode),
         };
 
         let subtle = Style::from(Color::Light(BaseColor::Black));
         printer.with_style(subtle, |p| p.print(XY::new(0, 0), &fmt_mode));
-        printer.print(XY::new(fmt_mode.chars().count(), 0), self.content.borrow().as_str());
+        printer.print(
+            XY::new(fmt_mode.chars().count(), 0),
+            self.content.borrow().as_str(),
+        );
     }
 
     fn on_event(&mut self, event: Event) -> EventResult {
@@ -62,22 +65,25 @@ impl View for Omnibox {
             Event::Char('/') => {
                 self.mode.replace(OmniboxMode::Filter);
                 EventResult::Consumed(None)
-            },
-            Event::Char(c) => {
-                let append = format!("{}{}", self.content.borrow(), c);
-                self.content.replace(append);
+            }
+            Event::Char(':') => {
+                self.mode.replace(OmniboxMode::Command);
                 EventResult::Consumed(None)
-            },
+            }
+            Event::Char(c) => {
+                self.content.borrow_mut().push(c);
+                EventResult::Consumed(None)
+            }
             Event::Key(Key::Backspace) if content_len > 0 => {
                 self.content.borrow_mut().truncate(content_len - 1);
                 EventResult::Consumed(None)
-            },
+            }
             Event::CtrlChar('u') => {
                 self.content.borrow_mut().truncate(0);
                 self.mode.replace(OmniboxMode::Clear);
                 EventResult::Consumed(None)
-            },
-            _ => EventResult::Ignored
+            }
+            _ => EventResult::Ignored,
         }
     }
 

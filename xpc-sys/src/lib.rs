@@ -12,6 +12,7 @@ use std::ptr::null_mut;
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 //
+pub mod csr;
 pub mod objects;
 pub mod traits;
 //

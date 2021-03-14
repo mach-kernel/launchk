@@ -1,39 +1,52 @@
 use cursive::view::ViewWrapper;
 use cursive::views::{LinearLayout, Panel};
-use cursive::{View, Cursive};
+use cursive::{Cursive, View};
 use tokio::runtime::Handle;
 use tokio::time::interval;
-use std::sync::Once;
-use std::sync::mpsc::{Sender, Receiver, channel};
-use std::time::Duration;
-use crate::tui::service::ServiceView;
+
 use crate::tui::omnibox::Omnibox;
+use crate::tui::service::ServiceView;
+use crate::tui::sysinfo::SysInfo;
+use cursive::event::{Event, EventResult};
 use cursive::traits::{Resizable, Scrollable};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::time::Duration;
 
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 
 pub struct RootLayout {
-    layout: LinearLayout
+    layout: LinearLayout,
+}
+
+enum RootLayoutChildren {
+    SysInfo,
+    Omnibox,
+    ServiceList,
 }
 
 impl RootLayout {
     pub fn new() -> Self {
-        Self { layout: LinearLayout::vertical() }
+        Self {
+            layout: LinearLayout::vertical(),
+        }
     }
 
     pub fn setup(&mut self, siv: &mut Cursive, handle: Handle) {
         self.with_view_mut(|v| {
             let tx = RootLayout::cbsink_channel(siv, &handle);
-            let sl = ServiceView::new(handle, tx.clone())
+
+            let sysinfo = Panel::new(SysInfo::default()).full_width();
+
+            let omnibox = Panel::new(Omnibox::new()).full_width().max_height(3);
+
+            let service_list = ServiceView::new(handle, tx.clone())
                 .full_width()
                 .full_height()
                 .scrollable();
-            let ob = Panel::new(Omnibox::new())
-                .full_width()
-                .max_height(3);
 
-            v.add_child(ob);
-            v.add_child(sl);
+            v.add_child(sysinfo);
+            v.add_child(omnibox);
+            v.add_child(service_list);
         });
     }
 
@@ -60,4 +73,20 @@ impl RootLayout {
 
 impl ViewWrapper for RootLayout {
     wrap_impl!(self.layout: LinearLayout);
+
+    fn wrap_on_event(&mut self, event: Event) -> EventResult {
+        match event {
+            Event::Char('/') => {
+                self.layout
+                    .set_focus_index(RootLayoutChildren::Omnibox as usize);
+                self.layout.on_event(event)
+            }
+            Event::Char(':') => {
+                self.layout
+                    .set_focus_index(RootLayoutChildren::Omnibox as usize);
+                self.layout.on_event(event)
+            }
+            _ => self.layout.on_event(event),
+        }
+    }
 }

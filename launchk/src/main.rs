@@ -4,9 +4,9 @@ extern crate lazy_static;
 #[macro_use]
 extern crate cursive;
 
-use cursive::views::{Panel, LinearLayout};
-use cursive::view::{Resizable, Scrollable};
 use crate::tui::root::RootLayout;
+use cursive::view::Resizable;
+use cursive::views::Panel;
 use cursive::Cursive;
 
 mod launchd;
