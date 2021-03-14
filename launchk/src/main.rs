@@ -27,8 +27,7 @@ fn main() {
     let panel = Panel::new(root_layout)
         .title("launchk")
         .full_width()
-        .full_height()
-        .scrollable();
+        .full_height();
 
     siv.add_layer(panel);
     runtime.block_on(async { siv.run() });

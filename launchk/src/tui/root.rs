@@ -8,7 +8,7 @@ use std::sync::mpsc::{Sender, Receiver, channel};
 use std::time::Duration;
 use crate::tui::service::ServiceView;
 use crate::tui::omnibox::Omnibox;
-use cursive::traits::Resizable;
+use cursive::traits::{Resizable, Scrollable};
 
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 
@@ -24,10 +24,14 @@ impl RootLayout {
     pub fn setup(&mut self, siv: &mut Cursive, handle: Handle) {
         self.with_view_mut(|v| {
             let tx = RootLayout::cbsink_channel(siv, &handle);
-            let sl = ServiceView::new(handle, tx.clone());
+            let sl = ServiceView::new(handle, tx.clone())
+                .full_width()
+                .full_height()
+                .scrollable();
             let ob = Panel::new(Omnibox::new())
                 .full_width()
                 .max_height(3);
+
             v.add_child(ob);
             v.add_child(sl);
         });
