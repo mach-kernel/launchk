@@ -1,5 +1,5 @@
 use cursive::view::ViewWrapper;
-use cursive::views::LinearLayout;
+use cursive::views::{LinearLayout, Panel};
 use cursive::{View, Cursive};
 use tokio::runtime::Handle;
 use tokio::time::interval;
@@ -7,6 +7,8 @@ use std::sync::Once;
 use std::sync::mpsc::{Sender, Receiver, channel};
 use std::time::Duration;
 use crate::tui::service::ServiceView;
+use crate::tui::omnibox::Omnibox;
+use cursive::traits::Resizable;
 
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 
@@ -23,6 +25,10 @@ impl RootLayout {
         self.with_view_mut(|v| {
             let tx = RootLayout::cbsink_channel(siv, &handle);
             let sl = ServiceView::new(handle, tx.clone());
+            let ob = Panel::new(Omnibox::new())
+                .full_width()
+                .max_height(3);
+            v.add_child(ob);
             v.add_child(sl);
         });
     }

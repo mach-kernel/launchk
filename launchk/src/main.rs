@@ -7,6 +7,7 @@ extern crate cursive;
 use cursive::views::{Panel, LinearLayout};
 use cursive::view::{Resizable, Scrollable};
 use crate::tui::root::RootLayout;
+use cursive::Cursive;
 
 mod launchd;
 mod tui;
@@ -17,7 +18,8 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut siv = cursive::default();
+    let mut siv: Cursive = cursive::default();
+    siv.load_toml(include_str!("tui/style.toml")).unwrap();
 
     let mut root_layout = RootLayout::new();
     root_layout.setup(&mut siv, runtime.handle().clone());
