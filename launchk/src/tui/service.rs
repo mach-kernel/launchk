@@ -135,7 +135,11 @@ impl ViewWrapper for ServiceView {
             for (name, xpc_object) in sorted.iter() {
                 let XPCDictionary(hm) = xpc_object.try_into().unwrap();
                 let pid: i64 = hm.get("pid").unwrap().xpc_value().unwrap();
-                let pid_str = format!("{}", pid);
+                let pid_str = if pid == 0 {
+                    "-".to_string()
+                } else {
+                    format!("{}", pid)
+                };
 
                 let mut trunc_name = name.clone();
                 let indent = size.x / 2;
