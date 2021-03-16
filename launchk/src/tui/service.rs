@@ -8,7 +8,7 @@ use cursive::{Cursive, Printer, View, XY};
 use std::collections::HashMap;
 use std::convert::TryInto;
 
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Sender, channel, Receiver};
 use std::sync::{Arc, RwLock};
 
 use std::time::{Duration, SystemTime};
@@ -25,6 +25,8 @@ use xpc_sys::traits::xpc_value::TryXPCValue;
 use crate::tui::root::CbSinkMessage;
 use cursive::theme::{BaseColor, Color, Effect, Style};
 use std::cell::Cell;
+use crate::tui::omnibox::{Omnibox, OmniboxState, OmniboxMode};
+use std::borrow::Borrow;
 
 async fn poll_services(
     svcs: Arc<RwLock<HashMap<String, XPCObject>>>,
@@ -61,41 +63,82 @@ async fn poll_services(
     }
 }
 
+fn poll_omnibox(
+    rx: Receiver<Box<OmniboxState>>,
+    state: Arc<RwLock<Box<OmniboxState>>>
+) {
+    loop {
+        let update = rx.recv();
+        if update.is_err() {
+            continue
+        }
+
+        let write = state.try_write();
+        if write.is_err() {
+            continue;
+        }
+
+        *write.unwrap() = update.unwrap();
+    }
+}
+
 pub struct ServiceView {
     services: Arc<RwLock<HashMap<String, XPCObject>>>,
     select_view: SelectView<XPCObject>,
     current_size: Cell<XY<usize>>,
+    omnibox_state: Arc<RwLock<Box<OmniboxState>>>,
 }
 
 impl ServiceView {
-    pub fn new(runtime_handle: Handle, cb_sink: Sender<CbSinkMessage>) -> Self {
-        let ref_svc = Arc::new(RwLock::new(HashMap::new()));
-        let ref_clone = ref_svc.clone();
+    pub fn new(
+        runtime_handle: Handle,
+        cb_sink: Sender<CbSinkMessage>,
+    ) -> Self {
+        let arc_svc = Arc::new(RwLock::new(HashMap::new()));
+        let ref_clone = arc_svc.clone();
 
-        runtime_handle.spawn(async move {
-            poll_services(ref_clone, cb_sink).await;
-        });
+        let ref_ob: Arc<RwLock<Box<OmniboxState>>> =
+            Arc::new(RwLock::new(Box::new((OmniboxMode::Clear, "".into()))));
+        let ref_ob_clone = ref_ob.clone();
+
+        let (tx, rx_omnibox): (Sender<Box<OmniboxState>>, Receiver<Box<OmniboxState>>) = channel();
+
+        cb_sink.send(Box::new(move |siv: &mut Cursive| {
+            siv.call_on_name("omnibox", |ob: &mut Omnibox| { ob.with_sub(tx); });
+        }));
+
+        runtime_handle.spawn(async move { poll_services(ref_clone, cb_sink).await });
+        runtime_handle.spawn(async move { poll_omnibox(rx_omnibox, ref_ob_clone) });
 
         let select_view: SelectView<XPCObject> = SelectView::new().into();
 
         Self {
-            services: ref_svc.clone(),
+            services: arc_svc.clone(),
+            omnibox_state: ref_ob.clone(),
             current_size: Cell::new(XY::new(0, 0)),
             select_view,
         }
     }
 
     fn sorted_services(&self) -> Vec<(String, XPCObject)> {
-        let read = self.services.try_read();
-        if read.is_err() {
+        let (services, ob) = (self.services.try_read(), self.omnibox_state.try_read());
+
+        if services.is_err() || ob.is_err() {
             return vec![];
         }
 
-        let read = read.unwrap();
+        let (services, (mode, filter)) = (services.unwrap(), *ob.unwrap().clone());
         let mut vec: Vec<(String, XPCObject)> = vec![];
 
-        for (key, xpc_object) in read.iter() {
-            vec.push((key.clone(), xpc_object.clone()));
+        for (key, xpc_object) in services.iter() {
+            if mode != OmniboxMode::Filter {
+                vec.push((key.clone(), xpc_object.clone()));
+                continue;
+            }
+
+            if mode == OmniboxMode::Filter && key.to_lowercase().contains(filter.to_lowercase().as_str()) {
+                vec.push((key.clone(), xpc_object.clone()));
+            }
         }
 
         vec.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));

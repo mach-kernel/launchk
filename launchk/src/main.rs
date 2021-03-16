@@ -30,5 +30,5 @@ fn main() {
         .full_height();
 
     siv.add_layer(panel);
-    runtime.block_on(async { siv.run() });
+    siv.run();
 }

@@ -20,9 +20,10 @@ use std::borrow::Borrow;
 use std::cell::RefCell;
 
 use cursive::theme::{BaseColor, Color, Style};
+use std::sync::mpsc::{channel, Receiver, Sender};
 
-#[derive(Debug, Clone)]
-enum OmniboxMode {
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum OmniboxMode {
     Command,
     Filter,
     Clear,
@@ -31,14 +32,23 @@ enum OmniboxMode {
 pub struct Omnibox {
     content: RefCell<String>,
     mode: RefCell<OmniboxMode>,
+    subs: Vec<Sender<Box<OmniboxState>>>
 }
+
+pub type OmniboxState = (OmniboxMode, String);
 
 impl Omnibox {
     pub fn new() -> Self {
         Self {
             content: RefCell::new("".into()),
             mode: RefCell::new(OmniboxMode::Clear),
+            subs: vec![],
         }
+    }
+
+    pub fn with_sub(&mut self, tx: Sender<Box<OmniboxState>>) -> &mut Self {
+        self.subs.push(tx);
+        self
     }
 }
 
@@ -60,34 +70,40 @@ impl View for Omnibox {
 
     fn on_event(&mut self, event: Event) -> EventResult {
         let content_len = self.content.borrow().chars().count();
+        let mut event_result = EventResult::Consumed(None);
 
         match event {
             Event::Char('/') => {
                 self.mode.replace(OmniboxMode::Filter);
-                EventResult::Consumed(None)
             }
             Event::Char(':') => {
                 self.mode.replace(OmniboxMode::Command);
-                EventResult::Consumed(None)
             }
-            Event::Char(c) => {
+            Event::Char(c) if *self.mode.borrow() != OmniboxMode::Clear => {
                 self.content.borrow_mut().push(c);
-                EventResult::Consumed(None)
             }
             Event::Key(Key::Backspace) if content_len > 0 => {
                 self.content.borrow_mut().truncate(content_len - 1);
-                EventResult::Consumed(None)
             }
             Event::CtrlChar('u') => {
                 self.content.borrow_mut().truncate(0);
                 self.mode.replace(OmniboxMode::Clear);
-                EventResult::Consumed(None)
             }
-            _ => EventResult::Ignored,
+            _ => event_result = EventResult::Ignored,
         }
+
+        for sub in self.subs.iter() {
+            sub.send(Box::new((self.mode.borrow().clone(), self.content.borrow().clone())));
+        }
+
+        event_result
     }
 
     fn take_focus(&mut self, _source: Direction) -> bool {
         true
     }
+}
+
+pub trait OmniboxSubscriber {
+
 }

@@ -1,5 +1,5 @@
 use cursive::view::ViewWrapper;
-use cursive::views::{LinearLayout, Panel};
+use cursive::views::{LinearLayout, Panel, NamedView};
 use cursive::{Cursive, View};
 use tokio::runtime::Handle;
 use tokio::time::interval;
@@ -37,7 +37,9 @@ impl RootLayout {
 
             let sysinfo = Panel::new(SysInfo::default()).full_width();
 
-            let omnibox = Panel::new(Omnibox::new()).full_width().max_height(3);
+            let omnibox = Panel::new(
+                NamedView::new("omnibox", Omnibox::new())
+            ).full_width().max_height(3);
 
             let service_list = ServiceView::new(handle, tx.clone())
                 .full_width()
@@ -51,7 +53,7 @@ impl RootLayout {
     }
 
     /// Cursive uses a different crate for its channel, so this is some glue
-    pub fn cbsink_channel(siv: &mut Cursive, handle: &Handle) -> Sender<CbSinkMessage> {
+    fn cbsink_channel(siv: &mut Cursive, handle: &Handle) -> Sender<CbSinkMessage> {
         let (tx, rx): (Sender<CbSinkMessage>, Receiver<CbSinkMessage>) = channel();
         let sink = siv.cb_sink().clone();
 
@@ -69,6 +71,11 @@ impl RootLayout {
 
         tx.clone()
     }
+
+    fn focus_and_forward(&mut self, child: RootLayoutChildren, event: Event) -> EventResult {
+        self.layout.set_focus_index(child as usize);
+        self.layout.on_event(event)
+    }
 }
 
 impl ViewWrapper for RootLayout {
@@ -76,16 +83,8 @@ impl ViewWrapper for RootLayout {
 
     fn wrap_on_event(&mut self, event: Event) -> EventResult {
         match event {
-            Event::Char('/') => {
-                self.layout
-                    .set_focus_index(RootLayoutChildren::Omnibox as usize);
-                self.layout.on_event(event)
-            }
-            Event::Char(':') => {
-                self.layout
-                    .set_focus_index(RootLayoutChildren::Omnibox as usize);
-                self.layout.on_event(event)
-            }
+            Event::Char('/') | Event::Char(':') | Event::CtrlChar('u') =>
+                self.focus_and_forward(RootLayoutChildren::Omnibox, event),
             _ => self.layout.on_event(event),
         }
     }
