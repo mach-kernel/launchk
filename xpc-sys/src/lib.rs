@@ -116,13 +116,12 @@ pub fn get_bootstrap_port() -> mach_port_t {
 pub fn get_xpc_bootstrap_pipe() -> xpc_pipe_t {
     match read_xpc_global_data() {
         Some(xpcgd) => {
+            #[cfg(feature = "log")]
             unsafe {
-                #[cfg(feature = "log")]
                 println!(
                     "Found _os_alloc_once_table: {:?}",
                     &_os_alloc_once_table as *const _
                 );
-                #[cfg(feature = "log")]
                 println!("Found xpc_bootstrap_pipe: {:?}", xpcgd.xpc_bootstrap_pipe);
             }
             xpcgd.xpc_bootstrap_pipe

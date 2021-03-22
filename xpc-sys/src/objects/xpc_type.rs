@@ -57,7 +57,7 @@ impl From<XPCObject> for XPCType {
 */
 
 lazy_static! {
-    pub static ref Dictionary: XPCType = unsafe {
+    pub static ref Dictionary: XPCType = {
         let empty: HashMap<&str, XPCObject> = HashMap::new();
         XPCObject::from(empty).xpc_type()
     };
