@@ -1,11 +1,11 @@
-use cursive::view::{AnyView, ViewWrapper};
+use cursive::view::{ViewWrapper};
 use cursive::views::{LinearLayout, NamedView, Panel};
 use cursive::{Cursive, View};
 use tokio::runtime::Handle;
 use tokio::time::interval;
 
 use crate::tui::omnibox::{Omnibox, OmniboxCommand};
-use crate::tui::service::ServiceView;
+use crate::tui::service_list::ServiceListView;
 use crate::tui::sysinfo::SysInfo;
 use cursive::event::{Event, EventResult};
 use cursive::traits::{Resizable, Scrollable};
@@ -23,6 +23,7 @@ pub struct RootLayout {
     last_focus_index: RefCell<usize>,
 }
 
+#[allow(dead_code)]
 enum RootLayoutChildren {
     SysInfo,
     Omnibox,
@@ -50,7 +51,7 @@ impl RootLayout {
             .full_width()
             .max_height(3);
 
-        let service_list = ServiceView::new(handle, tx.clone())
+        let service_list = ServiceListView::new(handle, tx.clone())
             .full_width()
             .full_height()
             .scrollable()
@@ -88,7 +89,13 @@ impl RootLayout {
     }
 
     fn focus_and_forward(&mut self, child: RootLayoutChildren, event: Event) -> EventResult {
-        self.last_focus_index.replace(self.layout.get_focus_index());
+        let current_focus = self.layout.get_focus_index();
+
+        // The Omnibox shouldn't/can't consume its own events
+        if current_focus != RootLayoutChildren::Omnibox as usize {
+            self.last_focus_index.replace(current_focus);
+        }
+
         self.layout.set_focus_index(child as usize).unwrap_or(());
         self.layout.on_event(event)
     }
@@ -117,7 +124,7 @@ impl RootLayout {
             return;
         }
 
-        target.unwrap().on_omnibox(recv.unwrap());
+        target.unwrap().on_omnibox(recv.unwrap()).unwrap();
     }
 }
 
@@ -125,13 +132,15 @@ impl ViewWrapper for RootLayout {
     wrap_impl!(self.layout: LinearLayout);
 
     fn wrap_on_event(&mut self, event: Event) -> EventResult {
-        self.poll_omnibox();
-
-        match event {
+        let ev = match event {
             Event::Char('/') | Event::Char(':') | Event::CtrlChar('u') => {
                 self.focus_and_forward(RootLayoutChildren::Omnibox, event)
             }
             _ => self.layout.on_event(event),
-        }
+        };
+
+        self.poll_omnibox();
+
+        ev
     }
 }

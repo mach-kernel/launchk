@@ -26,7 +26,6 @@ use crate::tui::omnibox::OmniboxCommand;
 use crate::tui::omnibox_subscribed_view::OmniboxSubscriber;
 use crate::tui::root::CbSinkMessage;
 use cursive::theme::{BaseColor, Color, Effect, Style};
-use std::borrow::Borrow;
 use std::cell::{Cell, RefCell};
 
 async fn poll_services(
@@ -64,21 +63,21 @@ async fn poll_services(
     }
 }
 
-pub struct ServiceView {
+pub struct ServiceListView {
     services: Arc<RwLock<HashMap<String, XPCObject>>>,
     select_view: SelectView<XPCObject>,
     current_size: Cell<XY<usize>>,
     current_filter: RefCell<String>,
 }
 
-impl ServiceView {
+impl ServiceListView {
     pub fn new(runtime_handle: Handle, cb_sink: Sender<CbSinkMessage>) -> Self {
         let arc_svc = Arc::new(RwLock::new(HashMap::new()));
         let ref_clone = arc_svc.clone();
 
         runtime_handle.spawn(async move { poll_services(ref_clone, cb_sink).await });
 
-        let select_view: SelectView<XPCObject> = SelectView::new().into();
+        let select_view: SelectView<XPCObject> = SelectView::new();
 
         Self {
             services: arc_svc.clone(),
@@ -105,7 +104,7 @@ impl ServiceView {
                 continue;
             }
 
-            if key.to_lowercase().contains(filter.to_lowercase().as_str()) {
+            if key.to_ascii_lowercase().contains(filter.to_ascii_lowercase().as_str()) {
                 vec.push((key.clone(), xpc_object.clone()));
             }
         }
@@ -115,7 +114,7 @@ impl ServiceView {
     }
 }
 
-impl ViewWrapper for ServiceView {
+impl ViewWrapper for ServiceListView {
     wrap_impl!(self.select_view: SelectView<XPCObject>);
 
     fn wrap_draw(&self, printer: &Printer<'_, '_>) {
@@ -168,11 +167,12 @@ impl ViewWrapper for ServiceView {
     }
 }
 
-impl OmniboxSubscriber for ServiceView {
+impl OmniboxSubscriber for ServiceListView {
     fn on_omnibox(&mut self, cmd: OmniboxCommand) -> Result<(), ()> {
         match cmd {
-            OmniboxCommand::Filter(new_filter) => self.current_filter.replace(new_filter),
-            OmniboxCommand::Clear => self.current_filter.replace("".to_string()),
+            OmniboxCommand::Filter(new_filter) => { self.current_filter.replace(new_filter); },
+            OmniboxCommand::Clear => { self.current_filter.replace("".to_string()); },
+            _ => (),
         };
 
         Ok(())
