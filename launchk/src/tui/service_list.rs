@@ -1,6 +1,5 @@
 use crate::launchd;
 use crate::launchd::messages::from_msg;
-use crate::tui::CbSinkMessage;
 
 use cursive::view::ViewWrapper;
 use cursive::views::SelectView;
@@ -23,8 +22,11 @@ use xpc_sys::traits::xpc_pipeable::XPCPipeable;
 
 use xpc_sys::traits::xpc_value::TryXPCValue;
 
+use crate::tui::omnibox::OmniboxCommand;
+use crate::tui::omnibox_subscribed_view::OmniboxSubscriber;
+use crate::tui::root::CbSinkMessage;
 use cursive::theme::{BaseColor, Color, Effect, Style};
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 
 async fn poll_services(
     svcs: Arc<RwLock<HashMap<String, XPCObject>>>,
@@ -61,41 +63,50 @@ async fn poll_services(
     }
 }
 
-pub struct ServiceView {
+pub struct ServiceListView {
     services: Arc<RwLock<HashMap<String, XPCObject>>>,
     select_view: SelectView<XPCObject>,
     current_size: Cell<XY<usize>>,
+    current_filter: RefCell<String>,
 }
 
-impl ServiceView {
+impl ServiceListView {
     pub fn new(runtime_handle: Handle, cb_sink: Sender<CbSinkMessage>) -> Self {
-        let ref_svc = Arc::new(RwLock::new(HashMap::new()));
-        let ref_clone = ref_svc.clone();
+        let arc_svc = Arc::new(RwLock::new(HashMap::new()));
+        let ref_clone = arc_svc.clone();
 
-        runtime_handle.spawn(async move {
-            poll_services(ref_clone, cb_sink).await;
-        });
+        runtime_handle.spawn(async move { poll_services(ref_clone, cb_sink).await });
 
-        let select_view: SelectView<XPCObject> = SelectView::new().into();
+        let select_view: SelectView<XPCObject> = SelectView::new();
 
         Self {
-            services: ref_svc.clone(),
+            services: arc_svc.clone(),
             current_size: Cell::new(XY::new(0, 0)),
+            current_filter: RefCell::new("".into()),
             select_view,
         }
     }
 
     fn sorted_services(&self) -> Vec<(String, XPCObject)> {
-        let read = self.services.try_read();
-        if read.is_err() {
+        let services = self.services.try_read();
+
+        if services.is_err() {
             return vec![];
         }
 
-        let read = read.unwrap();
+        let services = services.unwrap();
         let mut vec: Vec<(String, XPCObject)> = vec![];
+        let filter = self.current_filter.borrow();
 
-        for (key, xpc_object) in read.iter() {
-            vec.push((key.clone(), xpc_object.clone()));
+        for (key, xpc_object) in services.iter() {
+            if filter.is_empty() {
+                vec.push((key.clone(), xpc_object.clone()));
+                continue;
+            }
+
+            if key.to_ascii_lowercase().contains(filter.to_ascii_lowercase().as_str()) {
+                vec.push((key.clone(), xpc_object.clone()));
+            }
         }
 
         vec.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
@@ -103,12 +114,12 @@ impl ServiceView {
     }
 }
 
-impl ViewWrapper for ServiceView {
+impl ViewWrapper for ServiceListView {
     wrap_impl!(self.select_view: SelectView<XPCObject>);
 
     fn wrap_draw(&self, printer: &Printer<'_, '_>) {
         let middle = self.current_size.get().x / 2;
-        let bold = Style::from(Color::Dark(BaseColor::Black)).combine(Effect::Bold);
+        let bold = Style::from(Color::Dark(BaseColor::Blue)).combine(Effect::Bold);
 
         printer.with_style(bold, |p| p.print(XY::new(0, 0), "Name"));
 
@@ -117,7 +128,10 @@ impl ViewWrapper for ServiceView {
         let tsnow = format!("{:?}", SystemTime::now());
         printer.print(XY::new(0, 1), &tsnow);
 
-        let sub = printer.offset(XY::new(0, 2));
+        // Headers, timestamp
+        let offset = XY::new(0, 2);
+        let sub = printer.offset(offset).content_offset(offset);
+
         self.select_view.draw(&sub);
     }
 
@@ -132,7 +146,11 @@ impl ViewWrapper for ServiceView {
             for (name, xpc_object) in sorted.iter() {
                 let XPCDictionary(hm) = xpc_object.try_into().unwrap();
                 let pid: i64 = hm.get("pid").unwrap().xpc_value().unwrap();
-                let pid_str = format!("{}", pid);
+                let pid_str = if pid == 0 {
+                    "-".to_string()
+                } else {
+                    format!("{}", pid)
+                };
 
                 let mut trunc_name = name.clone();
                 let indent = size.x / 2;
@@ -145,7 +163,18 @@ impl ViewWrapper for ServiceView {
             }
 
             v.set_selection(current_selection);
-        })
-        .unwrap();
+        });
+    }
+}
+
+impl OmniboxSubscriber for ServiceListView {
+    fn on_omnibox(&mut self, cmd: OmniboxCommand) -> Result<(), ()> {
+        match cmd {
+            OmniboxCommand::Filter(new_filter) => { self.current_filter.replace(new_filter); },
+            OmniboxCommand::Clear => { self.current_filter.replace("".to_string()); },
+            _ => (),
+        };
+
+        Ok(())
     }
 }

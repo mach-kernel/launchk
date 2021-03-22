@@ -4,7 +4,10 @@ extern crate lazy_static;
 #[macro_use]
 extern crate cursive;
 
-use crate::tui::list_services;
+use crate::tui::root::RootLayout;
+use cursive::view::Resizable;
+use cursive::views::Panel;
+use cursive::Cursive;
 
 mod launchd;
 mod tui;
@@ -15,7 +18,17 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut siv = cursive::default();
-    list_services(&mut siv, runtime.handle().clone());
-    runtime.block_on(async { siv.run() });
+    let mut siv: Cursive = cursive::default();
+    siv.load_toml(include_str!("tui/style.toml")).unwrap();
+
+    let mut root_layout = RootLayout::new();
+    root_layout.setup(&mut siv, runtime.handle().clone());
+
+    let panel = Panel::new(root_layout)
+        .title("launchk")
+        .full_width()
+        .full_height();
+
+    siv.add_layer(panel);
+    siv.run();
 }
