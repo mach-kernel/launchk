@@ -32,23 +32,29 @@ pub enum OmniboxMode {
 pub struct Omnibox {
     content: RefCell<String>,
     mode: RefCell<OmniboxMode>,
-    subs: Vec<Sender<Box<OmniboxState>>>
+    tx: Sender<OmniboxCommand>,
 }
 
 pub type OmniboxState = (OmniboxMode, String);
 
-impl Omnibox {
-    pub fn new() -> Self {
-        Self {
-            content: RefCell::new("".into()),
-            mode: RefCell::new(OmniboxMode::Clear),
-            subs: vec![],
-        }
-    }
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum OmniboxCommand {
+    Filter(String),
+    Clear,
+}
 
-    pub fn with_sub(&mut self, tx: Sender<Box<OmniboxState>>) -> &mut Self {
-        self.subs.push(tx);
-        self
+impl Omnibox {
+    pub fn new() -> (Self, Receiver<OmniboxCommand>) {
+        let (tx, rx): (Sender<OmniboxCommand>, Receiver<OmniboxCommand>) = channel();
+
+        (
+            Self {
+                content: RefCell::new("".into()),
+                mode: RefCell::new(OmniboxMode::Clear),
+                tx,
+            },
+            rx,
+        )
     }
 }
 
@@ -75,25 +81,28 @@ impl View for Omnibox {
         match event {
             Event::Char('/') => {
                 self.mode.replace(OmniboxMode::Filter);
+                self.tx.send(OmniboxCommand::Clear);
             }
             Event::Char(':') => {
                 self.mode.replace(OmniboxMode::Command);
+                self.tx.send(OmniboxCommand::Clear);
             }
             Event::Char(c) if *self.mode.borrow() != OmniboxMode::Clear => {
                 self.content.borrow_mut().push(c);
+                self.tx
+                    .send(OmniboxCommand::Filter(self.content.borrow_mut().clone()));
             }
             Event::Key(Key::Backspace) if content_len > 0 => {
                 self.content.borrow_mut().truncate(content_len - 1);
+                self.tx
+                    .send(OmniboxCommand::Filter(self.content.borrow_mut().clone()));
             }
             Event::CtrlChar('u') => {
                 self.content.borrow_mut().truncate(0);
                 self.mode.replace(OmniboxMode::Clear);
+                self.tx.send(OmniboxCommand::Clear);
             }
             _ => event_result = EventResult::Ignored,
-        }
-
-        for sub in self.subs.iter() {
-            sub.send(Box::new((self.mode.borrow().clone(), self.content.borrow().clone())));
         }
 
         event_result
@@ -102,8 +111,4 @@ impl View for Omnibox {
     fn take_focus(&mut self, _source: Direction) -> bool {
         true
     }
-}
-
-pub trait OmniboxSubscriber {
-
 }
