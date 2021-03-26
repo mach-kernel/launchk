@@ -91,7 +91,7 @@ impl View for Omnibox {
             _ => {
                 event_result = EventResult::Ignored;
                 OmniboxCommand::NoOp
-            },
+            }
         };
 
         let sent = self.tx.send(command);

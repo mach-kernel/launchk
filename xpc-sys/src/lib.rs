@@ -96,8 +96,7 @@ pub fn lookup_bootstrap_port() -> mach_port_t {
     ret_port
 }
 
-/// Attempt to yield existing bootstrap_port if not
-/// MACH_PORT_NULL
+/// Attempt to yield existing bootstrap_port if not MACH_PORT_NULL
 pub fn get_bootstrap_port() -> mach_port_t {
     unsafe {
         if bootstrap_port == MACH_PORT_NULL {

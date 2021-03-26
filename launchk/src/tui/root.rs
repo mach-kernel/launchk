@@ -1,4 +1,4 @@
-use cursive::view::{ViewWrapper};
+use cursive::view::ViewWrapper;
 use cursive::views::{LinearLayout, NamedView, Panel};
 use cursive::{Cursive, View};
 use tokio::runtime::Handle;

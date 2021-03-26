@@ -3,8 +3,8 @@ use cursive::{Printer, Vec2, View, XY};
 use xpc_sys::sysctlbyname_string;
 
 use std::cell::Cell;
-use xpc_sys::csr::{sip_enabled, CSR_ALLOW_UNTRUSTED_KEXTS};
-use xpc_sys::csr::{CSR_STATUS};
+use xpc_sys::csr::CSR_ALLOW_UNTRUSTED_KEXTS;
+use xpc_sys::csr::CSR_STATUS;
 
 pub struct SysInfo {
     current_size: Cell<XY<usize>>,

@@ -1,22 +1,22 @@
-use std::os::raw::c_int;
 use std::collections::HashMap;
+use std::os::raw::c_int;
 
 pub type csr_config_t = u32;
 
 // https://github.com/apple/darwin-xnu/blob/main/bsd/kern/kern_csr.c
-pub static CSR_ALLOW_UNTRUSTED_KEXTS: csr_config_t = (1 << 0);
-pub static CSR_ALLOW_UNRESTRICTED_FS: csr_config_t = (1 << 1);
-pub static CSR_ALLOW_TASK_FOR_PID: csr_config_t = (1 << 2);
-pub static CSR_ALLOW_KERNEL_DEBUGGER: csr_config_t = (1 << 3);
-pub static CSR_ALLOW_APPLE_INTERNAL: csr_config_t = (1 << 4);
-pub static CSR_ALLOW_DESTRUCTIVE_DTRACE: csr_config_t = (1 << 5) /* name deprecated */;
-pub static CSR_ALLOW_UNRESTRICTED_DTRACE: csr_config_t = (1 << 5);
-pub static CSR_ALLOW_UNRESTRICTED_NVRAM: csr_config_t = (1 << 6);
-pub static CSR_ALLOW_DEVICE_CONFIGURATION: csr_config_t = (1 << 7);
-pub static CSR_ALLOW_ANY_RECOVERY_OS: csr_config_t = (1 << 8);
-pub static CSR_ALLOW_UNAPPROVED_KEXTS: csr_config_t = (1 << 9);
-pub static CSR_ALLOW_EXECUTABLE_POLICY_OVERRIDE: csr_config_t = (1 << 10);
-pub static CSR_ALLOW_UNAUTHENTICATED_ROOT: csr_config_t = (1 << 11);
+pub static CSR_ALLOW_UNTRUSTED_KEXTS: csr_config_t = 1 << 0;
+pub static CSR_ALLOW_UNRESTRICTED_FS: csr_config_t = 1 << 1;
+pub static CSR_ALLOW_TASK_FOR_PID: csr_config_t = 1 << 2;
+pub static CSR_ALLOW_KERNEL_DEBUGGER: csr_config_t = 1 << 3;
+pub static CSR_ALLOW_APPLE_INTERNAL: csr_config_t = 1 << 4;
+pub static CSR_ALLOW_DESTRUCTIVE_DTRACE: csr_config_t = 1 << 5 /* name deprecated */;
+pub static CSR_ALLOW_UNRESTRICTED_DTRACE: csr_config_t = 1 << 5;
+pub static CSR_ALLOW_UNRESTRICTED_NVRAM: csr_config_t = 1 << 6;
+pub static CSR_ALLOW_DEVICE_CONFIGURATION: csr_config_t = 1 << 7;
+pub static CSR_ALLOW_ANY_RECOVERY_OS: csr_config_t = 1 << 8;
+pub static CSR_ALLOW_UNAPPROVED_KEXTS: csr_config_t = 1 << 9;
+pub static CSR_ALLOW_EXECUTABLE_POLICY_OVERRIDE: csr_config_t = 1 << 10;
+pub static CSR_ALLOW_UNAUTHENTICATED_ROOT: csr_config_t = 1 << 11;
 
 extern "C" {
     pub fn csr_check(mask: csr_config_t) -> c_int;
