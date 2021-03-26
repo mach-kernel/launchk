@@ -122,6 +122,17 @@ impl ServiceListView {
         }
     }
 
+    fn cached_find_unit(&self, name: &String) -> Option<LaunchdEntryConfig> {
+        let mut cache = UNIT_META_CACHE.try_lock().ok()?;
+        if cache.contains_key(name) {
+            cache.get(name).map(|l| l.clone())
+        } else {
+            let retrieved = find_unit(name);
+            retrieved.clone().and_then(|r| cache.insert(name.clone(), r));
+            retrieved
+        }
+    }
+
     fn present_services(&self) -> Vec<ServiceListItem> {
         let services = self.services.try_read();
 
@@ -149,7 +160,7 @@ impl ServiceListView {
                 Some(ServiceListItem {
                     name: s.clone(),
                     pid,
-                    entry_config: find_unit(s),
+                    entry_config: self.cached_find_unit(s),
                 })
             })
             .collect();
