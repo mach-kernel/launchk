@@ -86,7 +86,14 @@ impl TableListItem for ServiceListItem {
             .map(|ec| format!("{:?}", ec.scope))
             .unwrap_or("-".to_string());
 
-        vec![self.name.clone(), scope, format!("{}", self.pid)]
+        let provider = self
+            .entry_config
+            .borrow()
+            .as_ref()
+            .map(|ec| format!("{:?}", ec.provider))
+            .unwrap_or("-".to_string());
+
+        vec![self.name.clone(), scope, provider, format!("{}", self.pid)]
     }
 }
 
@@ -108,6 +115,7 @@ impl ServiceListView {
             current_filter: RefCell::new("".into()),
             table_list_view: TableListView::new(vec![
                 "Name".to_string(),
+                "Type".to_string(),
                 "Scope".to_string(),
                 "PID".to_string(),
             ]),
