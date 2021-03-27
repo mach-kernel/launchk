@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 
 use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 
 use std::time::Duration;
 use tokio::runtime::Handle;
@@ -30,11 +30,6 @@ use crate::launchd::config::{find_unit, LaunchdEntryConfig};
 use crate::tui::table_list_view::{TableListItem, TableListView};
 use std::borrow::Borrow;
 use std::cell::RefCell;
-
-lazy_static! {
-    static ref UNIT_META_CACHE: Mutex<HashMap<String, LaunchdEntryConfig>> =
-        Mutex::new(HashMap::new());
-}
 
 async fn poll_services(
     svcs: Arc<RwLock<HashMap<String, XPCObject>>>,
@@ -79,21 +74,26 @@ pub struct ServiceListItem {
 
 impl TableListItem for ServiceListItem {
     fn as_row(&self) -> Vec<String> {
-        let scope = self
+        let session_type = self
             .entry_config
             .borrow()
             .as_ref()
-            .map(|ec| format!("{:?}", ec.scope))
+            .map(|ec| format!("{:?}", ec.session_type))
             .unwrap_or("-".to_string());
 
-        let provider = self
+        let entry_type = self
             .entry_config
             .borrow()
             .as_ref()
-            .map(|ec| format!("{:?}", ec.provider))
+            .map(|ec| format!("{:?}", ec.entry_type))
             .unwrap_or("-".to_string());
 
-        vec![self.name.clone(), scope, provider, format!("{}", self.pid)]
+        vec![
+            self.name.clone(),
+            session_type,
+            entry_type,
+            format!("{}", self.pid),
+        ]
     }
 }
 
@@ -115,21 +115,10 @@ impl ServiceListView {
             current_filter: RefCell::new("".into()),
             table_list_view: TableListView::new(vec![
                 "Name".to_string(),
-                "Type".to_string(),
-                "Scope".to_string(),
+                "Session Type".to_string(),
+                "Kind".to_string(),
                 "PID".to_string(),
             ]),
-        }
-    }
-
-    fn cached_find_unit(&self, name: &String) -> Option<LaunchdEntryConfig> {
-        let mut cache = UNIT_META_CACHE.try_lock().ok()?;
-        if cache.contains_key(name) {
-            cache.get(name).map(|l| l.clone())
-        } else {
-            let retrieved = find_unit(name);
-            retrieved.clone().and_then(|r| cache.insert(name.clone(), r));
-            retrieved
         }
     }
 
@@ -160,7 +149,7 @@ impl ServiceListView {
                 Some(ServiceListItem {
                     name: s.clone(),
                     pid,
-                    entry_config: self.cached_find_unit(s),
+                    entry_config: find_unit(s),
                 })
             })
             .collect();
