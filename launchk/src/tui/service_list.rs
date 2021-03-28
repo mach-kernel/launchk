@@ -1,5 +1,5 @@
 use crate::launchd;
-use crate::launchd::messages::from_msg;
+use crate::launchd::message::from_msg;
 
 use cursive::view::ViewWrapper;
 
@@ -36,21 +36,18 @@ async fn poll_services(
     cb_sink: Sender<CbSinkMessage>,
 ) -> () {
     // launchctl list
-    let message: HashMap<&str, XPCObject> = from_msg(&launchd::messages::LIST_SERVICES);
+    let message: HashMap<&str, XPCObject> = from_msg(&launchd::message::LIST_SERVICES);
     let mut interval = interval(Duration::from_secs(1));
 
     loop {
         interval.tick().await;
 
         let msg_list: XPCObject = message.clone().into();
-        let services = msg_list
-            .pipe_routine()
-            .and_then(|r| r.try_into())
-            .and_then(|XPCDictionary(ref hm)| {
-                hm.get("services").map(|s| s.clone()).ok_or(StandardError)
-            })
-            .and_then(|s| s.try_into())
-            .and_then(|XPCDictionary(ref hm)| Ok(hm.clone()));
+        let services = msg_list.pipe_routine().and_then(|r| {
+            let dict: XPCDictionary = r.try_into()?;
+            let XPCDictionary(map) = dict.get_as_dictionary(&["services".to_string()])?;
+            Ok(map)
+        });
 
         if services.is_err() {
             continue;

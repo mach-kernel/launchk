@@ -1,6 +1,6 @@
 // See https://www.launchd.info/ for more details
 
-use crate::launchd::messages::{from_msg, LIST_SERVICES};
+use crate::launchd::message::{from_msg, LIST_SERVICES};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;

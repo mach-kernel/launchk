@@ -6,7 +6,7 @@ use crate::{
 use block::ConcreteBlock;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 use std::ffi::{CStr, CString};
 
@@ -56,6 +56,47 @@ impl XPCDictionary {
         } else {
             Err(DictionaryError("xpc_dictionary_apply failed".to_string()))
         }
+    }
+
+    /// Get value from XPCDictionary with support for nesting
+    pub fn get<I, S>(&self, items: I) -> Result<XPCObject, XPCError>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let mut iter = items.into_iter();
+        let first = iter
+            .next()
+            .ok_or(XPCError::ValueError("Not enough elements".to_string()))?;
+        let XPCDictionary(ref hm) = self;
+
+        let first = hm
+            .get(&first.into())
+            .ok_or(XPCError::StandardError)
+            .map(|o| o.clone());
+
+        iter.fold(first, |o, k| {
+            if o.is_err() {
+                return o;
+            }
+
+            let key = k.into();
+            let XPCDictionary(ref inner) = o.unwrap().try_into()?;
+
+            inner
+                .get(&key)
+                .ok_or(XPCError::DictionaryError(format!("Can't get {}", &key)))
+                .map(|i| i.clone())
+        })
+    }
+
+    /// Retrieve a dictionary
+    pub fn get_as_dictionary<I, S>(&self, items: I) -> Result<XPCDictionary, XPCError>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.get(items).and_then(|o| o.try_into())
     }
 }
 
