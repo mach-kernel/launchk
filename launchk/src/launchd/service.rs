@@ -25,3 +25,4 @@ impl DomainTarget {
         vec![self.to_string(), name.into()].join("/")
     }
 }
+

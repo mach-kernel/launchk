@@ -45,7 +45,7 @@ async fn poll_services(
         let msg_list: XPCObject = message.clone().into();
         let services = msg_list.pipe_routine().and_then(|r| {
             let dict: XPCDictionary = r.try_into()?;
-            let XPCDictionary(map) = dict.get_as_dictionary(&["services".to_string()])?;
+            let XPCDictionary(map) = dict.get_as_dictionary(&["services"])?;
             Ok(map)
         });
 

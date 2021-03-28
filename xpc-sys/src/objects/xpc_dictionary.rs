@@ -62,30 +62,30 @@ impl XPCDictionary {
     pub fn get<I, S>(&self, items: I) -> Result<XPCObject, XPCError>
     where
         I: IntoIterator<Item = S>,
-        S: Into<String>,
+        S: AsRef<str>,
     {
         let mut iter = items.into_iter();
-        let first = iter
+        let first: S = iter
             .next()
             .ok_or(XPCError::ValueError("Not enough elements".to_string()))?;
         let XPCDictionary(ref hm) = self;
 
         let first = hm
-            .get(&first.into())
+            .get(first.as_ref())
             .ok_or(XPCError::StandardError)
             .map(|o| o.clone());
 
-        iter.fold(first, |o, k| {
+        iter.fold(first, |o, k: S| {
             if o.is_err() {
                 return o;
             }
 
-            let key = k.into();
+            let key = k.as_ref();
             let XPCDictionary(ref inner) = o.unwrap().try_into()?;
 
             inner
-                .get(&key)
-                .ok_or(XPCError::DictionaryError(format!("Can't get {}", &key)))
+                .get(key)
+                .ok_or(XPCError::DictionaryError(format!("Can't get {}", key)))
                 .map(|i| i.clone())
         })
     }
@@ -94,9 +94,9 @@ impl XPCDictionary {
     pub fn get_as_dictionary<I, S>(&self, items: I) -> Result<XPCDictionary, XPCError>
     where
         I: IntoIterator<Item = S>,
-        S: Into<String>,
+        S: AsRef<str>,
     {
-        self.get(items).and_then(|o| o.try_into())
+        self.get(items).and_then(|r| XPCDictionary::try_from(r))
     }
 }
 
