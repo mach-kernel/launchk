@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use xpc_sys::objects::xpc_object::XPCObject;
 
 lazy_static! {
+    /// launchctl list [name]
     pub static ref LIST_SERVICES: HashMap<&'static str, XPCObject> = {
         // "list com.apple.Spotlight" (if specified)
         // msg.insert("name", XPCObject::from("com.apple.Spotlight"));
@@ -14,10 +15,11 @@ lazy_static! {
         // );
 
         let mut msg = HashMap::new();
-        msg.insert("type", XPCObject::from(1 as u64));
-        msg.insert("handle", XPCObject::from(0 as u64));
         msg.insert("subsystem", XPCObject::from(3 as u64));
+        msg.insert("handle", XPCObject::from(0 as u64));
         msg.insert("routine", XPCObject::from(815 as u64));
+        msg.insert("type", XPCObject::from(1 as u64));
+
         msg.insert("legacy", XPCObject::from(true));
         msg
     };

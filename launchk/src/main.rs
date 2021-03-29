@@ -1,3 +1,6 @@
+#![feature(arbitrary_enum_discriminant)]
+#![feature(core_intrinsics)]
+
 #[macro_use]
 extern crate lazy_static;
 
@@ -8,6 +11,7 @@ use crate::tui::root::RootLayout;
 use cursive::view::Resizable;
 use cursive::views::Panel;
 use cursive::Cursive;
+use crate::launchd::service::{QueryTarget, DomainTarget};
 
 mod launchd;
 mod tui;
@@ -23,6 +27,10 @@ fn main() {
 
     let mut root_layout = RootLayout::new();
     root_layout.setup(&mut siv, runtime.handle().clone());
+
+    let res = launchd::service::print(QueryTarget(DomainTarget::System, None));
+    let res = res.unwrap();
+    println!("r! {}", res);
 
     let panel = Panel::new(root_layout)
         .title("launchk")
