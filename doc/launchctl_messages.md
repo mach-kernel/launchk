@@ -116,3 +116,15 @@ This is a handy reference of XPC messages sent by `launchctl` for some basic com
         "routine" => <uint64: 0xcfd74598a1448baf>: 837
         "type" => <uint64: 0xcfd74598a170cbaf>: 1
 ```
+
+#### `launchctl print-cache`
+
+- `handle` is the PID
+
+```
+}<dictionary: 0x1007042f0> { count = 4, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xdaa38f2c75b6474f>: 3
+	"handle" => <uint64: 0xdaa38f2c7531c74f>: 2171
+	"routine" => <uint64: 0xdaa38f2c7584474f>: 803
+	"type" => <uint64: 0xdaa38f2c75b6274f>: 5
+```
