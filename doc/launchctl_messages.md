@@ -128,3 +128,51 @@ This is a handy reference of XPC messages sent by `launchctl` for some basic com
 	"routine" => <uint64: 0xdaa38f2c7584474f>: 803
 	"type" => <uint64: 0xdaa38f2c75b6274f>: 5
 ```
+
+#### `launchctl list`
+
+The two messages below are produced by the command. Not sure what `type` is here.
+
+As the current user:
+
+```
+<dictionary: 0x1002054f0> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xf7cad99ebbc6520f>: 3
+	"handle" => <uint64: 0xf7cad99ebbc6620f>: 0
+	"routine" => <uint64: 0xf7cad99ebbf4920f>: 815
+	"type" => <uint64: 0xf7cad99ebbc6120f>: 7
+	"legacy" => <bool: 0x7fff800130b0>: true
+	"domain-port" => <mach send right: 0x100205e50> { name = 1799, right = send, urefs = 5 }
+```
+
+As root:
+
+```
+<dictionary: 0x1004042b0> { count = 5, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xd9db7e06388e848b>: 3
+	"handle" => <uint64: 0xd9db7e06388eb48b>: 0
+	"routine" => <uint64: 0xd9db7e0638bc448b>: 815
+	"type" => <uint64: 0xd9db7e06388ea48b>: 1
+	"legacy" => <bool: 0x7fff800130b0>: true
+```
+
+Maybe it works like `print`? With types 1-8 and `strerror` for XPC responses with an `error` key:
+
+```
+type 1
+ok
+type 2
+strerr Operation not permitted (this works if you are root)
+type 3
+strerr Domain does not support specified action
+type 4
+strerr Domain does not support specified action
+type 5
+strerr Could not find specified domain
+type 6
+ok
+type 7
+ok
+type 8
+strerr Domain does not support specified action
+```
