@@ -1,5 +1,3 @@
-#![feature(bool_to_option)]
-
 use crate::objects::xpc_object::XPCObject;
 use crate::objects::xpc_type;
 use crate::{

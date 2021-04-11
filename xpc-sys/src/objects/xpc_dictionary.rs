@@ -147,8 +147,8 @@ where
         for (k, v) in message {
             unsafe {
                 let as_str: String = k.into();
-                let cstr = CString::new(as_str);
-                xpc_dictionary_set_value(dict, cstr.unwrap().as_ptr(), v.as_ptr());
+                let cstr = CString::new(as_str).unwrap();
+                xpc_dictionary_set_value(dict, cstr.as_ptr(), v.as_ptr());
             }
         }
 
