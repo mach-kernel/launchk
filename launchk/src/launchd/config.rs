@@ -1,20 +1,20 @@
-use std::sync::{Mutex, Once};
 use std::collections::HashMap;
+use std::sync::{Mutex, Once};
 
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::io::empty;
+use std::path::Path;
+
 use futures::StreamExt;
-use std::fs::DirEntry;
-use std::borrow::{Borrow, BorrowMut};
-use std::iter::FlatMap;
+
+use std::borrow::Borrow;
 
 use std::fmt;
 
 static LABEL_MAP_INIT: Once = Once::new();
 
 lazy_static! {
-    static ref LABEL_TO_PLIST: Mutex<HashMap<String, LaunchdEntryConfig>> = Mutex::new(HashMap::new());
+    static ref LABEL_TO_PLIST: Mutex<HashMap<String, LaunchdEntryConfig>> =
+        Mutex::new(HashMap::new());
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -71,18 +71,26 @@ fn init_label_map() {
         ADMIN_LAUNCH_AGENTS,
         SYSTEM_LAUNCH_AGENTS,
         ADMIN_LAUNCH_DAEMONS,
-        SYSTEM_LAUNCH_DAEMONS
+        SYSTEM_LAUNCH_DAEMONS,
     ];
 
     // Get all the plists from everywhere into one stream
-    let plists = dirs.iter()
+    let plists = dirs
+        .iter()
         .filter_map(|&dirname| fs::read_dir(Path::new(dirname)).ok())
         .flat_map(|rd| {
             rd.flat_map(|e| {
-                if e.is_err() { return e.into_iter(); }
+                if e.is_err() {
+                    return e.into_iter();
+                }
                 let path = e.borrow().as_ref().unwrap().path();
 
-                if path.is_dir() || path.extension().map(|ex| ex.to_string_lossy().ne("plist")).unwrap_or(true) {
+                if path.is_dir()
+                    || path
+                        .extension()
+                        .map(|ex| ex.to_string_lossy().ne("plist"))
+                        .unwrap_or(true)
+                {
                     Err(()).into_iter()
                 } else {
                     e.into_iter()
@@ -103,7 +111,8 @@ fn init_label_map() {
         }
 
         let label = label.unwrap();
-        let label = label.as_dictionary()
+        let label = label
+            .as_dictionary()
             .and_then(|d| d.get("Label"))
             .and_then(|v| v.as_string());
 
@@ -111,7 +120,9 @@ fn init_label_map() {
             continue;
         }
 
-        let entry_type = if path_string.contains(ADMIN_LAUNCH_DAEMONS) || path_string.contains(SYSTEM_LAUNCH_DAEMONS) {
+        let entry_type = if path_string.contains(ADMIN_LAUNCH_DAEMONS)
+            || path_string.contains(SYSTEM_LAUNCH_DAEMONS)
+        {
             LaunchdEntryType::Daemon
         } else {
             LaunchdEntryType::Agent
@@ -119,18 +130,26 @@ fn init_label_map() {
 
         let entry_location = if path_string.contains(USER_LAUNCH_AGENTS) {
             LaunchdEntryLocation::User
-        } else if path_string.contains(ADMIN_LAUNCH_AGENTS) || path_string.contains(ADMIN_LAUNCH_DAEMONS) {
+        } else if path_string.contains(ADMIN_LAUNCH_AGENTS)
+            || path_string.contains(ADMIN_LAUNCH_DAEMONS)
+        {
             LaunchdEntryLocation::Global
         } else {
             LaunchdEntryLocation::System
         };
 
-        label_map.insert(label.unwrap().to_string(), LaunchdEntryConfig {
-            entry_location,
-            entry_type,
-            plist_path: path_string,
-            readonly: path.metadata().map(|m| m.permissions().readonly()).unwrap_or(true)
-        });
+        label_map.insert(
+            label.unwrap().to_string(),
+            LaunchdEntryConfig {
+                entry_location,
+                entry_type,
+                plist_path: path_string,
+                readonly: path
+                    .metadata()
+                    .map(|m| m.permissions().readonly())
+                    .unwrap_or(true),
+            },
+        );
     }
 }
 

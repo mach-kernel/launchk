@@ -1,12 +1,8 @@
-use crate::launchd;
-use crate::launchd::message::from_msg;
-
 use cursive::view::ViewWrapper;
 
 use cursive::{Cursive, View, XY};
 
-use std::collections::HashMap;
-use std::convert::TryInto;
+use std::collections::HashSet;
 
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, RwLock};
@@ -15,49 +11,29 @@ use std::time::Duration;
 use tokio::runtime::Handle;
 
 use tokio::time::interval;
-use xpc_sys::objects::xpc_dictionary::XPCDictionary;
-use xpc_sys::objects::xpc_error::XPCError::StandardError;
-use xpc_sys::objects::xpc_object::XPCObject;
-use xpc_sys::traits::xpc_pipeable::XPCPipeable;
-
-use xpc_sys::traits::xpc_value::TryXPCValue;
 
 use crate::tui::omnibox::OmniboxCommand;
 use crate::tui::omnibox_subscribed_view::OmniboxSubscriber;
 use crate::tui::root::CbSinkMessage;
 
-use crate::launchd::service::{find_entry_info, LaunchdEntryInfo};
+use crate::launchd::service::{find_entry_info, list_all, LaunchdEntryInfo};
 use crate::tui::table_list_view::{TableListItem, TableListView};
 use std::borrow::Borrow;
 use std::cell::RefCell;
 
-async fn poll_services(
-    svcs: Arc<RwLock<HashMap<String, XPCObject>>>,
-    cb_sink: Sender<CbSinkMessage>,
-) -> () {
-    // launchctl list
-    let message: HashMap<&str, XPCObject> = from_msg(&launchd::message::LIST_SERVICES);
+async fn poll_services(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSinkMessage>) {
     let mut interval = interval(Duration::from_secs(1));
 
     loop {
         interval.tick().await;
+        let write = svcs.try_write();
 
-        let msg_list: XPCObject = message.clone().into();
-        let services = msg_list.pipe_routine().and_then(|r| {
-            let dict: XPCDictionary = r.try_into()?;
-            let XPCDictionary(map) = dict.get_as_dictionary(&["services"])?;
-            Ok(map)
-        });
-
-        if services.is_err() {
+        if write.is_err() {
             continue;
         }
 
-        let svc_write = svcs.try_write();
-        if svc_write.is_err() {
-            continue;
-        }
-        *svc_write.unwrap() = services.unwrap();
+        let mut write = write.unwrap();
+        *write = list_all();
 
         cb_sink.send(Box::new(Cursive::noop)).unwrap();
     }
@@ -65,16 +41,12 @@ async fn poll_services(
 
 pub struct ServiceListItem {
     name: String,
-    pid: i64,
     entry_info: LaunchdEntryInfo,
 }
 
 impl TableListItem for ServiceListItem {
     fn as_row(&self) -> Vec<String> {
-        let session_type = self
-            .entry_info
-            .limit_load_to_session_type
-            .to_string();
+        let session_type = self.entry_info.limit_load_to_session_type.to_string();
 
         let entry_type = self
             .entry_info
@@ -88,20 +60,20 @@ impl TableListItem for ServiceListItem {
             self.name.clone(),
             session_type,
             entry_type,
-            format!("{}", self.pid),
+            format!("{}", self.entry_info.pid),
         ]
     }
 }
 
 pub struct ServiceListView {
-    services: Arc<RwLock<HashMap<String, XPCObject>>>,
+    services: Arc<RwLock<HashSet<String>>>,
     table_list_view: TableListView<ServiceListItem>,
     current_filter: RefCell<String>,
 }
 
 impl ServiceListView {
     pub fn new(runtime_handle: Handle, cb_sink: Sender<CbSinkMessage>) -> Self {
-        let arc_svc = Arc::new(RwLock::new(HashMap::new()));
+        let arc_svc = Arc::new(RwLock::new(HashSet::new()));
         let ref_clone = arc_svc.clone();
 
         runtime_handle.spawn(async move { poll_services(ref_clone, cb_sink).await });
@@ -128,9 +100,9 @@ impl ServiceListView {
         let services = services.unwrap();
         let filter = self.current_filter.borrow();
 
-        let mut vec: Vec<ServiceListItem> = services
+        let mut items: Vec<ServiceListItem> = services
             .iter()
-            .filter_map(|(s, o)| {
+            .filter_map(|s| {
                 if !filter.is_empty()
                     && !s
                         .to_ascii_lowercase()
@@ -139,19 +111,15 @@ impl ServiceListView {
                     return None;
                 }
 
-                let XPCDictionary(hm) = o.try_into().unwrap();
-                let pid: i64 = hm.get("pid").and_then(|p| p.xpc_value().ok()).unwrap();
-
                 Some(ServiceListItem {
                     name: s.clone(),
-                    pid,
                     entry_info: find_entry_info(s),
                 })
             })
             .collect();
 
-        vec.sort_by(|a, b| a.name.cmp(&b.name));
-        vec
+        items.sort_by(|a, b| a.name.cmp(&b.name));
+        items
     }
 }
 
