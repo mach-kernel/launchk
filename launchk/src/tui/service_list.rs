@@ -26,7 +26,7 @@ use crate::tui::omnibox::OmniboxCommand;
 use crate::tui::omnibox_subscribed_view::OmniboxSubscriber;
 use crate::tui::root::CbSinkMessage;
 
-use crate::launchd::config::{find_unit, LaunchdEntryConfig};
+use crate::launchd::service::{find_entry_info, LaunchdEntryInfo};
 use crate::tui::table_list_view::{TableListItem, TableListView};
 use std::borrow::Borrow;
 use std::cell::RefCell;
@@ -66,23 +66,22 @@ async fn poll_services(
 pub struct ServiceListItem {
     name: String,
     pid: i64,
-    entry_config: Option<LaunchdEntryConfig>,
+    entry_info: LaunchdEntryInfo,
 }
 
 impl TableListItem for ServiceListItem {
     fn as_row(&self) -> Vec<String> {
         let session_type = self
-            .entry_config
-            .borrow()
-            .as_ref()
-            .map(|ec| format!("{:?}", ec.session_type))
-            .unwrap_or("-".to_string());
+            .entry_info
+            .limit_load_to_session_type
+            .to_string();
 
         let entry_type = self
+            .entry_info
             .entry_config
             .borrow()
             .as_ref()
-            .map(|ec| format!("{:?}", ec.entry_type))
+            .map(|ec| ec.entry_type.to_string())
             .unwrap_or("-".to_string());
 
         vec![
@@ -113,7 +112,7 @@ impl ServiceListView {
             table_list_view: TableListView::new(vec![
                 "Name".to_string(),
                 "Session Type".to_string(),
-                "Kind".to_string(),
+                "Job Type".to_string(),
                 "PID".to_string(),
             ]),
         }
@@ -146,7 +145,7 @@ impl ServiceListView {
                 Some(ServiceListItem {
                     name: s.clone(),
                     pid,
-                    entry_config: find_unit(s),
+                    entry_info: find_entry_info(s),
                 })
             })
             .collect();

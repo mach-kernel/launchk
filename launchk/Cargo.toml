@@ -12,3 +12,4 @@ lazy_static = "1.4.0"
 cursive = { version = "0.15.0", features = ["toml"] }
 tokio = { version = "1", features = ["full"] }
 futures = "0.3"
+plist = "1.1.0"

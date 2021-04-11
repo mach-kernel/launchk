@@ -1,34 +1,38 @@
-// See https://www.launchd.info/ for more details
-
-use crate::launchd::message::{from_msg, LIST_SERVICES};
+use std::sync::{Mutex, Once};
 use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
-use std::fmt;
-use std::path::Path;
-use std::sync::Mutex;
-use xpc_sys::objects::xpc_object::XPCObject;
-use xpc_sys::objects::xpc_type;
-use xpc_sys::traits::xpc_pipeable::XPCPipeable;
-use xpc_sys::traits::xpc_value::TryXPCValue;
 
-use xpc_sys::objects::xpc_dictionary::XPCDictionary;
-use xpc_sys::objects::xpc_error::XPCError;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::io::empty;
+use futures::StreamExt;
+use std::fs::DirEntry;
+use std::borrow::{Borrow, BorrowMut};
+use std::iter::FlatMap;
+
+use std::fmt;
+
+static LABEL_MAP_INIT: Once = Once::new();
 
 lazy_static! {
-    static ref UNIT_META_CACHE: Mutex<HashMap<String, Option<LaunchdEntryConfig>>> =
-        Mutex::new(HashMap::new());
+    static ref LABEL_TO_PLIST: Mutex<HashMap<String, LaunchdEntryConfig>> = Mutex::new(HashMap::new());
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum EntryType {
+pub enum LaunchdEntryType {
     /// Runs on behalf of currently logged in user
     Agent,
     /// Global system daemon
     Daemon,
 }
 
+impl fmt::Display for LaunchdEntryType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum EntryLocation {
+pub enum LaunchdEntryLocation {
     /// macOS system provided agent or daemon
     System,
     /// "Administrator provided" agent or daemon
@@ -37,147 +41,102 @@ pub enum EntryLocation {
     User,
 }
 
-/// When querying XPC for a specific service, the LimitLoadToSessionType
-/// key contains this information.
-///
-/// https://developer.apple.com/library/archive/technotes/tn2083/_index.html
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum SessionType {
-    Aqua,
-    StandardIO,
-    Background,
-    LoginWindow,
-    System,
-    Unknown,
-}
-
-impl fmt::Display for SessionType {
+impl fmt::Display for LaunchdEntryLocation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-// TODO: This feels terrible
-impl From<String> for SessionType {
-    fn from(value: String) -> Self {
-        let aqua: String = SessionType::Aqua.to_string();
-        let standard_io: String = SessionType::StandardIO.to_string();
-        let background: String = SessionType::Background.to_string();
-        let login_window: String = SessionType::LoginWindow.to_string();
-        let system: String = SessionType::System.to_string();
-
-        match value {
-            s if s == aqua => SessionType::Aqua,
-            s if s == standard_io => SessionType::StandardIO,
-            s if s == background => SessionType::Background,
-            s if s == login_window => SessionType::LoginWindow,
-            s if s == system => SessionType::System,
-            _ => SessionType::Unknown,
-        }
-    }
-}
-
-impl TryFrom<XPCObject> for SessionType {
-    type Error = ();
-
-    fn try_from(value: XPCObject) -> Result<Self, Self::Error> {
-        if value.xpc_type() != *xpc_type::String {
-            return Err(());
-        }
-
-        let string: String = value.xpc_value().unwrap();
-        Ok(string.into())
-    }
-}
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LaunchdEntryConfig {
-    /// Path to launchd plist
-    pub config_path: String,
-    /// Is the plist read only?
+    pub entry_type: LaunchdEntryType,
+    pub entry_location: LaunchdEntryLocation,
+    pub plist_path: String,
     pub readonly: bool,
-    /// Meta
-    pub entry_type: EntryType,
-    pub entry_location: EntryLocation,
-    pub session_type: SessionType,
 }
 
-const USER_LAUNCH_AGENTS: &str = concat!(env!("HOME"), "/Library/LaunchAgents");
-const ADMIN_LAUNCH_AGENTS: &str = "/Library/LaunchAgents";
-const SYSTEM_LAUNCH_AGENTS: &str = "/System/Library/LaunchAgents";
+pub const USER_LAUNCH_AGENTS: &str = concat!(env!("HOME"), "/Library/LaunchAgents");
+pub const ADMIN_LAUNCH_AGENTS: &str = "/Library/LaunchAgents";
+pub const SYSTEM_LAUNCH_AGENTS: &str = "/System/Library/LaunchAgents";
 
-const ADMIN_LAUNCH_DAEMONS: &str = "/Library/LaunchDaemons";
-const SYSTEM_LAUNCH_DAEMONS: &str = "/System/Library/LaunchDaemons";
+pub const ADMIN_LAUNCH_DAEMONS: &str = "/Library/LaunchDaemons";
+pub const SYSTEM_LAUNCH_DAEMONS: &str = "/System/Library/LaunchDaemons";
 
-pub fn find_unit<T: Into<String>>(name: T) -> Option<LaunchdEntryConfig> {
-    let name_string = name.into();
-    let mut cache = UNIT_META_CACHE.try_lock().unwrap();
-    if cache.contains_key(name_string.as_str()) {
-        return cache.get(name_string.as_str()).unwrap().clone();
-    }
-
-    let meta = get_unit_meta(&name_string);
-    cache.insert(name_string, meta.clone());
-    meta
-}
-
-fn get_unit_meta<T: Into<String>>(name: T) -> Option<LaunchdEntryConfig> {
-    let name_string: String = name.into();
-    for parent_dir in [
+/// Unsure if this is overkill, since the filenames
+/// usually match the label property. Still looking for
+/// a way to do dumpstate, dumpjpcategory without parsing the string
+fn init_label_map() {
+    let dirs = [
         USER_LAUNCH_AGENTS,
         ADMIN_LAUNCH_AGENTS,
         SYSTEM_LAUNCH_AGENTS,
         ADMIN_LAUNCH_DAEMONS,
-        SYSTEM_LAUNCH_DAEMONS,
-    ]
-    .iter()
-    {
-        let path = Path::new(*parent_dir).join(format!("{}.plist", name_string));
-        let fs_meta = path.metadata();
+        SYSTEM_LAUNCH_DAEMONS
+    ];
 
-        if fs_meta.is_err() {
+    // Get all the plists from everywhere into one stream
+    let plists = dirs.iter()
+        .filter_map(|&dirname| fs::read_dir(Path::new(dirname)).ok())
+        .flat_map(|rd| {
+            rd.flat_map(|e| {
+                if e.is_err() { return e.into_iter(); }
+                let path = e.borrow().as_ref().unwrap().path();
+
+                if path.is_dir() || path.extension().map(|ex| ex.to_string_lossy().ne("plist")).unwrap_or(true) {
+                    Err(()).into_iter()
+                } else {
+                    e.into_iter()
+                }
+            })
+        });
+
+    let mut label_map = LABEL_TO_PLIST.lock().unwrap();
+
+    for plist_path in plists {
+        let path = plist_path.path();
+        let path_string = path.to_string_lossy().to_string();
+
+        let label = plist::Value::from_file(path.clone());
+
+        if label.is_err() {
             continue;
         }
 
-        // "launchctl list [name]"
-        let mut msg: HashMap<&str, XPCObject> = from_msg(&LIST_SERVICES);
-        msg.insert("name", name_string.clone().into());
-        let msg: XPCObject = msg.into();
-        let limit_load_to_session_type: Result<SessionType, XPCError> = msg
-            .pipe_routine()
-            .and_then(|r| r.try_into())
-            .and_then(|XPCDictionary(ref hm)| {
-                hm.get("service")
-                    .map(|s| s.clone())
-                    .ok_or(XPCError::StandardError)
-            })
-            .and_then(|s| s.try_into())
-            .and_then(|XPCDictionary(ref hm)| {
-                hm.get("LimitLoadToSessionType")
-                    .map(|s| s.clone())
-                    .ok_or(XPCError::StandardError)
-            })
-            .and_then(|o| o.clone().try_into().map_err(|_| XPCError::StandardError));
+        let label = label.unwrap();
+        let label = label.as_dictionary()
+            .and_then(|d| d.get("Label"))
+            .and_then(|v| v.as_string());
 
-        let fs_meta = fs_meta.unwrap();
-        let entry_type = match *parent_dir {
-            ADMIN_LAUNCH_DAEMONS | SYSTEM_LAUNCH_DAEMONS => EntryType::Daemon,
-            _ => EntryType::Agent,
-        };
-        let entry_location = match *parent_dir {
-            USER_LAUNCH_AGENTS => EntryLocation::User,
-            ADMIN_LAUNCH_AGENTS | ADMIN_LAUNCH_DAEMONS => EntryLocation::Global,
-            _ => EntryLocation::System,
+        if label.is_none() {
+            continue;
+        }
+
+        let entry_type = if path_string.contains(ADMIN_LAUNCH_DAEMONS) || path_string.contains(SYSTEM_LAUNCH_DAEMONS) {
+            LaunchdEntryType::Daemon
+        } else {
+            LaunchdEntryType::Agent
         };
 
-        return Some(LaunchdEntryConfig {
-            config_path: path.to_string_lossy().to_string(),
-            readonly: fs_meta.permissions().readonly(),
-            session_type: limit_load_to_session_type.unwrap_or(SessionType::Unknown),
-            entry_type,
+        let entry_location = if path_string.contains(USER_LAUNCH_AGENTS) {
+            LaunchdEntryLocation::User
+        } else if path_string.contains(ADMIN_LAUNCH_AGENTS) || path_string.contains(ADMIN_LAUNCH_DAEMONS) {
+            LaunchdEntryLocation::Global
+        } else {
+            LaunchdEntryLocation::System
+        };
+
+        label_map.insert(label.unwrap().to_string(), LaunchdEntryConfig {
             entry_location,
+            entry_type,
+            plist_path: path_string,
+            readonly: path.metadata().map(|m| m.permissions().readonly()).unwrap_or(true)
         });
     }
+}
 
-    None
+/// Get plist + fs meta for an entry by its label
+pub fn for_entry<S: Into<String>>(label: S) -> Option<LaunchdEntryConfig> {
+    LABEL_MAP_INIT.call_once(init_label_map);
+    let label_map = LABEL_TO_PLIST.try_lock().ok()?;
+    label_map.get(label.into().as_str()).map(|c| c.clone())
 }

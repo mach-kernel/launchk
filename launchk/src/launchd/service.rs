@@ -1,75 +1,111 @@
-use std::fmt;
-use xpc_sys;
-use xpc_sys::{uid_t, au_asid_t, pid_t, xpc_fd_create};
-use std::fmt::Formatter;
-use crate::launchd::message::from_msg;
-use xpc_sys::objects::xpc_object::XPCObject;
+use crate::launchd::message::{from_msg, LIST_SERVICES};
 use std::collections::HashMap;
-use xpc_sys::traits::xpc_pipeable::{XPCPipeResult, XPCPipeable};
-use std::borrow::Borrow;
-use std::intrinsics::discriminant_value;
+use std::convert::{TryFrom, TryInto};
+use std::fmt;
+use std::path::Path;
+use std::sync::Mutex;
+use xpc_sys::objects::xpc_object::XPCObject;
+use xpc_sys::objects::xpc_type;
+use xpc_sys::traits::xpc_pipeable::XPCPipeable;
+use xpc_sys::traits::xpc_value::TryXPCValue;
 
-#[repr(C, u64)]
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-/// Used in conjunction with the service name,
-/// ordinals correspond to the `type` key in XPC
-pub enum DomainTarget {
-    System = 1,
-    User(uid_t) = 2,
-    Login(au_asid_t) = 3,
-    GUI(uid_t) = 8,
-    PID(pid_t) = 5,
+use xpc_sys::objects::xpc_dictionary::XPCDictionary;
+use xpc_sys::objects::xpc_error::XPCError;
+use crate::launchd::config::{LaunchdEntryType, LaunchdEntryLocation, USER_LAUNCH_AGENTS, ADMIN_LAUNCH_DAEMONS, ADMIN_LAUNCH_AGENTS, SYSTEM_LAUNCH_DAEMONS, SYSTEM_LAUNCH_AGENTS, LaunchdEntryConfig};
+
+lazy_static! {
+    static ref ENTRY_INFO_CACHE: Mutex<HashMap<String, LaunchdEntryInfo>> =
+        Mutex::new(HashMap::new());
 }
 
-impl fmt::Display for DomainTarget {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = format!("{:?}", self).to_ascii_lowercase();
+/// LimitLoadToSessionType key in XPC response
+/// https://developer.apple.com/library/archive/technotes/tn2083/_index.html
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum LimitLoadToSessionType {
+    Aqua,
+    StandardIO,
+    Background,
+    LoginWindow,
+    System,
+    Unknown,
+}
 
-        match self {
-            DomainTarget::User(uid) | DomainTarget::GUI(uid) => write!(f, "{}/{}", name, uid),
-            DomainTarget::Login(asid) => write!(f, "{}/{}", name, asid),
-            DomainTarget::PID(pid) => write!(f, "{}/{}", name, pid),
-            _ => write!(f, "{}", name)
+impl fmt::Display for LimitLoadToSessionType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+// TODO: This feels terrible
+impl From<String> for LimitLoadToSessionType {
+    fn from(value: String) -> Self {
+        let aqua: String = LimitLoadToSessionType::Aqua.to_string();
+        let standard_io: String = LimitLoadToSessionType::StandardIO.to_string();
+        let background: String = LimitLoadToSessionType::Background.to_string();
+        let login_window: String = LimitLoadToSessionType::LoginWindow.to_string();
+        let system: String = LimitLoadToSessionType::System.to_string();
+
+        match value {
+            s if s == aqua => LimitLoadToSessionType::Aqua,
+            s if s == standard_io => LimitLoadToSessionType::StandardIO,
+            s if s == background => LimitLoadToSessionType::Background,
+            s if s == login_window => LimitLoadToSessionType::LoginWindow,
+            s if s == system => LimitLoadToSessionType::System,
+            _ => LimitLoadToSessionType::Unknown,
         }
     }
 }
 
-pub struct QueryTarget(pub DomainTarget, pub Option<String>);
+impl TryFrom<XPCObject> for LimitLoadToSessionType {
+    type Error = XPCError;
 
-impl fmt::Display for QueryTarget {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let QueryTarget(domain, maybe_name) = self;
-        let name = maybe_name.borrow().as_ref().map(|n| format!("/{}", n)).unwrap_or("".to_string());
+    fn try_from(value: XPCObject) -> Result<Self, Self::Error> {
+        if value.xpc_type() != *xpc_type::String {
+            return Err(XPCError::ValueError("xpc_type must be string".to_string()));
+        }
 
-        write!(f, "{}{}", domain, name)
+        let string: String = value.xpc_value().unwrap();
+        Ok(string.into())
     }
 }
 
-/// XPC query for launchctl print domain-target | service-target
-pub fn print(qt: QueryTarget) -> XPCPipeResult {
-    let QueryTarget(domain, maybe_name) = qt;
-
-    // Absence of a name -> domain target only,
-    // different routine + subsystem
-    let routine: u64 = maybe_name.clone().map(|_| 708).unwrap_or(828);
-    let subsystem: u64 = maybe_name.clone().map(|_| 2).unwrap_or(3);
-
-    let mut msg: HashMap<&str, XPCObject> = HashMap::new();
-    msg.insert("routine", routine.into());
-    msg.insert("subsystem", subsystem.into());
-    msg.insert("type", unsafe { discriminant_value(&domain) }.into());
-    msg.insert("handle", (0 as u64).into());
-
-    // Without this, EINVAL -- how can we get this as a dictionary?!
-    // let fd: XPCObject = unsafe { xpc_fd_create(1) }.into();
-    // msg.insert("fd", fd);
-
-    if maybe_name.is_some() {
-        msg.insert("name", maybe_name.unwrap().into());
-    }
-
-    let obj: XPCObject = msg.into();
-    println!("Sending {}", obj);
-    obj.pipe_routine()
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct LaunchdEntryInfo {
+    pub entry_config: Option<LaunchdEntryConfig>,
+    pub limit_load_to_session_type: LimitLoadToSessionType,
 }
 
+pub fn find_entry_info<T: Into<String>>(label: T) -> LaunchdEntryInfo {
+    let label_string = label.into();
+    let mut cache = ENTRY_INFO_CACHE.try_lock().unwrap();
+    if cache.contains_key(label_string.as_str()) {
+        return cache.get(label_string.as_str()).unwrap().clone();
+    }
+
+    let meta = build_entry_info(&label_string);
+    cache.insert(label_string, meta.clone());
+    meta
+}
+
+fn build_entry_info<T: Into<String>>(label: T) -> LaunchdEntryInfo {
+    let label_string = label.into();
+
+    // "launchctl list [name]"
+    let mut msg: HashMap<&str, XPCObject> = from_msg(&LIST_SERVICES);
+    msg.insert("name", label_string.clone().into());
+
+    let msg: XPCObject = msg.into();
+    let limit_load_to_session_type: LimitLoadToSessionType = msg
+        .pipe_routine()
+        .and_then(|o| o.try_into())
+        .and_then(|d: XPCDictionary| d.get(&["service", "LimitLoadToSessionType"]))
+        .and_then(|r| r.try_into())
+        .unwrap_or(LimitLoadToSessionType::Unknown);
+
+    let entry_config = crate::launchd::config::for_entry(label_string.clone());
+
+    LaunchdEntryInfo {
+        limit_load_to_session_type,
+        entry_config
+    }
+}
