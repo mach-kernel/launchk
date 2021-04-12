@@ -520,6 +520,7 @@ dependencies = [
 name = "launchk"
 version = "0.1.0"
 dependencies = [
+ "bitflags",
  "cursive",
  "futures",
  "lazy_static",

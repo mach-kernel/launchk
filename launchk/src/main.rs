@@ -7,6 +7,9 @@ extern crate lazy_static;
 #[macro_use]
 extern crate cursive;
 
+#[macro_use]
+extern crate bitflags;
+
 extern crate plist;
 
 use crate::tui::root::RootLayout;

@@ -1,6 +1,6 @@
 use cursive::view::ViewWrapper;
 
-use cursive::{Cursive, View, XY};
+use cursive::{Cursive, View, XY, Printer};
 
 use std::collections::HashSet;
 
@@ -20,6 +20,10 @@ use crate::launchd::service::{find_entry_info, list_all, LaunchdEntryInfo};
 use crate::tui::table_list_view::{TableListItem, TableListView};
 use std::borrow::Borrow;
 use std::cell::RefCell;
+use cursive::event::{EventResult, Event};
+
+use std::fmt;
+use std::fmt::Formatter;
 
 async fn poll_services(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSinkMessage>) {
     let mut interval = interval(Duration::from_secs(1));
@@ -53,7 +57,7 @@ impl TableListItem for ServiceListItem {
             .entry_config
             .borrow()
             .as_ref()
-            .map(|ec| ec.entry_type.to_string())
+            .map(|ec| format!("{}/{}", ec.entry_location, ec.entry_type))
             .unwrap_or("-".to_string());
 
         vec![
@@ -65,10 +69,50 @@ impl TableListItem for ServiceListItem {
     }
 }
 
+bitflags! {
+    #[derive(Default)]
+    struct JobTypeFilter: u32 {
+        const SYSTEM = (1 << 1);
+        const GLOBAL = (1 << 2);
+        const USER   = (1 << 3);
+        const AGENT  = (1 << 4);
+        const DAEMON = (1 << 5);
+    }
+}
+
+impl fmt::Display for JobTypeFilter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut display = format!("");
+
+        if (*self & JobTypeFilter::SYSTEM) == JobTypeFilter::SYSTEM {
+            display.push('s');
+        }
+
+        if (*self & JobTypeFilter::GLOBAL) == JobTypeFilter::GLOBAL {
+            display.push('g');
+        }
+
+        if (*self & JobTypeFilter::USER) == JobTypeFilter::USER {
+            display.push('u');
+        }
+
+        if (*self & JobTypeFilter::AGENT) == JobTypeFilter::AGENT {
+            display.push('a');
+        }
+
+        if (*self & JobTypeFilter::DAEMON) == JobTypeFilter::DAEMON {
+            display.push('u');
+        }
+
+        write!(f, "{}", display)
+    }
+}
+
 pub struct ServiceListView {
     services: Arc<RwLock<HashSet<String>>>,
     table_list_view: TableListView<ServiceListItem>,
-    current_filter: RefCell<String>,
+    name_filter: RefCell<String>,
+    job_type_filter: RefCell<JobTypeFilter>
 }
 
 impl ServiceListView {
@@ -80,7 +124,8 @@ impl ServiceListView {
 
         Self {
             services: arc_svc.clone(),
-            current_filter: RefCell::new("".into()),
+            name_filter: RefCell::new("".into()),
+            job_type_filter: RefCell::new(JobTypeFilter::default()),
             table_list_view: TableListView::new(vec![
                 "Name".to_string(),
                 "Session Type".to_string(),
@@ -98,7 +143,7 @@ impl ServiceListView {
         }
 
         let services = services.unwrap();
-        let filter = self.current_filter.borrow();
+        let filter = self.name_filter.borrow();
 
         let mut items: Vec<ServiceListItem> = services
             .iter()
@@ -126,21 +171,47 @@ impl ServiceListView {
 impl ViewWrapper for ServiceListView {
     wrap_impl!(self.table_list_view: TableListView<ServiceListItem>);
 
+    /// Bind bitmask filter and other view commands, cleared on omnibox clear
+    fn wrap_on_event(&mut self, ch: Event) -> EventResult {
+        let er = EventResult::Consumed(None);
+        let current_job_type_filter =
+            JobTypeFilter::from_bits(self.job_type_filter.borrow().bits).expect("oof");
+
+        match ch {
+            Event::Char('s') =>
+                self.job_type_filter.replace((current_job_type_filter | JobTypeFilter::SYSTEM)),
+            Event::Char('g') =>
+                self.job_type_filter.replace((current_job_type_filter | JobTypeFilter::GLOBAL)),
+            Event::Char('u') =>
+                self.job_type_filter.replace((current_job_type_filter | JobTypeFilter::USER)),
+            Event::Char('a') =>
+                self.job_type_filter.replace((current_job_type_filter | JobTypeFilter::AGENT)),
+            Event::Char('d') =>
+                self.job_type_filter.replace((current_job_type_filter | JobTypeFilter::DAEMON)),
+            _ => return self.table_list_view.on_event(ch)
+        };
+
+        er
+    }
+
     fn wrap_layout(&mut self, size: XY<usize>) {
         let sorted = self.present_services();
         self.with_view_mut(|v| v.replace_and_preserve_selection(sorted));
         self.table_list_view.layout(size);
     }
+
+
 }
 
 impl OmniboxSubscriber for ServiceListView {
     fn on_omnibox(&mut self, cmd: OmniboxCommand) -> Result<(), ()> {
         match cmd {
             OmniboxCommand::Filter(new_filter) => {
-                self.current_filter.replace(new_filter);
+                self.name_filter.replace(new_filter);
             }
             OmniboxCommand::Clear => {
-                self.current_filter.replace("".to_string());
+                self.name_filter.replace("".to_string());
+                self.job_type_filter.replace(JobTypeFilter::default());
             }
             _ => (),
         };

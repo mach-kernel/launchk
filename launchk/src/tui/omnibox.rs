@@ -71,10 +71,11 @@ impl View for Omnibox {
                 self.mode.replace(OmniboxMode::Filter);
                 OmniboxCommand::Clear
             }
-            Event::Char(':') => {
-                self.mode.replace(OmniboxMode::Command);
-                OmniboxCommand::Clear
-            }
+            // TODO: Overkill and unused
+            // Event::Char(':') => {
+            //     self.mode.replace(OmniboxMode::Command);
+            //     OmniboxCommand::Clear
+            // }
             Event::Char(c) if *self.mode.borrow() != OmniboxMode::Clear => {
                 self.content.borrow_mut().push(c);
                 OmniboxCommand::Filter(self.content.borrow_mut().clone())
