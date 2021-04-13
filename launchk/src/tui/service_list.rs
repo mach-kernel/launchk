@@ -17,7 +17,7 @@ use crate::tui::omnibox_subscribed_view::OmniboxSubscriber;
 use crate::tui::root::CbSinkMessage;
 
 use crate::launchd::service::{find_entry_info, list_all, LaunchdEntryInfo};
-use crate::tui::table_list_view::{TableListItem, TableListView};
+use crate::tui::table::table_list_view::{TableListItem, TableListView};
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use cursive::event::{EventResult, Event};
@@ -101,7 +101,7 @@ impl fmt::Display for JobTypeFilter {
         }
 
         if (*self & JobTypeFilter::DAEMON) == JobTypeFilter::DAEMON {
-            display.push('u');
+            display.push('d');
         }
 
         write!(f, "{}", display)

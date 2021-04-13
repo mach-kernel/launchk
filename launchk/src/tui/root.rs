@@ -80,7 +80,7 @@ impl RootLayout {
                 interval.tick().await;
 
                 if let Ok(cb_sink_msg) = rx.recv() {
-                    sink.send(cb_sink_msg).unwrap();
+                    sink.send(cb_sink_msg).expect("Cannot forward CbSink message")
                 }
             }
         });
