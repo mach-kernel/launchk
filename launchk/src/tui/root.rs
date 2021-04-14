@@ -44,7 +44,7 @@ impl RootLayout {
 
         let sysinfo = Panel::new(SysInfo::default()).full_width();
 
-        let (omnibox, rx_omnibox) = Omnibox::new();
+        let (omnibox, rx_omnibox) = Omnibox::new(&handle);
         self.omnibox_rx.replace(Some(rx_omnibox));
 
         let omnibox = Panel::new(NamedView::new("omnibox", omnibox))
@@ -115,6 +115,14 @@ impl RootLayout {
             return;
         }
 
+        let recv = recv.unwrap();
+
+        // Triggered by Omnibox when toggling to idle
+        if recv == OmniboxCommand::Refocus {
+            self.layout.set_focus_index(RootLayoutChildren::Omnibox as usize);
+            return;
+        }
+
         let target = self
             .layout
             .get_child_mut(*self.last_focus_index.borrow())
@@ -124,7 +132,7 @@ impl RootLayout {
             return;
         }
 
-        target.unwrap().on_omnibox(recv.unwrap()).unwrap();
+        target.unwrap().on_omnibox(recv).unwrap();
     }
 }
 
@@ -136,6 +144,11 @@ impl ViewWrapper for RootLayout {
             Event::Char('/') | Event::Char(':') | Event::CtrlChar('u') => {
                 self.focus_and_forward(RootLayoutChildren::Omnibox, event)
             }
+            Event::Char('s') |
+                Event::Char('g') |
+                Event::Char('u') |
+                Event::Char('a') |
+                Event::Char('d') => self.focus_and_forward(RootLayoutChildren::Omnibox, event),
             _ => self.layout.on_event(event),
         };
 

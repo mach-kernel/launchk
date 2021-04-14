@@ -36,6 +36,7 @@ pub enum LaunchdEntryLocation {
     /// macOS system provided agent or daemon
     System,
     /// "Administrator provided" agent or daemon
+    /// TODO: Global? Local? What's right?
     Global,
     /// User provided agent
     User,
@@ -56,11 +57,11 @@ pub struct LaunchdEntryConfig {
 }
 
 pub const USER_LAUNCH_AGENTS: &str = concat!(env!("HOME"), "/Library/LaunchAgents");
-pub const ADMIN_LAUNCH_AGENTS: &str = "/Library/LaunchAgents";
+pub const GLOBAL_LAUNCH_AGENTS: &str = "/Library/LaunchAgents";
 pub const SYSTEM_LAUNCH_AGENTS: &str = "/System/Library/LaunchAgents";
 
 pub const ADMIN_LAUNCH_DAEMONS: &str = "/Library/LaunchDaemons";
-pub const SYSTEM_LAUNCH_DAEMONS: &str = "/System/Library/LaunchDaemons";
+pub const GLOBAL_LAUNCH_DAEMONS: &str = "/System/Library/LaunchDaemons";
 
 /// Unsure if this is overkill, since the filenames
 /// usually match the label property. Still looking for
@@ -68,10 +69,10 @@ pub const SYSTEM_LAUNCH_DAEMONS: &str = "/System/Library/LaunchDaemons";
 fn init_label_map() {
     let dirs = [
         USER_LAUNCH_AGENTS,
-        ADMIN_LAUNCH_AGENTS,
+        GLOBAL_LAUNCH_AGENTS,
         SYSTEM_LAUNCH_AGENTS,
         ADMIN_LAUNCH_DAEMONS,
-        SYSTEM_LAUNCH_DAEMONS,
+        GLOBAL_LAUNCH_DAEMONS,
     ];
 
     // Get all the plists from everywhere into one stream
@@ -121,7 +122,7 @@ fn init_label_map() {
         }
 
         let entry_type = if path_string.contains(ADMIN_LAUNCH_DAEMONS)
-            || path_string.contains(SYSTEM_LAUNCH_DAEMONS)
+            || path_string.contains(GLOBAL_LAUNCH_DAEMONS)
         {
             LaunchdEntryType::Daemon
         } else {
@@ -130,7 +131,7 @@ fn init_label_map() {
 
         let entry_location = if path_string.contains(USER_LAUNCH_AGENTS) {
             LaunchdEntryLocation::User
-        } else if path_string.contains(ADMIN_LAUNCH_AGENTS)
+        } else if path_string.contains(GLOBAL_LAUNCH_AGENTS)
             || path_string.contains(ADMIN_LAUNCH_DAEMONS)
         {
             LaunchdEntryLocation::Global

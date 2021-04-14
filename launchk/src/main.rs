@@ -1,6 +1,3 @@
-#![feature(arbitrary_enum_discriminant)]
-#![feature(core_intrinsics)]
-
 #[macro_use]
 extern crate lazy_static;
 
