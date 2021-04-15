@@ -105,22 +105,33 @@ impl ServiceListView {
         }
 
         let services = services.unwrap();
-        let filter = self.name_filter.borrow();
+        let name_filter = self.name_filter.borrow();
+        let job_type_filter = self.job_type_filter.borrow();
 
         let mut items: Vec<ServiceListItem> = services
             .iter()
             .filter_map(|s| {
-                if !filter.is_empty()
+                if !name_filter.is_empty()
                     && !s
                         .to_ascii_lowercase()
-                        .contains(filter.to_ascii_lowercase().as_str())
+                        .contains(name_filter.to_ascii_lowercase().as_str())
                 {
+                    return None;
+                }
+
+                let entry_info = find_entry_info(s);
+
+                if !job_type_filter.is_empty() &&
+                    entry_info.entry_config
+                        .as_ref()
+                        .map(|ec| !job_type_filter.contains(ec.job_type_filter()))
+                        .unwrap_or(true) {
                     return None;
                 }
 
                 Some(ServiceListItem {
                     name: s.clone(),
-                    entry_info: find_entry_info(s),
+                    entry_info,
                 })
             })
             .collect();
@@ -138,8 +149,6 @@ impl ViewWrapper for ServiceListView {
         self.with_view_mut(|v| v.replace_and_preserve_selection(sorted));
         self.table_list_view.layout(size);
     }
-
-
 }
 
 impl OmniboxSubscriber for ServiceListView {

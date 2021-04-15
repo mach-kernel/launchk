@@ -9,6 +9,7 @@ use futures::StreamExt;
 use std::borrow::Borrow;
 
 use std::fmt;
+use crate::tui::job_type_filter::JobTypeFilter;
 
 static LABEL_MAP_INIT: Once = Once::new();
 
@@ -54,6 +55,25 @@ pub struct LaunchdEntryConfig {
     pub entry_location: LaunchdEntryLocation,
     pub plist_path: String,
     pub readonly: bool,
+}
+
+impl LaunchdEntryConfig {
+    pub fn job_type_filter(&self) -> JobTypeFilter {
+        let mut jtf = JobTypeFilter::default();
+
+        match self.entry_location {
+            LaunchdEntryLocation::System => jtf.toggle(JobTypeFilter::SYSTEM),
+            LaunchdEntryLocation::Global => jtf.toggle(JobTypeFilter::GLOBAL),
+            LaunchdEntryLocation::User => jtf.toggle(JobTypeFilter::USER),
+        };
+
+        match self.entry_type {
+            LaunchdEntryType::Agent => jtf.toggle(JobTypeFilter::AGENT),
+            LaunchdEntryType::Daemon => jtf.toggle(JobTypeFilter::DAEMON)
+        };
+
+        jtf
+    }
 }
 
 pub const USER_LAUNCH_AGENTS: &str = concat!(env!("HOME"), "/Library/LaunchAgents");

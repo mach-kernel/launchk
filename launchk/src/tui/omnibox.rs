@@ -45,15 +45,24 @@ async fn omnibox_tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxComman
 
     loop {
         tick_rate.tick().await;
-        let read_state = &*state.read().expect("Omnibox must update");
-        let OmniboxState(mode, cmd, last) = read_state.clone();
 
-        if mode == OmniboxMode::Idle || SystemTime::now().duration_since(last).unwrap().as_secs() < 1 {
+        let read = state.try_read();
+        if read.is_err() {
             continue;
         }
 
-        let mut write = state.write().expect("Omnibox must write");
-        *write = OmniboxState(OmniboxMode::Idle, cmd, SystemTime::now());
+        let read = read.unwrap();
+        let OmniboxState(ref mode, ref cmd, ref last) = &*read;
+
+        if *mode == OmniboxMode::Idle || SystemTime::now().duration_since(*last).unwrap().as_secs() < 1 {
+            continue;
+        }
+
+        let cmd = cmd.clone();
+        drop(read);
+
+        let mut write = state.write().expect("Must queue write");
+        *write = OmniboxState(OmniboxMode::Idle, cmd.clone(), SystemTime::now());
 
         // Refocus the service list
         tx.send(OmniboxCommand::Refocus);
@@ -157,8 +166,8 @@ impl View for Omnibox {
     }
 
     fn on_event(&mut self, event: Event) -> EventResult {
-        let state = &*self.state.read().expect("Must read state");
-        let state = state.clone();
+        let read = self.state.read().expect("Must read state");
+        let state = &read.clone();
         let mut event_result = EventResult::Consumed(None);
 
         let command = if let Event::CtrlChar('u') = event {
@@ -172,14 +181,16 @@ impl View for Omnibox {
             OmniboxCommand::NoOp
         };
 
-        // let mut write = self.state.write().expect("Must write state");
-        //
-        // match event_result {
-        //     EventResult::Ignored => {
-        //         *write = OmniboxState(OmniboxMode::Active, command.clone(), SystemTime::now());
-        //     }
-        //     _ => {}
-        // };
+        drop(read);
+
+        match event_result {
+            EventResult::Ignored => return event_result,
+            _ => {
+                let mut write = self.state.write().expect("Must write state");
+                *write = OmniboxState(OmniboxMode::Active, command.clone(), SystemTime::now());
+                drop(write);
+            }
+        };
 
         self.tx.send(command).expect("Must send Omnibox command");
         event_result
