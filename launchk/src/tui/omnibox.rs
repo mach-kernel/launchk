@@ -41,7 +41,7 @@ impl Default for OmniboxState {
 /// Move OmniboxState back to some time after the user stops
 /// interacting with it
 async fn omnibox_tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxCommand>) {
-    let mut tick_rate = interval(Duration::from_secs(2));
+    let mut tick_rate = interval(Duration::from_secs(1));
 
     loop {
         tick_rate.tick().await;
@@ -143,7 +143,7 @@ impl Omnibox {
 impl View for Omnibox {
     fn draw(&self, printer: &Printer<'_, '_>) {
         let state = &*self.state.read().expect("Must read state");
-        let OmniboxState(_, cmd, _) = state.clone();
+        let OmniboxState(mode, cmd, _) = state.clone();
 
         let fmt_cmd = match cmd {
             OmniboxCommand::Clear => "".into(),
@@ -152,7 +152,14 @@ impl View for Omnibox {
         };
 
         let subtle = Style::from(Color::Light(BaseColor::Black));
-        printer.with_style(subtle, |p| p.print(XY::new(0, 0), &fmt_cmd));
+        let purple = Style::from(Color::Light(BaseColor::Blue));
+        let style = if let OmniboxMode::Idle = mode {
+            subtle
+        } else {
+            purple
+        };
+
+        printer.with_style(style, |p| p.print(XY::new(0, 0), &fmt_cmd));
 
         match cmd {
             OmniboxCommand::NameFilter(filter) => {
@@ -177,9 +184,12 @@ impl View for Omnibox {
         } else if state.0 == OmniboxMode::Idle {
             Self::handle_idle(&event, &state)
         } else {
-            event_result = EventResult::Ignored;
             OmniboxCommand::NoOp
         };
+
+        if command == OmniboxCommand::NoOp {
+            event_result = EventResult::Ignored;
+        }
 
         drop(read);
 

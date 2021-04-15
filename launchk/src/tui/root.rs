@@ -119,7 +119,7 @@ impl RootLayout {
 
         // Triggered by Omnibox when toggling to idle
         if recv == OmniboxCommand::Refocus {
-            self.layout.set_focus_index(RootLayoutChildren::Omnibox as usize);
+            self.layout.set_focus_index(RootLayoutChildren::ServiceList as usize);
             return;
         }
 
@@ -148,6 +148,7 @@ impl ViewWrapper for RootLayout {
                 Event::Char('g') |
                 Event::Char('u') |
                 Event::Char('a') |
+
                 Event::Char('d') => self.focus_and_forward(RootLayoutChildren::Omnibox, event),
             _ => self.layout.on_event(event),
         };
