@@ -6,7 +6,7 @@ use cursive::{Printer, Vec2, View, XY};
 use std::cell::RefCell;
 use crate::tui::table::table_headers::TableHeaders;
 use std::marker::PhantomData;
-use cursive::event::{EventResult, Event};
+use cursive::event::{EventResult, Event, Key};
 
 pub trait TableListItem {
     fn as_row(&self) -> Vec<String>;
@@ -32,6 +32,10 @@ impl<T: 'static + TableListItem> TableListView<T> {
             num_columns: *num_columns,
             inner: PhantomData::default()
         }
+    }
+
+    pub fn update(&mut self) {
+        self.linear_layout.set_focus_index(1);
     }
 
     pub fn replace_and_preserve_selection<I>(&mut self, items: I)
@@ -82,6 +86,4 @@ impl<T: 'static + TableListItem> ViewWrapper for TableListView<T> {
         self.last_layout_size.replace(size);
         self.linear_layout.layout(size);
     }
-
-
 }

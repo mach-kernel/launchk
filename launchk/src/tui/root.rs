@@ -1,6 +1,6 @@
 use cursive::view::ViewWrapper;
 use cursive::views::{LinearLayout, NamedView, Panel};
-use cursive::{Cursive, View};
+use cursive::{Cursive, View, Vec2};
 use tokio::runtime::Handle;
 use tokio::time::interval;
 
@@ -19,8 +19,10 @@ pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 
 pub struct RootLayout {
     layout: LinearLayout,
-    omnibox_rx: RefCell<Option<Receiver<OmniboxCommand>>>,
+    omnibox_rx: Receiver<OmniboxCommand>,
     last_focus_index: RefCell<usize>,
+    runtime_handle: Handle,
+    cbsink_channel: Sender<CbSinkMessage>,
 }
 
 #[allow(dead_code)]
@@ -31,27 +33,30 @@ enum RootLayoutChildren {
 }
 
 impl RootLayout {
-    pub fn new() -> Self {
-        Self {
+    pub fn new(siv: &mut Cursive, runtime_handle: &Handle) -> Self {
+        let (omnibox, omnibox_rx) = Omnibox::new(runtime_handle);
+
+        let mut new = Self {
+            omnibox_rx,
             layout: LinearLayout::vertical(),
-            omnibox_rx: RefCell::new(None),
             last_focus_index: RefCell::new(RootLayoutChildren::ServiceList as usize),
-        }
+            cbsink_channel: RootLayout::cbsink_channel(siv, runtime_handle),
+            runtime_handle: runtime_handle.clone()
+
+        };
+
+        new.setup(omnibox);
+        new
     }
 
-    pub fn setup(&mut self, siv: &mut Cursive, handle: Handle) {
-        let tx = RootLayout::cbsink_channel(siv, &handle);
-
+    fn setup(&mut self, omnibox: Omnibox) {
         let sysinfo = Panel::new(SysInfo::default()).full_width();
-
-        let (omnibox, rx_omnibox) = Omnibox::new(&handle);
-        self.omnibox_rx.replace(Some(rx_omnibox));
 
         let omnibox = Panel::new(NamedView::new("omnibox", omnibox))
             .full_width()
             .max_height(3);
 
-        let service_list = ServiceListView::new(handle, tx.clone())
+        let service_list = ServiceListView::new(&self.runtime_handle, self.cbsink_channel.clone())
             .full_width()
             .full_height()
             .scrollable()
@@ -89,27 +94,13 @@ impl RootLayout {
     }
 
     fn focus_and_forward(&mut self, child: RootLayoutChildren, event: Event) -> EventResult {
-        let current_focus = self.layout.get_focus_index();
-
-        // The Omnibox shouldn't/can't consume its own events
-        if current_focus != RootLayoutChildren::Omnibox as usize {
-            self.last_focus_index.replace(current_focus);
-        }
-
-        self.layout.set_focus_index(child as usize).unwrap_or(());
+        self.layout.set_focus_index(child as usize).expect("Must focus");
         self.layout.on_event(event)
     }
 
     /// Check for Omnibox commands during Cursive's on_event
     fn poll_omnibox(&mut self) {
-        let rxcell = self.omnibox_rx.borrow();
-        let rxcell = rxcell.as_ref();
-
-        if rxcell.is_none() {
-            return;
-        }
-
-        let recv = rxcell.unwrap().try_recv();
+        let recv = self.omnibox_rx.try_recv();
 
         if recv.is_err() {
             return;
@@ -132,7 +123,7 @@ impl RootLayout {
             return;
         }
 
-        target.unwrap().on_omnibox(recv).unwrap();
+        target.unwrap().on_omnibox(recv).expect("Must deliver Omnibox message");
     }
 }
 
@@ -148,7 +139,6 @@ impl ViewWrapper for RootLayout {
                 Event::Char('g') |
                 Event::Char('u') |
                 Event::Char('a') |
-
                 Event::Char('d') => self.focus_and_forward(RootLayoutChildren::Omnibox, event),
             _ => self.layout.on_event(event),
         };
@@ -156,5 +146,10 @@ impl ViewWrapper for RootLayout {
         self.poll_omnibox();
 
         ev
+    }
+
+    fn wrap_layout(&mut self, size: Vec2) {
+        self.poll_omnibox();
+        self.layout.layout(size)
     }
 }

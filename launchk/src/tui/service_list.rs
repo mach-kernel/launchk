@@ -1,4 +1,4 @@
-use cursive::view::ViewWrapper;
+use cursive::view::{ViewWrapper, Selector};
 
 use cursive::{Cursive, View, XY, Printer};
 
@@ -25,6 +25,7 @@ use cursive::event::{EventResult, Event};
 use std::fmt;
 use std::fmt::Formatter;
 use crate::tui::job_type_filter::JobTypeFilter;
+use std::prelude::v1::Result::Err;
 
 async fn poll_services(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSinkMessage>) {
     let mut interval = interval(Duration::from_secs(1));
@@ -74,11 +75,11 @@ pub struct ServiceListView {
     services: Arc<RwLock<HashSet<String>>>,
     table_list_view: TableListView<ServiceListItem>,
     name_filter: RefCell<String>,
-    job_type_filter: RefCell<JobTypeFilter>
+    job_type_filter: RefCell<JobTypeFilter>,
 }
 
 impl ServiceListView {
-    pub fn new(runtime_handle: Handle, cb_sink: Sender<CbSinkMessage>) -> Self {
+    pub fn new(runtime_handle: &Handle, cb_sink: Sender<CbSinkMessage>) -> Self {
         let arc_svc = Arc::new(RwLock::new(HashSet::new()));
         let ref_clone = arc_svc.clone();
 

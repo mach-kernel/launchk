@@ -41,20 +41,15 @@ impl Default for OmniboxState {
 /// Move OmniboxState back to some time after the user stops
 /// interacting with it
 async fn omnibox_tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxCommand>) {
-    let mut tick_rate = interval(Duration::from_secs(1));
+    let mut tick_rate = interval(Duration::from_millis(500));
 
     loop {
         tick_rate.tick().await;
 
-        let read = state.try_read();
-        if read.is_err() {
-            continue;
-        }
-
-        let read = read.unwrap();
+        let read = state.read().expect("Must read state");
         let OmniboxState(ref mode, ref cmd, ref last) = &*read;
 
-        if *mode == OmniboxMode::Idle || SystemTime::now().duration_since(*last).unwrap().as_secs() < 1 {
+        if *mode == OmniboxMode::Idle || SystemTime::now().duration_since(*last).unwrap().as_millis() < 500 {
             continue;
         }
 
@@ -128,7 +123,7 @@ impl Omnibox {
         let OmniboxState(_, ref cmd, _) = state;
 
         match (event, cmd) {
-            (Event::Char('/'), OmniboxCommand::NameFilter(_)) => cmd.clone(),
+            // (Event::Char('/'), OmniboxCommand::NameFilter(_)) => cmd.clone(),
             (Event::Char('/'), _)  => OmniboxCommand::NameFilter("".to_string()),
             (Event::Char('s'), _) => Self::merge_job_type_filter(cmd, JobTypeFilter::SYSTEM),
             (Event::Char('g'), _) => Self::merge_job_type_filter(cmd, JobTypeFilter::GLOBAL),
@@ -182,6 +177,7 @@ impl View for Omnibox {
         } else if state.0 == OmniboxMode::Active {
             Self::handle_active(&event, &state)
         } else if state.0 == OmniboxMode::Idle {
+            self.tx.send(OmniboxCommand::Refocus).expect("Must send Omnibox command");
             Self::handle_idle(&event, &state)
         } else {
             OmniboxCommand::NoOp
