@@ -143,6 +143,7 @@ impl View for Omnibox {
         let fmt_cmd = match cmd {
             OmniboxCommand::Clear => "".into(),
             OmniboxCommand::NameFilter(_) => "Filter > ".to_string(),
+            OmniboxCommand::JobTypeFilter(_) => "[s]ystem | [g]lobal | [u]ser | [a]gent | [d]aemon".to_string(),
             _ => "".to_string(),
         };
 
@@ -177,8 +178,9 @@ impl View for Omnibox {
         } else if state.0 == OmniboxMode::Active {
             Self::handle_active(&event, &state)
         } else if state.0 == OmniboxMode::Idle {
+            let ev = Self::handle_idle(&event, &state);
             self.tx.send(OmniboxCommand::Refocus).expect("Must send Omnibox command");
-            Self::handle_idle(&event, &state)
+            ev
         } else {
             OmniboxCommand::NoOp
         };
@@ -194,7 +196,6 @@ impl View for Omnibox {
             _ => {
                 let mut write = self.state.write().expect("Must write state");
                 *write = OmniboxState(OmniboxMode::Active, command.clone(), SystemTime::now());
-                drop(write);
             }
         };
 

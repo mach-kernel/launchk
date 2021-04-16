@@ -26,6 +26,7 @@ use std::fmt;
 use std::fmt::Formatter;
 use crate::tui::job_type_filter::JobTypeFilter;
 use std::prelude::v1::Result::Err;
+use cursive::theme::{Color, BaseColor, Effect, Style};
 
 async fn poll_services(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSinkMessage>) {
     let mut interval = interval(Duration::from_secs(1));
@@ -76,6 +77,7 @@ pub struct ServiceListView {
     table_list_view: TableListView<ServiceListItem>,
     name_filter: RefCell<String>,
     job_type_filter: RefCell<JobTypeFilter>,
+    last_size: RefCell<XY<usize>>,
 }
 
 impl ServiceListView {
@@ -95,6 +97,7 @@ impl ServiceListView {
                 "Job Type".to_string(),
                 "PID".to_string(),
             ]),
+            last_size: RefCell::new(XY::new(0, 0))
         }
     }
 
@@ -145,10 +148,29 @@ impl ServiceListView {
 impl ViewWrapper for ServiceListView {
     wrap_impl!(self.table_list_view: TableListView<ServiceListItem>);
 
+    fn wrap_draw(&self, printer: &Printer<'_, '_>) {
+        self.table_list_view.draw(printer);
+
+        let mut begin = self.last_size.borrow().x - 7;
+        let jtf = self.job_type_filter.borrow().to_string();
+        let style_on = Style::from(Color::Dark(BaseColor::Blue)).combine(Effect::Bold);
+
+        for char in "[sguad]".to_string().chars() {
+            if jtf.contains(char) {
+                printer.with_style(style_on, |p| p.print(XY::new(begin, 0), char.to_string().as_str()));
+            } else {
+                printer.print(XY::new(begin, 0), char.to_string().as_str());
+            }
+
+            begin += 1;
+        }
+    }
+
     fn wrap_layout(&mut self, size: XY<usize>) {
         let sorted = self.present_services();
         self.with_view_mut(|v| v.replace_and_preserve_selection(sorted));
         self.table_list_view.layout(size);
+        self.last_size.replace(size);
     }
 }
 
