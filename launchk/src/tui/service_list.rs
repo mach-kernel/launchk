@@ -22,6 +22,7 @@ use std::borrow::Borrow;
 use std::cell::RefCell;
 
 use crate::tui::job_type_filter::JobTypeFilter;
+use cursive::direction::Direction;
 
 async fn poll_services(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSinkMessage>) {
     let mut interval = interval(Duration::from_secs(1));
@@ -147,6 +148,10 @@ impl ViewWrapper for ServiceListView {
         let sorted = self.present_services();
         self.with_view_mut(|v| v.replace_and_preserve_selection(sorted));
         self.table_list_view.layout(size);
+    }
+
+    fn wrap_take_focus(&mut self, _: Direction) -> bool {
+        true
     }
 }
 

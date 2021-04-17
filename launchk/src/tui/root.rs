@@ -95,7 +95,9 @@ impl RootLayout {
     }
 
     fn focus_and_forward(&mut self, child: RootLayoutChildren, event: Event) -> EventResult {
-        self.layout.set_focus_index(child as usize);
+        self.layout
+            .set_focus_index(child as usize)
+            .expect("Must focus child");
         self.layout.on_event(event)
     }
 
@@ -112,7 +114,8 @@ impl RootLayout {
         // Triggered by Omnibox when toggling to idle
         if recv == OmniboxEvent::FocusServiceList {
             self.layout
-                .set_focus_index(RootLayoutChildren::ServiceList as usize);
+                .set_focus_index(RootLayoutChildren::ServiceList as usize)
+                .expect("Must focus SL");
             return;
         }
 

@@ -1,10 +1,11 @@
+use std::ffi::CStr;
+
 use crate::objects::xpc_object::XPCObject;
 use crate::objects::xpc_type;
 use crate::{
-    mach_port_t, xpc_bool_get_value, xpc_int64_get_value, xpc_object_t, xpc_string_get_string_ptr,
-    xpc_type_get_name, xpc_uint64_get_value,
+    xpc_bool_get_value, xpc_int64_get_value, xpc_string_get_string_ptr, xpc_type_get_name,
+    xpc_uint64_get_value,
 };
-use std::ffi::CStr;
 
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::ValueError;

@@ -1,10 +1,8 @@
-use crate::{
-    mach_port_t, xpc_dictionary_create, xpc_get_type, xpc_int64_create, xpc_object_t, xpc_release,
-    xpc_type_t, xpc_uint64_create,
-};
+use std::collections::HashMap;
+
+use crate::{mach_port_t, xpc_get_type, xpc_object_t, xpc_type_t};
 
 use crate::objects::xpc_object::XPCObject;
-use std::collections::HashMap;
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

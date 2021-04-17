@@ -1,15 +1,11 @@
+use std::borrow::Borrow;
 use std::collections::HashMap;
-use std::sync::{Mutex, Once};
-
+use std::fmt;
 use std::fs;
 use std::path::Path;
-
-use futures::StreamExt;
-
-use std::borrow::Borrow;
+use std::sync::{Mutex, Once};
 
 use crate::tui::job_type_filter::JobTypeFilter;
-use std::fmt;
 
 static LABEL_MAP_INIT: Once = Once::new();
 

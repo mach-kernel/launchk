@@ -16,8 +16,6 @@ use tokio::time::interval;
 /// via a channel in a wrapped view
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum OmniboxEvent {
-    NoOp,
-    Clear,
     FocusServiceList,
     StateUpdate(OmniboxState),
 }
@@ -50,12 +48,6 @@ impl OmniboxState {
             name_filter: name_filter.unwrap_or(self.name_filter.clone()),
             job_type_filter: job_type_filter.unwrap_or(self.job_type_filter.clone()),
         }
-    }
-
-    pub fn now(&self) -> OmniboxState {
-        let mut with_now = self.clone();
-        with_now.tick = SystemTime::now();
-        with_now
     }
 }
 
@@ -91,11 +83,15 @@ async fn omnibox_tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>
         drop(read);
         let mut write = state.write().expect("Must write");
 
-        // Refocus the service list
-        tx.send(OmniboxEvent::FocusServiceList);
+        let out = [
+            tx.send(OmniboxEvent::FocusServiceList),
+            tx.send(OmniboxEvent::StateUpdate(new.clone())),
+        ];
 
-        // Send the state update
-        tx.send(OmniboxEvent::StateUpdate(new.clone()));
+        for msg in out.iter() {
+            msg.as_ref().expect("Must send");
+        }
+
         *write = new;
     }
 }
@@ -282,7 +278,12 @@ impl View for Omnibox {
         let mode = &state.mode;
 
         let new_state = match (event, mode) {
-            (Event::CtrlChar('u'), _) => Some(OmniboxState::default()),
+            (Event::CtrlChar('u'), _) => {
+                self.tx
+                    .send(OmniboxEvent::FocusServiceList)
+                    .expect("Must focus");
+                Some(OmniboxState::default())
+            }
             (e, OmniboxMode::Idle) => Self::handle_idle(&e, &*state),
             (e, _) => Self::handle_active(&e, &*state),
         };
@@ -292,7 +293,9 @@ impl View for Omnibox {
         }
 
         let new_state = new_state.unwrap();
-        self.tx.send(OmniboxEvent::StateUpdate(new_state.clone()));
+        self.tx
+            .send(OmniboxEvent::StateUpdate(new_state.clone()))
+            .expect("Must broadcast state");
 
         drop(state);
         let mut write = self.state.write().expect("Must write state");

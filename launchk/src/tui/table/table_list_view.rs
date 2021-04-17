@@ -38,10 +38,6 @@ impl<T: 'static + TableListItem> TableListView<T> {
         }
     }
 
-    pub fn update(&mut self) {
-        self.linear_layout.set_focus_index(1);
-    }
-
     pub fn replace_and_preserve_selection<I>(&mut self, items: I)
     where
         I: IntoIterator<Item = T>,
@@ -87,7 +83,7 @@ impl<T: 'static + TableListItem> ViewWrapper for TableListView<T> {
     wrap_impl!(self.linear_layout: LinearLayout);
 
     fn wrap_on_event(&mut self, ch: Event) -> EventResult {
-        self.linear_layout.set_focus_index(1);
+        self.linear_layout.set_focus_index(1).expect("Must focus");
         self.linear_layout.on_event(ch)
     }
 

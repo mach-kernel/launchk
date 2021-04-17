@@ -1,21 +1,18 @@
-use crate::{objects, xpc_retain};
-use crate::{
-    xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_get_type,
-    xpc_object_t, xpc_type_t,
-};
-use block::ConcreteBlock;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
-
 use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
+use std::ptr::{null, null_mut};
+use std::rc::Rc;
 
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::DictionaryError;
 use crate::objects::xpc_object::XPCObject;
-use std::os::raw::c_char;
-use std::ptr::{null, null_mut};
-use std::rc::Rc;
+use crate::{objects, xpc_retain};
+use crate::{xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t};
+
+use block::ConcreteBlock;
 
 pub struct XPCDictionary(pub HashMap<String, XPCObject>);
 
