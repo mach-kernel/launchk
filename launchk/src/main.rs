@@ -26,7 +26,7 @@ fn main() {
     let mut siv: Cursive = cursive::default();
     siv.load_toml(include_str!("tui/style.toml")).unwrap();
 
-    let mut root_layout = RootLayout::new(&mut siv, runtime.handle());
+    let root_layout = RootLayout::new(&mut siv, runtime.handle());
 
     let panel = Panel::new(root_layout)
         .title("launchk")

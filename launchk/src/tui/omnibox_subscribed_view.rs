@@ -1,4 +1,4 @@
-use crate::tui::omnibox::{OmniboxEvent};
+use crate::tui::omnibox::OmniboxEvent;
 use cursive::view::{Selector, ViewWrapper};
 use cursive::views::{Panel, ResizedView, ScrollView};
 use cursive::{Printer, Rect, Vec2, View};

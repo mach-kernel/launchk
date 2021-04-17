@@ -1,6 +1,6 @@
-use cursive::view::{ViewWrapper, Selector};
+use cursive::view::ViewWrapper;
 
-use cursive::{Cursive, View, XY, Printer};
+use cursive::{Cursive, View, XY};
 
 use std::collections::HashSet;
 
@@ -20,13 +20,8 @@ use crate::launchd::service::{find_entry_info, list_all, LaunchdEntryInfo};
 use crate::tui::table::table_list_view::{TableListItem, TableListView};
 use std::borrow::Borrow;
 use std::cell::RefCell;
-use cursive::event::{EventResult, Event};
 
-use std::fmt;
-use std::fmt::Formatter;
 use crate::tui::job_type_filter::JobTypeFilter;
-use std::prelude::v1::Result::Err;
-use cursive::theme::{Color, BaseColor, Effect, Style};
 
 async fn poll_services(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSinkMessage>) {
     let mut interval = interval(Duration::from_secs(1));
@@ -123,11 +118,13 @@ impl ServiceListView {
 
                 let entry_info = find_entry_info(s);
 
-                if !job_type_filter.is_empty() &&
-                    entry_info.entry_config
+                if !job_type_filter.is_empty()
+                    && entry_info
+                        .entry_config
                         .as_ref()
                         .map(|ec| !job_type_filter.contains(ec.job_type_filter()))
-                        .unwrap_or(true) {
+                        .unwrap_or(true)
+                {
                     return None;
                 }
 
@@ -155,7 +152,12 @@ impl ViewWrapper for ServiceListView {
 
 impl OmniboxSubscriber for ServiceListView {
     fn on_omnibox(&mut self, event: OmniboxEvent) -> Result<(), ()> {
-        if let OmniboxEvent::StateUpdate(OmniboxState { name_filter, job_type_filter, .. }) = event {
+        if let OmniboxEvent::StateUpdate(OmniboxState {
+            name_filter,
+            job_type_filter,
+            ..
+        }) = event
+        {
             self.name_filter.replace(name_filter);
             self.job_type_filter.replace(job_type_filter);
         }

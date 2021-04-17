@@ -1,12 +1,11 @@
-use cursive::theme::{BaseColor, Color, Effect, Style};
-use cursive::view::ViewWrapper;
-use cursive::views::{SelectView, LinearLayout, DummyView, ResizedView, ScrollView};
-use cursive::traits::{Resizable, Scrollable};
-use cursive::{Printer, Vec2, View, XY};
-use std::cell::RefCell;
 use crate::tui::table::table_headers::TableHeaders;
+use cursive::event::{Event, EventResult};
+use cursive::traits::{Resizable, Scrollable};
+use cursive::view::ViewWrapper;
+use cursive::views::{LinearLayout, ResizedView, ScrollView, SelectView};
+use cursive::{Vec2, View, XY};
+use std::cell::RefCell;
 use std::marker::PhantomData;
-use cursive::event::{EventResult, Event, Key};
 
 pub trait TableListItem {
     fn as_row(&self) -> Vec<String>;
@@ -16,7 +15,7 @@ pub struct TableListView<T> {
     linear_layout: LinearLayout,
     last_layout_size: RefCell<XY<usize>>,
     num_columns: usize,
-    inner: PhantomData<T>
+    inner: PhantomData<T>,
 }
 
 impl<T: 'static + TableListItem> TableListView<T> {
@@ -25,12 +24,17 @@ impl<T: 'static + TableListItem> TableListView<T> {
 
         let mut linear_layout = LinearLayout::vertical();
         linear_layout.add_child(TableHeaders::new(columns.iter()).full_width().max_height(1));
-        linear_layout.add_child(SelectView::<T>::new().full_width().full_height().scrollable());
+        linear_layout.add_child(
+            SelectView::<T>::new()
+                .full_width()
+                .full_height()
+                .scrollable(),
+        );
         Self {
             linear_layout,
             last_layout_size: RefCell::new(XY::new(0, 0)),
             num_columns: *num_columns,
-            inner: PhantomData::default()
+            inner: PhantomData::default(),
         }
     }
 
@@ -44,8 +48,13 @@ impl<T: 'static + TableListItem> TableListView<T> {
     {
         // Get the index of the SelectView and unwrap it out of
         // ScrollView<ResizedView<ResizedView<SelectView<T>>>>
-        let sv = self.linear_layout.get_child_mut(1)
-            .and_then(|c| c.as_any_mut().downcast_mut::<ScrollView<ResizedView<ResizedView<SelectView<T>>>>>())
+        let sv = self
+            .linear_layout
+            .get_child_mut(1)
+            .and_then(|c| {
+                c.as_any_mut()
+                    .downcast_mut::<ScrollView<ResizedView<ResizedView<SelectView<T>>>>>()
+            })
             .and_then(|v| Some(v.get_inner_mut()))
             .and_then(|v| Some(v.get_inner_mut()))
             .and_then(|v| Some(v.get_inner_mut()))

@@ -1,6 +1,6 @@
 use cursive::view::ViewWrapper;
 use cursive::views::{LinearLayout, NamedView, Panel};
-use cursive::{Cursive, View, Vec2};
+use cursive::{Cursive, Vec2, View};
 use tokio::runtime::Handle;
 use tokio::time::interval;
 
@@ -42,8 +42,7 @@ impl RootLayout {
             layout: LinearLayout::vertical(),
             last_focus_index: RefCell::new(RootLayoutChildren::ServiceList as usize),
             cbsink_channel: RootLayout::cbsink_channel(siv, runtime_handle),
-            runtime_handle: runtime_handle.clone()
-
+            runtime_handle: runtime_handle.clone(),
         };
 
         new.setup(omnibox);
@@ -86,7 +85,8 @@ impl RootLayout {
                 interval.tick().await;
 
                 if let Ok(cb_sink_msg) = rx.recv() {
-                    sink.send(cb_sink_msg).expect("Cannot forward CbSink message")
+                    sink.send(cb_sink_msg)
+                        .expect("Cannot forward CbSink message")
                 }
             }
         });
@@ -95,7 +95,6 @@ impl RootLayout {
     }
 
     fn focus_and_forward(&mut self, child: RootLayoutChildren, event: Event) -> EventResult {
-        println!("Forwarding {:?} {:?}", child, event);
         self.layout.set_focus_index(child as usize);
         self.layout.on_event(event)
     }
@@ -112,7 +111,8 @@ impl RootLayout {
 
         // Triggered by Omnibox when toggling to idle
         if recv == OmniboxEvent::FocusServiceList {
-            self.layout.set_focus_index(RootLayoutChildren::ServiceList as usize);
+            self.layout
+                .set_focus_index(RootLayoutChildren::ServiceList as usize);
             return;
         }
 
@@ -125,7 +125,10 @@ impl RootLayout {
             return;
         }
 
-        target.unwrap().on_omnibox(recv).expect("Must deliver Omnibox message");
+        target
+            .unwrap()
+            .on_omnibox(recv)
+            .expect("Must deliver Omnibox message");
     }
 }
 
@@ -137,11 +140,11 @@ impl ViewWrapper for RootLayout {
             Event::Char('/') | Event::Char(':') | Event::CtrlChar('u') => {
                 self.focus_and_forward(RootLayoutChildren::Omnibox, event)
             }
-            Event::Char('s') |
-                Event::Char('g') |
-                Event::Char('u') |
-                Event::Char('a') |
-                Event::Char('d') => self.focus_and_forward(RootLayoutChildren::Omnibox, event),
+            Event::Char('s')
+            | Event::Char('g')
+            | Event::Char('u')
+            | Event::Char('a')
+            | Event::Char('d') => self.focus_and_forward(RootLayoutChildren::Omnibox, event),
             _ => self.layout.on_event(event),
         };
 

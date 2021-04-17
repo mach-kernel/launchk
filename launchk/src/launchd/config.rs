@@ -8,8 +8,8 @@ use futures::StreamExt;
 
 use std::borrow::Borrow;
 
-use std::fmt;
 use crate::tui::job_type_filter::JobTypeFilter;
+use std::fmt;
 
 static LABEL_MAP_INIT: Once = Once::new();
 
@@ -69,7 +69,7 @@ impl LaunchdEntryConfig {
 
         match self.entry_type {
             LaunchdEntryType::Agent => jtf.toggle(JobTypeFilter::AGENT),
-            LaunchdEntryType::Daemon => jtf.toggle(JobTypeFilter::DAEMON)
+            LaunchdEntryType::Daemon => jtf.toggle(JobTypeFilter::DAEMON),
         };
 
         jtf
