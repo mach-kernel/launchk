@@ -2,12 +2,13 @@ use crate::objects::xpc_error::XPCError::{DictionaryError, PipeError};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum XPCError {
     DictionaryError(String),
     PipeError(String),
     ValueError(String),
     StandardError,
+    NotFound,
 }
 
 impl Display for XPCError {

@@ -1,21 +1,18 @@
-use crate::{objects, xpc_retain};
-use crate::{
-    xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_get_type,
-    xpc_object_t, xpc_type_t,
-};
-use block::ConcreteBlock;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::convert::TryFrom;
-
+use std::convert::{TryFrom, TryInto};
 use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
+use std::ptr::{null, null_mut};
+use std::rc::Rc;
 
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::DictionaryError;
 use crate::objects::xpc_object::XPCObject;
-use std::os::raw::c_char;
-use std::ptr::{null, null_mut};
-use std::rc::Rc;
+use crate::{objects, xpc_retain};
+use crate::{xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t};
+
+use block::ConcreteBlock;
 
 pub struct XPCDictionary(pub HashMap<String, XPCObject>);
 
@@ -56,6 +53,47 @@ impl XPCDictionary {
         } else {
             Err(DictionaryError("xpc_dictionary_apply failed".to_string()))
         }
+    }
+
+    /// Get value from XPCDictionary with support for nesting
+    pub fn get<I, S>(&self, items: I) -> Result<XPCObject, XPCError>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let mut iter = items.into_iter();
+        let first: S = iter
+            .next()
+            .ok_or(XPCError::ValueError("Not enough elements".to_string()))?;
+        let XPCDictionary(ref hm) = self;
+
+        let first = hm
+            .get(first.as_ref())
+            .ok_or(XPCError::StandardError)
+            .map(|o| o.clone());
+
+        iter.fold(first, |o, k: S| {
+            if o.is_err() {
+                return o;
+            }
+
+            let key = k.as_ref();
+            let XPCDictionary(ref inner) = o.unwrap().try_into()?;
+
+            inner
+                .get(key)
+                .ok_or(XPCError::DictionaryError(format!("Can't get {}", key)))
+                .map(|i| i.clone())
+        })
+    }
+
+    /// Retrieve a dictionary
+    pub fn get_as_dictionary<I, S>(&self, items: I) -> Result<XPCDictionary, XPCError>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        self.get(items).and_then(|r| XPCDictionary::try_from(r))
     }
 }
 
@@ -106,8 +144,8 @@ where
         for (k, v) in message {
             unsafe {
                 let as_str: String = k.into();
-                let cstr = CString::new(as_str);
-                xpc_dictionary_set_value(dict, cstr.unwrap().as_ptr(), v.as_ptr());
+                let cstr = CString::new(as_str).unwrap();
+                xpc_dictionary_set_value(dict, cstr.as_ptr(), v.as_ptr());
             }
         }
 

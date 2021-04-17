@@ -97,7 +97,15 @@ impl From<&str> for XPCObject {
     /// Create XPCObject via xpc_string_create
     fn from(slice: &str) -> Self {
         let cstr = CString::new(slice).unwrap();
-        unsafe { XPCObject::new(xpc_string_create(cstr.into_boxed_c_str().as_ptr())) }
+        unsafe { XPCObject::new(xpc_string_create(cstr.as_ptr())) }
+    }
+}
+
+impl From<String> for XPCObject {
+    /// Create XPCObject via xpc_string_create
+    fn from(value: String) -> Self {
+        let cstr = CString::new(value).unwrap();
+        unsafe { XPCObject::new(xpc_string_create(cstr.as_ptr())) }
     }
 }
 

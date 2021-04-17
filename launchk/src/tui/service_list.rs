@@ -1,93 +1,101 @@
-use crate::launchd;
-use crate::launchd::messages::from_msg;
-
 use cursive::view::ViewWrapper;
-use cursive::views::SelectView;
-use cursive::{Cursive, Printer, View, XY};
 
-use std::collections::HashMap;
-use std::convert::TryInto;
+use cursive::{Cursive, View, XY};
+
+use std::collections::HashSet;
 
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, RwLock};
 
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use tokio::runtime::Handle;
 
 use tokio::time::interval;
-use xpc_sys::objects::xpc_dictionary::XPCDictionary;
-use xpc_sys::objects::xpc_error::XPCError::StandardError;
-use xpc_sys::objects::xpc_object::XPCObject;
-use xpc_sys::traits::xpc_pipeable::XPCPipeable;
 
-use xpc_sys::traits::xpc_value::TryXPCValue;
-
-use crate::tui::omnibox::OmniboxCommand;
+use crate::tui::omnibox::{OmniboxEvent, OmniboxState};
 use crate::tui::omnibox_subscribed_view::OmniboxSubscriber;
 use crate::tui::root::CbSinkMessage;
-use cursive::theme::{BaseColor, Color, Effect, Style};
-use std::cell::{Cell, RefCell};
 
-async fn poll_services(
-    svcs: Arc<RwLock<HashMap<String, XPCObject>>>,
-    cb_sink: Sender<CbSinkMessage>,
-) -> () {
-    // launchctl list
-    let message: HashMap<&str, XPCObject> = from_msg(&launchd::messages::LIST_SERVICES);
+use crate::launchd::service::{find_entry_info, list_all, LaunchdEntryInfo};
+use crate::tui::table::table_list_view::{TableListItem, TableListView};
+use std::borrow::Borrow;
+use std::cell::RefCell;
+
+use crate::tui::job_type_filter::JobTypeFilter;
+use cursive::direction::Direction;
+
+async fn poll_services(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSinkMessage>) {
     let mut interval = interval(Duration::from_secs(1));
 
     loop {
         interval.tick().await;
+        let write = svcs.try_write();
 
-        let msg_list: XPCObject = message.clone().into();
-        let services = msg_list
-            .pipe_routine()
-            .and_then(|r| r.try_into())
-            .and_then(|XPCDictionary(ref hm)| {
-                hm.get("services").map(|s| s.clone()).ok_or(StandardError)
-            })
-            .and_then(|s| s.try_into())
-            .and_then(|XPCDictionary(ref hm)| Ok(hm.clone()));
-
-        if services.is_err() {
+        if write.is_err() {
             continue;
         }
 
-        let svc_write = svcs.try_write();
-        if svc_write.is_err() {
-            continue;
-        }
-        *svc_write.unwrap() = services.unwrap();
+        let mut write = write.unwrap();
+        *write = list_all();
 
         cb_sink.send(Box::new(Cursive::noop)).unwrap();
     }
 }
 
+pub struct ServiceListItem {
+    name: String,
+    entry_info: LaunchdEntryInfo,
+}
+
+impl TableListItem for ServiceListItem {
+    fn as_row(&self) -> Vec<String> {
+        let session_type = self.entry_info.limit_load_to_session_type.to_string();
+
+        let entry_type = self
+            .entry_info
+            .entry_config
+            .borrow()
+            .as_ref()
+            .map(|ec| format!("{}/{}", ec.entry_location, ec.entry_type))
+            .unwrap_or("-".to_string());
+
+        vec![
+            self.name.clone(),
+            session_type,
+            entry_type,
+            format!("{}", self.entry_info.pid),
+        ]
+    }
+}
+
 pub struct ServiceListView {
-    services: Arc<RwLock<HashMap<String, XPCObject>>>,
-    select_view: SelectView<XPCObject>,
-    current_size: Cell<XY<usize>>,
-    current_filter: RefCell<String>,
+    services: Arc<RwLock<HashSet<String>>>,
+    table_list_view: TableListView<ServiceListItem>,
+    name_filter: RefCell<String>,
+    job_type_filter: RefCell<JobTypeFilter>,
 }
 
 impl ServiceListView {
-    pub fn new(runtime_handle: Handle, cb_sink: Sender<CbSinkMessage>) -> Self {
-        let arc_svc = Arc::new(RwLock::new(HashMap::new()));
+    pub fn new(runtime_handle: &Handle, cb_sink: Sender<CbSinkMessage>) -> Self {
+        let arc_svc = Arc::new(RwLock::new(HashSet::new()));
         let ref_clone = arc_svc.clone();
 
         runtime_handle.spawn(async move { poll_services(ref_clone, cb_sink).await });
 
-        let select_view: SelectView<XPCObject> = SelectView::new();
-
         Self {
             services: arc_svc.clone(),
-            current_size: Cell::new(XY::new(0, 0)),
-            current_filter: RefCell::new("".into()),
-            select_view,
+            name_filter: RefCell::new("".into()),
+            job_type_filter: RefCell::new(JobTypeFilter::default()),
+            table_list_view: TableListView::new(vec![
+                "Name".to_string(),
+                "Session Type".to_string(),
+                "Job Type".to_string(),
+                "PID".to_string(),
+            ]),
         }
     }
 
-    fn sorted_services(&self) -> Vec<(String, XPCObject)> {
+    fn present_services(&self) -> Vec<ServiceListItem> {
         let services = self.services.try_read();
 
         if services.is_err() {
@@ -95,85 +103,69 @@ impl ServiceListView {
         }
 
         let services = services.unwrap();
-        let mut vec: Vec<(String, XPCObject)> = vec![];
-        let filter = self.current_filter.borrow();
+        let name_filter = self.name_filter.borrow();
+        let job_type_filter = self.job_type_filter.borrow();
 
-        for (key, xpc_object) in services.iter() {
-            if filter.is_empty() {
-                vec.push((key.clone(), xpc_object.clone()));
-                continue;
-            }
+        let mut items: Vec<ServiceListItem> = services
+            .iter()
+            .filter_map(|s| {
+                if !name_filter.is_empty()
+                    && !s
+                        .to_ascii_lowercase()
+                        .contains(name_filter.to_ascii_lowercase().as_str())
+                {
+                    return None;
+                }
 
-            if key.to_ascii_lowercase().contains(filter.to_ascii_lowercase().as_str()) {
-                vec.push((key.clone(), xpc_object.clone()));
-            }
-        }
+                let entry_info = find_entry_info(s);
 
-        vec.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
-        vec
+                if !job_type_filter.is_empty()
+                    && entry_info
+                        .entry_config
+                        .as_ref()
+                        .map(|ec| !job_type_filter.intersects(ec.job_type_filter()))
+                        .unwrap_or(true)
+                {
+                    return None;
+                }
+
+                Some(ServiceListItem {
+                    name: s.clone(),
+                    entry_info,
+                })
+            })
+            .collect();
+
+        items.sort_by(|a, b| a.name.cmp(&b.name));
+        items
     }
 }
 
 impl ViewWrapper for ServiceListView {
-    wrap_impl!(self.select_view: SelectView<XPCObject>);
-
-    fn wrap_draw(&self, printer: &Printer<'_, '_>) {
-        let middle = self.current_size.get().x / 2;
-        let bold = Style::from(Color::Dark(BaseColor::Blue)).combine(Effect::Bold);
-
-        printer.with_style(bold, |p| p.print(XY::new(0, 0), "Name"));
-
-        printer.with_style(bold, |p| p.print(XY::new(middle, 0), "PID"));
-
-        let tsnow = format!("{:?}", SystemTime::now());
-        printer.print(XY::new(0, 1), &tsnow);
-
-        // Headers, timestamp
-        let offset = XY::new(0, 2);
-        let sub = printer.offset(offset).content_offset(offset);
-
-        self.select_view.draw(&sub);
-    }
+    wrap_impl!(self.table_list_view: TableListView<ServiceListItem>);
 
     fn wrap_layout(&mut self, size: XY<usize>) {
-        self.current_size.replace(size);
-        let sorted = self.sorted_services();
+        let sorted = self.present_services();
+        self.with_view_mut(|v| v.replace_and_preserve_selection(sorted));
+        self.table_list_view.layout(size);
+    }
 
-        self.with_view_mut(move |v| {
-            let current_selection = v.selected_id().unwrap_or(0);
-            v.clear();
-
-            for (name, xpc_object) in sorted.iter() {
-                let XPCDictionary(hm) = xpc_object.try_into().unwrap();
-                let pid: i64 = hm.get("pid").unwrap().xpc_value().unwrap();
-                let pid_str = if pid == 0 {
-                    "-".to_string()
-                } else {
-                    format!("{}", pid)
-                };
-
-                let mut trunc_name = name.clone();
-                let indent = size.x / 2;
-                if trunc_name.chars().count() > indent {
-                    trunc_name.truncate(indent - 1);
-                }
-
-                let row = format!("{:indent$}{}", trunc_name, pid_str, indent = indent);
-                v.add_item(row, xpc_object.clone());
-            }
-
-            v.set_selection(current_selection);
-        });
+    fn wrap_take_focus(&mut self, _: Direction) -> bool {
+        true
     }
 }
 
 impl OmniboxSubscriber for ServiceListView {
-    fn on_omnibox(&mut self, cmd: OmniboxCommand) -> Result<(), ()> {
-        match cmd {
-            OmniboxCommand::Filter(new_filter) => { self.current_filter.replace(new_filter); },
-            OmniboxCommand::Clear => { self.current_filter.replace("".to_string()); },
-            _ => (),
-        };
+    fn on_omnibox(&mut self, event: OmniboxEvent) -> Result<(), ()> {
+        if let OmniboxEvent::StateUpdate(OmniboxState {
+            name_filter,
+            job_type_filter,
+            ..
+        }) = event
+        {
+            self.name_filter.replace(name_filter);
+            self.job_type_filter.replace(job_type_filter);
+        }
 
         Ok(())
     }

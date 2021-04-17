@@ -3,7 +3,8 @@ use cursive::{Printer, Vec2, View, XY};
 use xpc_sys::sysctlbyname_string;
 
 use std::cell::Cell;
-use xpc_sys::csr::sip_enabled;
+use xpc_sys::csr::CSR_ALLOW_UNTRUSTED_KEXTS;
+use xpc_sys::csr::CSR_STATUS;
 
 pub struct SysInfo {
     current_size: Cell<XY<usize>>,
@@ -27,8 +28,9 @@ impl View for SysInfo {
         let osversion = sysctlbyname_string("kern.osversion").unwrap_or("".to_string());
         let mac_os_data = format!("{} ({})", osproductversion, osversion);
 
+        // If granted CSR_ALLOW_UNTRUSTED_KEXTS, SIP is probably off
         let sip_label = "SIP:";
-        let sip_data = format!("{}", sip_enabled());
+        let sip_data = format!("{}", !CSR_STATUS.get(&CSR_ALLOW_UNTRUSTED_KEXTS).unwrap());
 
         let bold = Style::from(Color::Light(BaseColor::White));
         let bold = bold.combine(Effect::Bold);

@@ -1,110 +1,310 @@
 use cursive::direction::Direction;
 use cursive::event::{Event, EventResult, Key};
-use cursive::{Printer, View, XY};
+use cursive::{Printer, Vec2, View, XY};
 use std::cell::RefCell;
 
-use cursive::theme::{BaseColor, Color, Style};
+use crate::tui::job_type_filter::JobTypeFilter;
+use cursive::theme::{BaseColor, Color, Effect, Style};
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, SystemTime};
+use tokio::runtime::Handle;
+
+use tokio::time::interval;
+
+/// Consumers impl OmniboxSubscriber receive these commands
+/// via a channel in a wrapped view
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum OmniboxEvent {
+    FocusServiceList,
+    StateUpdate(OmniboxState),
+}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-enum OmniboxMode {
-    Command,
-    Filter,
-    Clear,
+pub enum OmniboxMode {
+    NameFilter,
+    JobTypeFilter,
+    Idle,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct OmniboxState {
+    pub mode: OmniboxMode,
+    pub tick: SystemTime,
+    pub name_filter: String,
+    pub job_type_filter: JobTypeFilter,
+}
+
+impl OmniboxState {
+    pub fn update_existing(
+        &self,
+        mode: Option<OmniboxMode>,
+        name_filter: Option<String>,
+        job_type_filter: Option<JobTypeFilter>,
+    ) -> OmniboxState {
+        OmniboxState {
+            tick: SystemTime::now(),
+            mode: mode.unwrap_or(self.mode.clone()),
+            name_filter: name_filter.unwrap_or(self.name_filter.clone()),
+            job_type_filter: job_type_filter.unwrap_or(self.job_type_filter.clone()),
+        }
+    }
+}
+
+impl Default for OmniboxState {
+    fn default() -> Self {
+        Self {
+            mode: OmniboxMode::Idle,
+            tick: SystemTime::now(),
+            name_filter: "".to_string(),
+            job_type_filter: JobTypeFilter::default(),
+        }
+    }
+}
+
+/// Move OmniboxState back to some time after the user stops
+/// interacting with it
+async fn omnibox_tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>) {
+    let mut tick_rate = interval(Duration::from_millis(500));
+
+    loop {
+        tick_rate.tick().await;
+
+        let read = state.read().expect("Must read state");
+        let OmniboxState { mode, tick, .. } = &*read;
+
+        let delta_ms = SystemTime::now().duration_since(*tick).unwrap().as_millis();
+
+        if *mode == OmniboxMode::Idle || delta_ms < 1000 {
+            continue;
+        }
+
+        let new = read.update_existing(Some(OmniboxMode::Idle), None, None);
+        drop(read);
+        let mut write = state.write().expect("Must write");
+
+        let out = [
+            tx.send(OmniboxEvent::FocusServiceList),
+            tx.send(OmniboxEvent::StateUpdate(new.clone())),
+        ];
+
+        for msg in out.iter() {
+            msg.as_ref().expect("Must send");
+        }
+
+        *write = new;
+    }
 }
 
 /// Omnibox that pipes commands to a channel
 /// we consume in the root view
 pub struct Omnibox {
-    content: RefCell<String>,
-    mode: RefCell<OmniboxMode>,
-    tx: Sender<OmniboxCommand>,
-}
-
-/// Consumers receive OmniboxCommand messages without
-/// having to look at its internal state
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum OmniboxCommand {
-    NoOp,
-    Filter(String),
-    Clear,
+    state: Arc<RwLock<OmniboxState>>,
+    tx: Sender<OmniboxEvent>,
+    last_size: RefCell<XY<usize>>,
 }
 
 impl Omnibox {
     /// Create a new Omnibox and receive its rx on create
-    pub fn new() -> (Self, Receiver<OmniboxCommand>) {
-        let (tx, rx): (Sender<OmniboxCommand>, Receiver<OmniboxCommand>) = channel();
+    pub fn new(handle: &Handle) -> (Self, Receiver<OmniboxEvent>) {
+        let (tx, rx): (Sender<OmniboxEvent>, Receiver<OmniboxEvent>) = channel();
+        let state = Arc::new(RwLock::new(OmniboxState::default()));
+
+        let tx_state = state.clone();
+        let tx_tick = tx.clone();
+
+        handle.spawn(async move { omnibox_tick(tx_state, tx_tick).await });
 
         (
             Self {
-                content: RefCell::new("".into()),
-                mode: RefCell::new(OmniboxMode::Clear),
+                state,
                 tx,
+                last_size: RefCell::new(XY::new(0, 0)),
             },
             rx,
         )
+    }
+
+    fn handle_active(event: &Event, state: &OmniboxState) -> Option<OmniboxState> {
+        let OmniboxState {
+            mode, name_filter, ..
+        } = &state;
+
+        match (event, mode) {
+            (Event::Char(c), OmniboxMode::NameFilter) => {
+                Some(state.update_existing(None, Some(format!("{}{}", name_filter, c)), None))
+            }
+            (Event::Key(Key::Backspace), OmniboxMode::NameFilter) => {
+                if name_filter.is_empty() {
+                    None
+                } else {
+                    let mut nf = name_filter.clone();
+                    nf.truncate(nf.len() - 1);
+                    Some(state.update_existing(None, Some(nf), None))
+                }
+            }
+            (ev, OmniboxMode::JobTypeFilter) => Self::handle_job_type_filter(ev, state),
+            _ => None,
+        }
+    }
+
+    fn handle_job_type_filter(event: &Event, state: &OmniboxState) -> Option<OmniboxState> {
+        let mut jtf = state.job_type_filter.clone();
+
+        match event {
+            Event::Char('s') => jtf.toggle(JobTypeFilter::SYSTEM),
+            Event::Char('g') => jtf.toggle(JobTypeFilter::GLOBAL),
+            Event::Char('u') => jtf.toggle(JobTypeFilter::USER),
+            Event::Char('a') => jtf.toggle(JobTypeFilter::AGENT),
+            Event::Char('d') => jtf.toggle(JobTypeFilter::DAEMON),
+            _ => return None,
+        };
+
+        Some(state.update_existing(Some(OmniboxMode::JobTypeFilter), None, Some(jtf)))
+    }
+
+    fn handle_idle(event: &Event, state: &OmniboxState) -> Option<OmniboxState> {
+        match event {
+            Event::Char('/') => Some(state.update_existing(
+                Some(OmniboxMode::NameFilter),
+                Some("".to_string()),
+                None,
+            )),
+            _ => Self::handle_job_type_filter(event, state),
+        }
+    }
+
+    fn draw_command_header(&self, printer: &Printer<'_, '_>) {
+        let read = self.state.read().expect("Must read state");
+        let OmniboxState {
+            name_filter, mode, ..
+        } = &*read;
+
+        let cmd_header = if name_filter.len() > 0 || *mode == OmniboxMode::NameFilter {
+            "Filter > "
+        } else {
+            ""
+        };
+
+        let subtle = Style::from(Color::Light(BaseColor::Black));
+        let purple = Style::from(Color::Light(BaseColor::Blue));
+
+        let modal_hilight = if let OmniboxMode::Idle = mode {
+            subtle
+        } else {
+            purple
+        };
+
+        // Print command header
+        let width = (self.last_size.borrow().x / 2) - cmd_header.len();
+        printer.with_style(modal_hilight, |p| p.print(XY::new(0, 0), cmd_header));
+
+        // Print cmd header value
+        printer.print(
+            XY::new(cmd_header.len(), 0),
+            format!("{:width$}", name_filter, width = width).as_str(),
+        );
+    }
+
+    fn draw_job_type_filter(&self, printer: &Printer<'_, '_>) {
+        let read = self.state.read().expect("Must read state");
+        let OmniboxState {
+            job_type_filter,
+            mode,
+            ..
+        } = &*read;
+
+        let jtf_ofs = if *mode != OmniboxMode::JobTypeFilter {
+            // "[sguad]"
+            7
+        } else {
+            // "[system global user agent daemon]"
+            33
+        };
+
+        let mut jtf_ofs = self.last_size.borrow().x - jtf_ofs;
+        printer.print(XY::new(jtf_ofs, 0), "[");
+        jtf_ofs += 1;
+
+        let inactive = Style::from(Color::Light(BaseColor::Black));
+        let active = Style::from(Color::Light(BaseColor::Blue)).combine(Effect::Bold);
+
+        for mask in [
+            JobTypeFilter::SYSTEM,
+            JobTypeFilter::GLOBAL,
+            JobTypeFilter::USER,
+            JobTypeFilter::AGENT,
+            JobTypeFilter::DAEMON,
+        ]
+        .iter()
+        {
+            let mut mask_string = format!("{:?} ", mask).to_ascii_lowercase();
+            if *mode != OmniboxMode::JobTypeFilter {
+                mask_string.truncate(1);
+            }
+
+            if *mask == JobTypeFilter::DAEMON && *mode == OmniboxMode::JobTypeFilter {
+                mask_string.truncate(mask_string.len() - 1);
+            }
+
+            let style = if job_type_filter.contains(*mask) {
+                active
+            } else {
+                inactive
+            };
+
+            printer.with_style(style, |p| {
+                p.print(XY::new(jtf_ofs, 0), mask_string.as_str())
+            });
+            jtf_ofs += mask_string.len();
+        }
+
+        printer.print(XY::new(jtf_ofs, 0), "]");
     }
 }
 
 impl View for Omnibox {
     fn draw(&self, printer: &Printer<'_, '_>) {
-        let current_mode = self.mode.borrow();
-        let fmt_mode = match *current_mode {
-            OmniboxMode::Clear => "".into(),
-            _ => format!("{:?} > ", current_mode),
-        };
+        self.draw_command_header(printer);
+        self.draw_job_type_filter(printer);
+    }
 
-        let subtle = Style::from(Color::Light(BaseColor::Black));
-        printer.with_style(subtle, |p| p.print(XY::new(0, 0), &fmt_mode));
-        printer.print(
-            XY::new(fmt_mode.chars().count(), 0),
-            self.content.borrow().as_str(),
-        );
+    fn layout(&mut self, sz: Vec2) {
+        self.last_size.replace(sz);
     }
 
     fn on_event(&mut self, event: Event) -> EventResult {
-        let content_len = self.content.borrow().chars().count();
-        let mut event_result = EventResult::Consumed(None);
+        let state = self.state.read().expect("Must read state");
+        let mode = &state.mode;
 
-        let command = match event {
-            Event::Char('/') => {
-                self.mode.replace(OmniboxMode::Filter);
-                OmniboxCommand::Clear
+        let new_state = match (event, mode) {
+            (Event::CtrlChar('u'), _) => {
+                self.tx
+                    .send(OmniboxEvent::FocusServiceList)
+                    .expect("Must focus");
+                Some(OmniboxState::default())
             }
-            Event::Char(':') => {
-                self.mode.replace(OmniboxMode::Command);
-                OmniboxCommand::Clear
-            }
-            Event::Char(c) if *self.mode.borrow() != OmniboxMode::Clear => {
-                self.content.borrow_mut().push(c);
-                OmniboxCommand::Filter(self.content.borrow_mut().clone())
-            }
-            Event::Key(Key::Backspace) if content_len > 0 => {
-                self.content.borrow_mut().truncate(content_len - 1);
-                OmniboxCommand::Filter(self.content.borrow_mut().clone())
-            }
-            Event::CtrlChar('u') => {
-                self.content.borrow_mut().truncate(0);
-                self.mode.replace(OmniboxMode::Clear);
-                OmniboxCommand::Clear
-            }
-            _ => {
-                event_result = EventResult::Ignored;
-                OmniboxCommand::NoOp
-            },
+            (e, OmniboxMode::Idle) => Self::handle_idle(&e, &*state),
+            (e, _) => Self::handle_active(&e, &*state),
         };
 
-        let sent = self.tx.send(command);
-        if sent.is_err() {
-            panic!("Unable to send Omnibox command");
+        if new_state.is_none() {
+            return EventResult::Ignored;
         }
-        sent.unwrap();
 
-        event_result
+        let new_state = new_state.unwrap();
+        self.tx
+            .send(OmniboxEvent::StateUpdate(new_state.clone()))
+            .expect("Must broadcast state");
+
+        drop(state);
+        let mut write = self.state.write().expect("Must write state");
+        *write = new_state;
+
+        EventResult::Consumed(None)
     }
 
-    /// If offered focus, we should always take it
-    fn take_focus(&mut self, _source: Direction) -> bool {
+    fn take_focus(&mut self, _: Direction) -> bool {
         true
     }
 }
