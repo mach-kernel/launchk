@@ -4,7 +4,7 @@ use cursive::{Cursive, View, Vec2};
 use tokio::runtime::Handle;
 use tokio::time::interval;
 
-use crate::tui::omnibox::{Omnibox, OmniboxCommand};
+use crate::tui::omnibox::{Omnibox, OmniboxEvent};
 use crate::tui::service_list::ServiceListView;
 use crate::tui::sysinfo::SysInfo;
 use cursive::event::{Event, EventResult};
@@ -19,13 +19,14 @@ pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 
 pub struct RootLayout {
     layout: LinearLayout,
-    omnibox_rx: Receiver<OmniboxCommand>,
+    omnibox_rx: Receiver<OmniboxEvent>,
     last_focus_index: RefCell<usize>,
     runtime_handle: Handle,
     cbsink_channel: Sender<CbSinkMessage>,
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 enum RootLayoutChildren {
     SysInfo,
     Omnibox,
@@ -94,7 +95,8 @@ impl RootLayout {
     }
 
     fn focus_and_forward(&mut self, child: RootLayoutChildren, event: Event) -> EventResult {
-        self.layout.set_focus_index(child as usize).expect("Must focus");
+        println!("Forwarding {:?} {:?}", child, event);
+        self.layout.set_focus_index(child as usize);
         self.layout.on_event(event)
     }
 
@@ -109,7 +111,7 @@ impl RootLayout {
         let recv = recv.unwrap();
 
         // Triggered by Omnibox when toggling to idle
-        if recv == OmniboxCommand::Refocus {
+        if recv == OmniboxEvent::FocusServiceList {
             self.layout.set_focus_index(RootLayoutChildren::ServiceList as usize);
             return;
         }

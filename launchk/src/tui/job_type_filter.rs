@@ -14,6 +14,14 @@ bitflags! {
     }
 }
 
+impl JobTypeFilter {
+    pub fn merge(&self, given: JobTypeFilter) -> JobTypeFilter {
+        let mut jtf = self.clone();
+        jtf.toggle(given);
+        jtf
+    }
+}
+
 /// Represent the bitmask as a string for easy TUI check for styling
 /// hotkey status
 impl fmt::Display for JobTypeFilter {

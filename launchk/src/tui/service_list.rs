@@ -12,7 +12,7 @@ use tokio::runtime::Handle;
 
 use tokio::time::interval;
 
-use crate::tui::omnibox::OmniboxCommand;
+use crate::tui::omnibox::{OmniboxEvent, OmniboxState};
 use crate::tui::omnibox_subscribed_view::OmniboxSubscriber;
 use crate::tui::root::CbSinkMessage;
 
@@ -77,7 +77,6 @@ pub struct ServiceListView {
     table_list_view: TableListView<ServiceListItem>,
     name_filter: RefCell<String>,
     job_type_filter: RefCell<JobTypeFilter>,
-    last_size: RefCell<XY<usize>>,
 }
 
 impl ServiceListView {
@@ -97,7 +96,6 @@ impl ServiceListView {
                 "Job Type".to_string(),
                 "PID".to_string(),
             ]),
-            last_size: RefCell::new(XY::new(0, 0))
         }
     }
 
@@ -148,47 +146,19 @@ impl ServiceListView {
 impl ViewWrapper for ServiceListView {
     wrap_impl!(self.table_list_view: TableListView<ServiceListItem>);
 
-    fn wrap_draw(&self, printer: &Printer<'_, '_>) {
-        self.table_list_view.draw(printer);
-
-        let mut begin = self.last_size.borrow().x - 7;
-        let jtf = self.job_type_filter.borrow().to_string();
-        let style_on = Style::from(Color::Dark(BaseColor::Blue)).combine(Effect::Bold);
-
-        for char in "[sguad]".to_string().chars() {
-            if jtf.contains(char) {
-                printer.with_style(style_on, |p| p.print(XY::new(begin, 0), char.to_string().as_str()));
-            } else {
-                printer.print(XY::new(begin, 0), char.to_string().as_str());
-            }
-
-            begin += 1;
-        }
-    }
-
     fn wrap_layout(&mut self, size: XY<usize>) {
         let sorted = self.present_services();
         self.with_view_mut(|v| v.replace_and_preserve_selection(sorted));
         self.table_list_view.layout(size);
-        self.last_size.replace(size);
     }
 }
 
 impl OmniboxSubscriber for ServiceListView {
-    fn on_omnibox(&mut self, cmd: OmniboxCommand) -> Result<(), ()> {
-        match cmd {
-            OmniboxCommand::NameFilter(new_filter) => {
-                self.name_filter.replace(new_filter);
-            }
-            OmniboxCommand::JobTypeFilter(new_filter) => {
-                self.job_type_filter.replace(new_filter);
-            }
-            OmniboxCommand::Clear => {
-                self.name_filter.replace("".to_string());
-                self.job_type_filter.replace(JobTypeFilter::default());
-            }
-            _ => (),
-        };
+    fn on_omnibox(&mut self, event: OmniboxEvent) -> Result<(), ()> {
+        if let OmniboxEvent::StateUpdate(OmniboxState { name_filter, job_type_filter, .. }) = event {
+            self.name_filter.replace(name_filter);
+            self.job_type_filter.replace(job_type_filter);
+        }
 
         Ok(())
     }

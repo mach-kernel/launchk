@@ -15,52 +15,82 @@ use tokio::time::interval;
 /// Consumers impl OmniboxSubscriber receive these commands
 /// via a channel in a wrapped view
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum OmniboxCommand {
+pub enum OmniboxEvent {
     NoOp,
-    NameFilter(String),
-    JobTypeFilter(JobTypeFilter),
     Clear,
-    Refocus,
+    FocusServiceList,
+    StateUpdate(OmniboxState),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-enum OmniboxMode {
-    Active,
+pub enum OmniboxMode {
+    NameFilter,
+    JobTypeFilter,
     Idle,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-struct OmniboxState(pub OmniboxMode, pub OmniboxCommand, pub SystemTime);
+pub struct OmniboxState {
+    pub mode: OmniboxMode,
+    pub tick: SystemTime,
+    pub name_filter: String,
+    pub job_type_filter: JobTypeFilter,
+}
+
+impl OmniboxState {
+    pub fn update_existing(&self, mode: Option<OmniboxMode>, name_filter: Option<String>, job_type_filter: Option<JobTypeFilter>) -> OmniboxState {
+        OmniboxState {
+            tick: SystemTime::now(),
+            mode: mode.unwrap_or(self.mode.clone()),
+            name_filter: name_filter.unwrap_or(self.name_filter.clone()),
+            job_type_filter: job_type_filter.unwrap_or(self.job_type_filter.clone()),
+        }
+    }
+
+    pub fn now(&self) -> OmniboxState {
+        let mut with_now = self.clone();
+        with_now.tick = SystemTime::now();
+        with_now
+    }
+}
 
 impl Default for OmniboxState {
     fn default() -> Self {
-        Self(OmniboxMode::Idle, OmniboxCommand::NoOp, SystemTime::now())
+        Self {
+            mode: OmniboxMode::Idle,
+            tick: SystemTime::now(),
+            name_filter: "".to_string(),
+            job_type_filter: JobTypeFilter::default()
+        }
     }
 }
 
 /// Move OmniboxState back to some time after the user stops
 /// interacting with it
-async fn omnibox_tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxCommand>) {
-    let mut tick_rate = interval(Duration::from_millis(500));
+async fn omnibox_tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>) {
+    let mut tick_rate = interval(Duration::from_millis(1000));
 
     loop {
         tick_rate.tick().await;
-
         let read = state.read().expect("Must read state");
-        let OmniboxState(ref mode, ref cmd, ref last) = &*read;
 
-        if *mode == OmniboxMode::Idle || SystemTime::now().duration_since(*last).unwrap().as_millis() < 500 {
+        let OmniboxState { mode, tick, .. } = &*read;
+        let delta_ms = SystemTime::now().duration_since(*tick).unwrap().as_millis();
+
+        if *mode == OmniboxMode::Idle && delta_ms < 2000 {
             continue;
         }
 
-        let cmd = cmd.clone();
+        let new = read.update_existing(Some(OmniboxMode::Idle), None, None);
         drop(read);
-
-        let mut write = state.write().expect("Must queue write");
-        *write = OmniboxState(OmniboxMode::Idle, cmd.clone(), SystemTime::now());
+        let mut write = state.write().expect("Must write");
 
         // Refocus the service list
-        tx.send(OmniboxCommand::Refocus);
+        tx.send(OmniboxEvent::FocusServiceList);
+
+        // Send the state update
+        tx.send(OmniboxEvent::StateUpdate(new.clone()));
+        *write = new;
     }
 }
 
@@ -68,13 +98,13 @@ async fn omnibox_tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxComman
 /// we consume in the root view
 pub struct Omnibox {
     state: Arc<RwLock<OmniboxState>>,
-    tx: Sender<OmniboxCommand>,
+    tx: Sender<OmniboxEvent>,
 }
 
 impl Omnibox {
     /// Create a new Omnibox and receive its rx on create
-    pub fn new(handle: &Handle) -> (Self, Receiver<OmniboxCommand>) {
-        let (tx, rx): (Sender<OmniboxCommand>, Receiver<OmniboxCommand>) = channel();
+    pub fn new(handle: &Handle) -> (Self, Receiver<OmniboxEvent>) {
+        let (tx, rx): (Sender<OmniboxEvent>, Receiver<OmniboxEvent>) = channel();
         let state = Arc::new(RwLock::new(OmniboxState::default()));
 
         let tx_state = state.clone();
@@ -91,59 +121,67 @@ impl Omnibox {
         )
     }
 
-    fn merge_job_type_filter(cmd: &OmniboxCommand, given: JobTypeFilter) -> OmniboxCommand {
-        if let OmniboxCommand::JobTypeFilter(jtf) = cmd {
-            let mut new_filter = jtf.clone();
-            new_filter.toggle(given);
-            OmniboxCommand::JobTypeFilter(new_filter)
-        } else {
-            OmniboxCommand::JobTypeFilter(JobTypeFilter::default())
-        }
-    }
-
-    fn handle_active(event: &Event, state: &OmniboxState) -> OmniboxCommand {
-        let OmniboxState(_, ref cmd, _) = state;
-
-        match (event, cmd) {
-            (Event::Char(c), OmniboxCommand::NameFilter(of)) => OmniboxCommand::NameFilter(format!("{}{}", of, c)),
-            (Event::Key(Key::Backspace), OmniboxCommand::NameFilter(of)) => {
-                if of.is_empty() {
-                    OmniboxCommand::NoOp
+    fn handle_active(event: &Event, state: &OmniboxState) -> OmniboxState {
+        let OmniboxState { mode, name_filter, .. } = &state;
+        
+        match (event, mode) {
+            (Event::Char(c), OmniboxMode::NameFilter) =>
+                state.update_existing(None, Some(format!("{}{}", name_filter, c)), None),
+            (Event::Key(Key::Backspace), OmniboxMode::NameFilter) => {
+                if name_filter.is_empty() {
+                    state.now()
                 } else {
-                    let mut truncate_me = of.clone();
-                    truncate_me.truncate(truncate_me.len() - 1);
-                    OmniboxCommand::NameFilter(truncate_me)
+                    let mut nf = name_filter.clone();
+                    nf.truncate(nf.len() - 1);
+                    state.update_existing(
+                        None,
+                        Some(nf),
+                        None
+                    )
                 }
-            }
-            _ => OmniboxCommand::NoOp,
+            },
+            (ev, OmniboxMode::JobTypeFilter) => Self::handle_job_type_filter(ev, state),
+            _ => state.now()
         }
     }
 
-    fn handle_idle(event: &Event, state: &OmniboxState) -> OmniboxCommand {
-        let OmniboxState(_, ref cmd, _) = state;
+    fn handle_job_type_filter(event: &Event, state: &OmniboxState) -> OmniboxState {
+        match event {
+            Event::Char('s') => state.update_existing(Some(OmniboxMode::JobTypeFilter), None, Some(JobTypeFilter::SYSTEM)),
+            Event::Char('g') => state.update_existing(Some(OmniboxMode::JobTypeFilter), None, Some(JobTypeFilter::GLOBAL)),
+            Event::Char('u') => state.update_existing(Some(OmniboxMode::JobTypeFilter), None, Some(JobTypeFilter::USER)),
+            Event::Char('a') => state.update_existing(Some(OmniboxMode::JobTypeFilter), None, Some(JobTypeFilter::AGENT)),
+            Event::Char('d') => state.update_existing(Some(OmniboxMode::JobTypeFilter), None, Some(JobTypeFilter::DAEMON)),
+            _ => state.now(),
+        }
+    }
 
-        match (event, cmd) {
-            // (Event::Char('/'), OmniboxCommand::NameFilter(_)) => cmd.clone(),
-            (Event::Char('/'), _)  => OmniboxCommand::NameFilter("".to_string()),
-            (Event::Char('s'), _) => Self::merge_job_type_filter(cmd, JobTypeFilter::SYSTEM),
-            (Event::Char('g'), _) => Self::merge_job_type_filter(cmd, JobTypeFilter::GLOBAL),
-            (Event::Char('u'), _) => Self::merge_job_type_filter(cmd, JobTypeFilter::USER),
-            (Event::Char('a'), _) => Self::merge_job_type_filter(cmd, JobTypeFilter::AGENT),
-            (Event::Char('d'), _) => Self::merge_job_type_filter(cmd, JobTypeFilter::DAEMON),
-            _ => OmniboxCommand::NoOp
+    fn handle_idle(event: &Event, state: &OmniboxState) -> OmniboxState {
+        match event {
+            Event::Char('/') => state.update_existing(Some(OmniboxMode::NameFilter), Some("".to_string()), None),
+            _ => Self::handle_job_type_filter(event, state),
         }
     }
 }
 
 impl View for Omnibox {
     fn draw(&self, printer: &Printer<'_, '_>) {
-        let state = &*self.state.read().expect("Must read state");
-        let OmniboxState(mode, cmd, _) = state.clone();
+        // for char in "[sguad]".to_string().chars() {
+        //     if jtf.contains(char) {
+        //         printer.with_style(style_on, |p| p.print(XY::new(begin, 0), char.to_string().as_str()));
+        //     } else {
+        //         printer.print(XY::new(begin, 0), char.to_string().as_str());
+        //     }
+        //
+        //     begin += 1;
+        // }
 
-        let fmt_cmd = match cmd {
-            OmniboxCommand::Clear => "".into(),
-            OmniboxCommand::NameFilter(_) => "Filter > ".to_string(),
-            OmniboxCommand::JobTypeFilter(_) => "[s]ystem | [g]lobal | [u]ser | [a]gent | [d]aemon".to_string(),
+        let state = &*self.state.read().expect("Must read state");
+        let OmniboxState { mode, name_filter, .. } = &state;
+
+        let fmt_cmd = match mode {
+            OmniboxMode::NameFilter if name_filter.len() > 0 => "Filter > ".to_string(),
+            OmniboxMode::JobTypeFilter => "[s]ystem | [g]lobal | [u]ser | [a]gent | [d]aemon".to_string(),
             _ => "".to_string(),
         };
 
@@ -157,11 +195,11 @@ impl View for Omnibox {
 
         printer.with_style(style, |p| p.print(XY::new(0, 0), &fmt_cmd));
 
-        match cmd {
-            OmniboxCommand::NameFilter(filter) => {
+        match mode {
+            OmniboxMode::NameFilter => {
                 printer.print(
                     XY::new(fmt_cmd.chars().count(), 0),
-                    filter.as_str(),
+                    name_filter.as_str(),
                 );
             }
             _ => {}
@@ -169,42 +207,23 @@ impl View for Omnibox {
     }
 
     fn on_event(&mut self, event: Event) -> EventResult {
-        let read = self.state.read().expect("Must read state");
-        let state = &read.clone();
-        let mut event_result = EventResult::Consumed(None);
+        let state = self.state.read().expect("Must read state");
+        let mode = &state.mode;
 
-        let command = if let Event::CtrlChar('u') = event {
-            OmniboxCommand::Clear
-        } else if state.0 == OmniboxMode::Active {
-            Self::handle_active(&event, &state)
-        } else if state.0 == OmniboxMode::Idle {
-            let ev = Self::handle_idle(&event, &state);
-            self.tx.send(OmniboxCommand::Refocus).expect("Must send Omnibox command");
-            ev
-        } else {
-            OmniboxCommand::NoOp
+        let new_state = match mode {
+            OmniboxMode::Idle => Self::handle_idle(&event, &*state),
+            _ => Self::handle_active(&event, &*state),
         };
 
-        if command == OmniboxCommand::NoOp {
-            event_result = EventResult::Ignored;
-        }
+        drop(state);
 
-        drop(read);
-
-        match event_result {
-            EventResult::Ignored => return event_result,
-            _ => {
-                let mut write = self.state.write().expect("Must write state");
-                *write = OmniboxState(OmniboxMode::Active, command.clone(), SystemTime::now());
-            }
-        };
-
-        self.tx.send(command).expect("Must send Omnibox command");
-        event_result
+        self.tx.send(OmniboxEvent::StateUpdate(new_state.clone()));
+        let mut write = self.state.write().expect("Must write state");
+        *write = new_state;
+        EventResult::Consumed(None)
     }
 
-    /// If offered focus, we should always take it
-    fn take_focus(&mut self, _source: Direction) -> bool {
+    fn take_focus(&mut self, _: Direction) -> bool {
         true
     }
 }
