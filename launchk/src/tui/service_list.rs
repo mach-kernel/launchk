@@ -122,7 +122,7 @@ impl ServiceListView {
                     && entry_info
                         .entry_config
                         .as_ref()
-                        .map(|ec| !job_type_filter.contains(ec.job_type_filter()))
+                        .map(|ec| !job_type_filter.intersects(ec.job_type_filter()))
                         .unwrap_or(true)
                 {
                     return None;
