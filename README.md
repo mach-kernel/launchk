@@ -2,11 +2,11 @@
 
 [![Rust](https://github.com/mach-kernel/launchk/actions/workflows/rust.yml/badge.svg?branch=master)](https://github.com/mach-kernel/launchk/actions/workflows/rust.yml)
 
-A small and WIP ncurses/cursive TUI around launchctl for managing Apple launchd.
+WIP ncurses TUI that queries XPC for launchd jobs!
 
 Should work on macOS 10.10+ according to the availability sec. [in the docs](https://developer.apple.com/documentation/xpc?language=objc).
 
-<img src="https://i.imgur.com/jccLO5r.gif" width="600">
+<img src="https://i.imgur.com/OOhVXuX.gif" width="600">
 
 ### xpc-sys crate
 
