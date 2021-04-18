@@ -73,9 +73,7 @@ async fn omnibox_tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>
         let read = state.read().expect("Must read state");
         let OmniboxState { mode, tick, .. } = &*read;
 
-        let delta_ms = SystemTime::now().duration_since(*tick).unwrap().as_millis();
-
-        if *mode == OmniboxMode::Idle || delta_ms < 1000 {
+        if *mode == OmniboxMode::Idle || tick.elapsed().unwrap() > Duration::from_secs(1) {
             continue;
         }
 
@@ -157,6 +155,7 @@ impl Omnibox {
             Event::Char('u') => jtf.toggle(JobTypeFilter::USER),
             Event::Char('a') => jtf.toggle(JobTypeFilter::AGENT),
             Event::Char('d') => jtf.toggle(JobTypeFilter::DAEMON),
+            Event::Char('l') => jtf.toggle(JobTypeFilter::LOADED),
             _ => return None,
         };
 
@@ -215,11 +214,11 @@ impl Omnibox {
         } = &*read;
 
         let jtf_ofs = if *mode != OmniboxMode::JobTypeFilter {
-            // "[sguad]"
-            7
+            // "[sguadl]"
+            8
         } else {
-            // "[system global user agent daemon]"
-            33
+            // "[system global user agent daemon loaded]"
+            40
         };
 
         let mut jtf_ofs = self.last_size.borrow().x - jtf_ofs;
@@ -235,6 +234,7 @@ impl Omnibox {
             JobTypeFilter::USER,
             JobTypeFilter::AGENT,
             JobTypeFilter::DAEMON,
+            JobTypeFilter::LOADED,
         ]
         .iter()
         {
@@ -243,7 +243,7 @@ impl Omnibox {
                 mask_string.truncate(1);
             }
 
-            if *mask == JobTypeFilter::DAEMON && *mode == OmniboxMode::JobTypeFilter {
+            if *mask == JobTypeFilter::LOADED && *mode == OmniboxMode::JobTypeFilter {
                 mask_string.truncate(mask_string.len() - 1);
             }
 

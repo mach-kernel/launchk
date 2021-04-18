@@ -13,6 +13,9 @@ use crate::launchd::config::LaunchdEntryConfig;
 use std::iter::FromIterator;
 use xpc_sys::objects::xpc_dictionary::XPCDictionary;
 use xpc_sys::objects::xpc_error::XPCError;
+use std::time::{SystemTime, Duration};
+
+const ENTRY_INFO_QUERY_TTL: u64 = 15; // seconds
 
 lazy_static! {
     static ref ENTRY_INFO_CACHE: Mutex<HashMap<String, LaunchdEntryInfo>> =
@@ -76,6 +79,7 @@ pub struct LaunchdEntryInfo {
     pub limit_load_to_session_type: LimitLoadToSessionType,
     // So, there is a pid_t, but it's i32, and the XPC response has an i64?
     pub pid: i64,
+    tick: SystemTime,
 }
 
 impl Default for LaunchdEntryInfo {
@@ -84,6 +88,7 @@ impl Default for LaunchdEntryInfo {
             limit_load_to_session_type: LimitLoadToSessionType::Unknown,
             entry_config: None,
             pid: 0,
+            tick: SystemTime::now(),
         }
     }
 }
@@ -138,8 +143,16 @@ pub fn list_all() -> HashSet<String> {
 pub fn find_entry_info<T: Into<String>>(label: T) -> LaunchdEntryInfo {
     let label_string = label.into();
     let mut cache = ENTRY_INFO_CACHE.try_lock().unwrap();
+
     if cache.contains_key(label_string.as_str()) {
-        return cache.get(label_string.as_str()).unwrap().clone();
+        let item = cache.get(label_string.as_str()).unwrap().clone();
+
+        if item.tick.elapsed().unwrap() > Duration::from_secs(ENTRY_INFO_QUERY_TTL) {
+            cache.remove(label_string.as_str());
+            return find_entry_info(label_string);
+        }
+
+        return item;
     }
 
     let meta = build_entry_info(&label_string);
@@ -173,5 +186,6 @@ fn build_entry_info<T: Into<String>>(label: T) -> LaunchdEntryInfo {
         limit_load_to_session_type,
         entry_config,
         pid,
+        tick: SystemTime::now(),
     }
 }

@@ -147,7 +147,8 @@ impl ViewWrapper for RootLayout {
             | Event::Char('g')
             | Event::Char('u')
             | Event::Char('a')
-            | Event::Char('d') => self.focus_and_forward(RootLayoutChildren::Omnibox, event),
+            | Event::Char('d')
+            | Event::Char('l') => self.focus_and_forward(RootLayoutChildren::Omnibox, event),
             _ => self.layout.on_event(event),
         };
 

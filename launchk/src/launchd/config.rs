@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fs;
 use std::path::Path;
-use std::sync::{Mutex, Once};
+use std::sync::{Mutex, Once, RwLock};
 
 use crate::tui::job_type_filter::JobTypeFilter;
 use std::fs::{DirEntry, ReadDir};
@@ -16,8 +16,8 @@ use std::iter::FilterMap;
 pub static LABEL_MAP_INIT: Once = Once::new();
 
 lazy_static! {
-    static ref LABEL_TO_PLIST: Mutex<HashMap<String, LaunchdEntryConfig>> =
-        Mutex::new(HashMap::new());
+    pub static ref LABEL_TO_ENTRY_CONFIG: RwLock<HashMap<String, LaunchdEntryConfig>> =
+        RwLock::new(HashMap::new());
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -60,7 +60,7 @@ pub struct LaunchdEntryConfig {
 }
 
 impl LaunchdEntryConfig {
-    pub fn job_type_filter(&self) -> JobTypeFilter {
+    pub fn job_type_filter(&self, is_loaded: bool) -> JobTypeFilter {
         let mut jtf = JobTypeFilter::default();
 
         match self.entry_location {
@@ -73,6 +73,10 @@ impl LaunchdEntryConfig {
             LaunchdEntryType::Agent => jtf.toggle(JobTypeFilter::AGENT),
             LaunchdEntryType::Daemon => jtf.toggle(JobTypeFilter::DAEMON),
         };
+
+        if is_loaded {
+            jtf.toggle(JobTypeFilter::LOADED);
+        }
 
         jtf
     }
@@ -187,7 +191,7 @@ fn readdir_filter_plists(rd: ReadDir) -> FilterMap<ReadDir, fn(futures::io::Resu
 }
 
 fn insert_plists(plists: impl Iterator<Item=DirEntry>) {
-    let mut label_map = LABEL_TO_PLIST.lock().unwrap();
+    let mut label_map = LABEL_TO_ENTRY_CONFIG.write().expect("Must update");
 
     for plist_path in plists {
         let entry = build_label_map_entry(plist_path);
@@ -223,6 +227,6 @@ pub fn init_label_map(runtime_handle: &Handle) {
 
 /// Get plist + fs meta for an entry by its label
 pub fn for_entry<S: Into<String>>(label: S) -> Option<LaunchdEntryConfig> {
-    let label_map = LABEL_TO_PLIST.try_lock().ok()?;
+    let label_map = LABEL_TO_ENTRY_CONFIG.read().ok()?;
     label_map.get(label.into().as_str()).map(|c| c.clone())
 }

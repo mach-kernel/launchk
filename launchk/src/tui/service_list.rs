@@ -15,6 +15,7 @@ use tokio::time::interval;
 use crate::tui::omnibox::{OmniboxEvent, OmniboxState};
 use crate::tui::omnibox_subscribed_view::OmniboxSubscriber;
 use crate::tui::root::CbSinkMessage;
+use crate::launchd::config::{LABEL_TO_ENTRY_CONFIG};
 
 use crate::launchd::service::{find_entry_info, list_all, LaunchdEntryInfo};
 use crate::tui::table::table_list_view::{TableListItem, TableListView};
@@ -42,11 +43,11 @@ async fn poll_running_jobs(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<C
     }
 }
 
+#[derive(Debug)]
 pub struct ServiceListItem {
     name: String,
     entry_info: LaunchdEntryInfo,
-    // running: bool,
-    // loaded: bool,
+    job_type_filter: JobTypeFilter,
 }
 
 impl TableListItem for ServiceListItem {
@@ -61,11 +62,24 @@ impl TableListItem for ServiceListItem {
             .map(|ec| format!("{}/{}", ec.entry_location, ec.entry_type))
             .unwrap_or("-".to_string());
 
+        let pid = if self.entry_info.pid > 0 {
+            format!("{}", self.entry_info.pid)
+        } else {
+            "-".to_string()
+        };
+
+        let loaded = if self.job_type_filter.intersects(JobTypeFilter::LOADED) {
+            "✓"
+        } else {
+            "✗"
+        };
+
         vec![
             self.name.clone(),
             session_type,
             entry_type,
-            format!("{}", self.entry_info.pid),
+            pid,
+            loaded.to_string(),
         ]
     }
 }
@@ -93,53 +107,59 @@ impl ServiceListView {
                 "Session Type".to_string(),
                 "Job Type".to_string(),
                 "PID".to_string(),
+                "Loaded".to_string(),
             ]),
         }
     }
 
-    fn present_services(&self) -> Vec<ServiceListItem> {
-        let services = self.running_jobs.try_read();
+    fn present_services(&self) -> Option<Vec<ServiceListItem>> {
+        let plists = LABEL_TO_ENTRY_CONFIG.read().ok()?;
+        let running = self.running_jobs.read().ok()?;
 
-        if services.is_err() {
-            return vec![];
-        }
-
-        let services = services.unwrap();
         let name_filter = self.name_filter.borrow();
         let job_type_filter = self.job_type_filter.borrow();
 
-        let mut items: Vec<ServiceListItem> = services
+        let running_no_plist = running
             .iter()
-            .filter_map(|s| {
+            .filter(|r| !plists.contains_key(*r));
+
+        let mut items: Vec<ServiceListItem> = plists
+            .keys()
+            .into_iter()
+            .chain(running_no_plist)
+            .filter_map(|label| {
                 if !name_filter.is_empty()
-                    && !s
+                    && !label
                         .to_ascii_lowercase()
                         .contains(name_filter.to_ascii_lowercase().as_str())
                 {
                     return None;
                 }
 
-                let entry_info = find_entry_info(s);
+                let entry_info = find_entry_info(label);
+                let is_loaded = running.contains(label);
 
-                if !job_type_filter.is_empty()
-                    && entry_info
-                        .entry_config
-                        .as_ref()
-                        .map(|ec| !job_type_filter.intersects(ec.job_type_filter()))
-                        .unwrap_or(true)
+                let entry_job_type_filter = entry_info
+                    .entry_config
+                    .as_ref()
+                    .map(|ec| ec.job_type_filter(is_loaded))
+                    .unwrap_or(JobTypeFilter::empty());
+
+                if !job_type_filter.is_empty() && !entry_job_type_filter.intersects(*job_type_filter)
                 {
                     return None;
                 }
 
                 Some(ServiceListItem {
-                    name: s.clone(),
+                    name: label.clone(),
                     entry_info,
+                    job_type_filter: entry_job_type_filter,
                 })
             })
             .collect();
 
         items.sort_by(|a, b| a.name.cmp(&b.name));
-        items
+        Some(items)
     }
 }
 
@@ -147,9 +167,11 @@ impl ViewWrapper for ServiceListView {
     wrap_impl!(self.table_list_view: TableListView<ServiceListItem>);
 
     fn wrap_layout(&mut self, size: XY<usize>) {
-        let sorted = self.present_services();
-        self.with_view_mut(|v| v.replace_and_preserve_selection(sorted));
         self.table_list_view.layout(size);
+
+        if let Some(sorted) = self.present_services() {
+            self.with_view_mut(|v| v.replace_and_preserve_selection(sorted));
+        }
     }
 
     fn wrap_take_focus(&mut self, _: Direction) -> bool {
