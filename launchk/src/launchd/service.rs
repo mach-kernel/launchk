@@ -149,6 +149,7 @@ pub fn find_entry_info<T: Into<String>>(label: T) -> LaunchdEntryInfo {
 
         if item.tick.elapsed().unwrap() > Duration::from_secs(ENTRY_INFO_QUERY_TTL) {
             cache.remove(label_string.as_str());
+            drop(cache);
             return find_entry_info(label_string);
         }
 
