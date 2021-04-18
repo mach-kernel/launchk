@@ -100,7 +100,7 @@ async fn fsnotify_subscriber() {
     ];
 
     for sub in watchers.iter() {
-        sub.expect("Must subscribe to fs events");
+        sub.as_ref().expect("Must subscribe to fs events");
     }
 
     loop {
