@@ -24,7 +24,7 @@ use std::cell::RefCell;
 use crate::tui::job_type_filter::JobTypeFilter;
 use cursive::direction::Direction;
 
-async fn poll_services(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSinkMessage>) {
+async fn poll_running_jobs(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSinkMessage>) {
     let mut interval = interval(Duration::from_secs(1));
 
     loop {
@@ -45,6 +45,8 @@ async fn poll_services(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSin
 pub struct ServiceListItem {
     name: String,
     entry_info: LaunchdEntryInfo,
+    // running: bool,
+    // loaded: bool,
 }
 
 impl TableListItem for ServiceListItem {
@@ -69,7 +71,7 @@ impl TableListItem for ServiceListItem {
 }
 
 pub struct ServiceListView {
-    services: Arc<RwLock<HashSet<String>>>,
+    running_jobs: Arc<RwLock<HashSet<String>>>,
     table_list_view: TableListView<ServiceListItem>,
     name_filter: RefCell<String>,
     job_type_filter: RefCell<JobTypeFilter>,
@@ -80,10 +82,10 @@ impl ServiceListView {
         let arc_svc = Arc::new(RwLock::new(HashSet::new()));
         let ref_clone = arc_svc.clone();
 
-        runtime_handle.spawn(async move { poll_services(ref_clone, cb_sink).await });
+        runtime_handle.spawn(async move { poll_running_jobs(ref_clone, cb_sink).await });
 
         Self {
-            services: arc_svc.clone(),
+            running_jobs: arc_svc.clone(),
             name_filter: RefCell::new("".into()),
             job_type_filter: RefCell::new(JobTypeFilter::default()),
             table_list_view: TableListView::new(vec![
@@ -96,7 +98,7 @@ impl ServiceListView {
     }
 
     fn present_services(&self) -> Vec<ServiceListItem> {
-        let services = self.services.try_read();
+        let services = self.running_jobs.try_read();
 
         if services.is_err() {
             return vec![];

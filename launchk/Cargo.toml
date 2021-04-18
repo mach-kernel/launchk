@@ -14,3 +14,4 @@ tokio = { version = "1", features = ["full"] }
 futures = "0.3"
 plist = "1.1.0"
 bitflags = "1.2.1"
+notify = "4.0.16"

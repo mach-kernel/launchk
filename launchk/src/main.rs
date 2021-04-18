@@ -13,6 +13,7 @@ use crate::tui::root::RootLayout;
 use cursive::view::Resizable;
 use cursive::views::Panel;
 use cursive::Cursive;
+use crate::launchd::config::{init_label_map, LABEL_MAP_INIT};
 
 mod launchd;
 mod tui;
@@ -22,6 +23,9 @@ fn main() {
         .enable_all()
         .build()
         .unwrap();
+
+    // Cache launchd job plists, spawn fsnotify to keep up with changes
+    LABEL_MAP_INIT.call_once(|| { init_label_map(runtime.handle()) });
 
     let mut siv: Cursive = cursive::default();
     siv.load_toml(include_str!("tui/style.toml")).unwrap();
