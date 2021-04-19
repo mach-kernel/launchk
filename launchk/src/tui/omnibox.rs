@@ -73,7 +73,7 @@ async fn omnibox_tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>
         let read = state.read().expect("Must read state");
         let OmniboxState { mode, tick, .. } = &*read;
 
-        if *mode == OmniboxMode::Idle || tick.elapsed().unwrap() > Duration::from_secs(1) {
+        if *mode == OmniboxMode::Idle || tick.elapsed().unwrap() < Duration::from_secs(1) {
             continue;
         }
 

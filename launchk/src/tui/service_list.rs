@@ -69,9 +69,11 @@ impl TableListItem for ServiceListItem {
         };
 
         let loaded = if self.job_type_filter.intersects(JobTypeFilter::LOADED) {
-            "✓"
+            "y"
+            // "✓"
         } else {
-            "✗"
+            "n"
+            // "✗"
         };
 
         vec![
@@ -103,11 +105,11 @@ impl ServiceListView {
             name_filter: RefCell::new("".into()),
             job_type_filter: RefCell::new(JobTypeFilter::default()),
             table_list_view: TableListView::new(vec![
-                "Name".to_string(),
-                "Session Type".to_string(),
-                "Job Type".to_string(),
-                "PID".to_string(),
-                "Loaded".to_string(),
+                ("Name", None),
+                ("Session", Some(12)),
+                ("Job Type", Some(14)),
+                ("PID", Some(6)),
+                ("Loaded", Some(6)),
             ]),
         }
     }
