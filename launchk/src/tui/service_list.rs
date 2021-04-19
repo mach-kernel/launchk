@@ -191,10 +191,14 @@ impl OmniboxSubscriber for ServiceListView {
             ..
         }) = event
         {
-            if mode == OmniboxMode::NameFilter || mode == OmniboxMode::Idle {
-                self.name_filter.replace(name_filter);
-                self.job_type_filter.replace(job_type_filter);
-            }
+            match mode {
+                OmniboxMode::NameFilter => { self.name_filter.replace(name_filter); },
+                OmniboxMode::JobTypeFilter => { self.job_type_filter.replace(job_type_filter); },
+                _ => {
+                    self.name_filter.replace(name_filter);
+                    self.job_type_filter.replace(job_type_filter);
+                }
+            };
         }
 
         Ok(())
