@@ -22,6 +22,7 @@ pub enum OmniboxEvent {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum OmniboxMode {
+    CommandFilter,
     NameFilter,
     JobTypeFilter,
     Idle,
@@ -77,7 +78,14 @@ async fn omnibox_tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>
             continue;
         }
 
-        let new = read.update_existing(Some(OmniboxMode::Idle), None, None);
+        // If you don't confirm command before tick, too slow!
+        let name_filter_update = if *mode == OmniboxMode::CommandFilter {
+            Some("".to_string())
+        } else {
+            None
+        };
+
+        let new = read.update_existing(Some(OmniboxMode::Idle), name_filter_update, None);
         drop(read);
         let mut write = state.write().expect("Must write");
 
@@ -129,10 +137,12 @@ impl Omnibox {
         } = &state;
 
         match (event, mode) {
-            (Event::Char(c), OmniboxMode::NameFilter) => {
+            (Event::Char(c), OmniboxMode::NameFilter)
+            | (Event::Char(c), OmniboxMode::CommandFilter) => {
                 Some(state.update_existing(None, Some(format!("{}{}", name_filter, c)), None))
             }
-            (Event::Key(Key::Backspace), OmniboxMode::NameFilter) => {
+            (Event::Key(Key::Backspace), OmniboxMode::NameFilter)
+            | (Event::Key(Key::Backspace), OmniboxMode::CommandFilter) => {
                 if name_filter.is_empty() {
                     None
                 } else {
@@ -169,6 +179,11 @@ impl Omnibox {
                 Some("".to_string()),
                 None,
             )),
+            Event::Char(':') => Some(state.update_existing(
+               Some(OmniboxMode::CommandFilter),
+                Some("".to_string()),
+                None
+            )),
             _ => Self::handle_job_type_filter(event, state),
         }
     }
@@ -179,10 +194,11 @@ impl Omnibox {
             name_filter, mode, ..
         } = &*read;
 
-        let cmd_header = if name_filter.len() > 0 || *mode == OmniboxMode::NameFilter {
-            "Filter > "
-        } else {
-            ""
+        let cmd_header =  match *mode {
+            OmniboxMode::NameFilter => "Filter > ",
+            OmniboxMode::CommandFilter => "Command > ",
+            _ if name_filter.len() > 1 => "Filter > ",
+            _ => "",
         };
 
         let subtle = Style::from(Color::Light(BaseColor::Black));
@@ -293,6 +309,7 @@ impl View for Omnibox {
         }
 
         let new_state = new_state.unwrap();
+
         self.tx
             .send(OmniboxEvent::StateUpdate(new_state.clone()))
             .expect("Must broadcast state");

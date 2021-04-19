@@ -32,7 +32,7 @@ impl View for TableHeaders {
         if let Ok(dcs) = self.dynamic_col_sz_rx.try_recv() {
             self.dynamic_cols_sz.replace(dcs);
         }
-        
+
         let bold = Style::from(Color::Dark(BaseColor::Blue)).combine(Effect::Bold);
 
         let (dyn_max, padding) = *self.dynamic_cols_sz.borrow();

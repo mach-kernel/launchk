@@ -12,7 +12,7 @@ use tokio::runtime::Handle;
 
 use tokio::time::interval;
 
-use crate::tui::omnibox::{OmniboxEvent, OmniboxState};
+use crate::tui::omnibox::{OmniboxEvent, OmniboxState, OmniboxMode};
 use crate::tui::omnibox_subscribed_view::OmniboxSubscriber;
 use crate::tui::root::CbSinkMessage;
 use crate::launchd::config::{LABEL_TO_ENTRY_CONFIG};
@@ -68,6 +68,7 @@ impl TableListItem for ServiceListItem {
             "-".to_string()
         };
 
+        // TODO: This would be cute and stuff, but truncate() panics
         let loaded = if self.job_type_filter.intersects(JobTypeFilter::LOADED) {
             "y"
             // "✓"
@@ -184,13 +185,16 @@ impl ViewWrapper for ServiceListView {
 impl OmniboxSubscriber for ServiceListView {
     fn on_omnibox(&mut self, event: OmniboxEvent) -> Result<(), ()> {
         if let OmniboxEvent::StateUpdate(OmniboxState {
+            mode,
             name_filter,
             job_type_filter,
             ..
         }) = event
         {
-            self.name_filter.replace(name_filter);
-            self.job_type_filter.replace(job_type_filter);
+            if mode == OmniboxMode::NameFilter || mode == OmniboxMode::Idle {
+                self.name_filter.replace(name_filter);
+                self.job_type_filter.replace(job_type_filter);
+            }
         }
 
         Ok(())
