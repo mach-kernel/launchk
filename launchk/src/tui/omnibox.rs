@@ -1,16 +1,20 @@
-use cursive::direction::Direction;
-use cursive::event::{Event, EventResult, Key};
-use cursive::{Printer, Vec2, View, XY};
-use std::cell::RefCell;
 
-use crate::tui::job_type_filter::JobTypeFilter;
-use cursive::theme::{BaseColor, Color, Effect, Style};
+use std::cell::RefCell;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime};
-use tokio::runtime::Handle;
+use std::fmt;
 
+use tokio::runtime::Handle;
 use tokio::time::interval;
+
+use cursive::direction::Direction;
+use cursive::event::{Event, EventResult, Key};
+use cursive::{Printer, Vec2, View, XY};
+use cursive::theme::{BaseColor, Color, Effect, Style};
+
+use crate::tui::job_type_filter::JobTypeFilter;
+use std::fmt::Formatter;
 
 /// Consumers impl OmniboxSubscriber receive these commands
 /// via a channel in a wrapped view
@@ -18,11 +22,32 @@ use tokio::time::interval;
 pub enum OmniboxEvent {
     FocusServiceList,
     StateUpdate(OmniboxState),
+    Command(OmniboxCommand),
 }
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum OmniboxCommand {
+    Load,
+    Unload,
+    Edit,
+}
+
+impl fmt::Display for OmniboxCommand {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", format!("{:?}", self).to_ascii_lowercase())
+    }
+}
+
+static OMNIBOX_COMNANDS: [(OmniboxCommand, &str); 3] = [
+    (OmniboxCommand::Load, "Load highlighted job"),
+    (OmniboxCommand::Unload, "Unload highlighted job"),
+    (OmniboxCommand::Edit, "Edit plist with $EDITOR, then reload job")
+];
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum OmniboxMode {
     CommandFilter,
+    CommandConfirm(OmniboxCommand),
     NameFilter,
     JobTypeFilter,
     Idle,
@@ -50,6 +75,21 @@ impl OmniboxState {
             job_type_filter: job_type_filter.unwrap_or(self.job_type_filter.clone()),
         }
     }
+
+    /// Suggest a command based on name filter
+    pub fn suggest_command(&self) -> Option<(OmniboxCommand, &str)> {
+        let OmniboxState { mode, name_filter, .. } = self;
+
+        if *mode != OmniboxMode::CommandFilter || name_filter.is_empty() {
+            return None;
+        }
+
+        OMNIBOX_COMNANDS
+            .iter()
+            .filter(|(c, d)| c.to_string().contains(name_filter))
+            .next()
+            .map(|s| s.clone())
+    }
 }
 
 impl Default for OmniboxState {
@@ -74,18 +114,23 @@ async fn omnibox_tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>
         let read = state.read().expect("Must read state");
         let OmniboxState { mode, tick, .. } = &*read;
 
-        if *mode == OmniboxMode::Idle || tick.elapsed().unwrap() < Duration::from_secs(1) {
+        if let OmniboxMode::CommandConfirm(cmd) = mode {
+            tx.send(OmniboxEvent::Command(cmd.clone())).expect("Must confirm command");
+        } else if *mode == OmniboxMode::Idle || tick.elapsed().unwrap() < Duration::from_secs(2) {
             continue;
         }
 
         // If you don't confirm command before tick, too slow!
-        let name_filter_update = if *mode == OmniboxMode::CommandFilter {
-            Some("".to_string())
-        } else {
-            None
+        let name_filter_update = match *mode {
+            OmniboxMode::CommandFilter | OmniboxMode::CommandConfirm(_) => Some("".to_string()),
+            _ => None
         };
 
-        let new = read.update_existing(Some(OmniboxMode::Idle), name_filter_update, None);
+        let new = match *mode {
+            OmniboxMode::CommandConfirm(_) => OmniboxState::default(),
+            _ => read.update_existing(Some(OmniboxMode::Idle), name_filter_update, None)
+        };
+
         drop(read);
         let mut write = state.write().expect("Must write");
 
@@ -136,6 +181,11 @@ impl Omnibox {
             mode, name_filter, ..
         } = &state;
 
+        let matched_command = state
+            .suggest_command()
+            .filter(|(cmd, _)| cmd.to_string() == *name_filter)
+            .map(|(cmd, _)| cmd);
+
         match (event, mode) {
             (Event::Char(c), OmniboxMode::NameFilter)
             | (Event::Char(c), OmniboxMode::CommandFilter) => {
@@ -152,6 +202,18 @@ impl Omnibox {
                 }
             }
             (ev, OmniboxMode::JobTypeFilter) => Self::handle_job_type_filter(ev, state),
+            (Event::Key(Key::Tab), OmniboxMode::CommandFilter) => {
+                let suggestion = state.suggest_command();
+                if suggestion.is_none() { return None; }
+                let (cmd, _) = suggestion.unwrap();
+
+                // Can submit from here, but catching a glimpse of the whole command
+                // highlighting before flushing back out is confirmation that it did something
+                Some(state.update_existing(None, Some(cmd.to_string()), None))
+            },
+            (Event::Key(Key::Enter), OmniboxMode::CommandFilter) if matched_command.is_some() => {
+                Some(state.update_existing(Some(OmniboxMode::CommandConfirm(matched_command.unwrap())), None, None))
+            }
             _ => None,
         }
     }
@@ -197,6 +259,7 @@ impl Omnibox {
         let cmd_header =  match *mode {
             OmniboxMode::NameFilter => "Filter > ",
             OmniboxMode::CommandFilter => "Command > ",
+            OmniboxMode::CommandConfirm(_) => "OK! > ",
             _ if name_filter.len() > 1 => "Filter > ",
             _ => "",
         };
@@ -211,14 +274,29 @@ impl Omnibox {
         };
 
         // Print command header
-        let width = (self.last_size.borrow().x / 2) - cmd_header.len();
+        // let width = (self.last_size.borrow().x / 2) - cmd_header.len();
         printer.with_style(modal_hilight, |p| p.print(XY::new(0, 0), cmd_header));
 
-        // Print cmd header value
-        printer.print(
-            XY::new(cmd_header.len(), 0),
-            format!("{:width$}", name_filter, width = width).as_str(),
-        );
+        // Print string filter
+        printer.print(XY::new(cmd_header.len(), 0),name_filter);
+
+        if let OmniboxMode::CommandFilter = mode {
+            let mut start = cmd_header.len() + name_filter.len();
+            let suggestion = read.suggest_command();
+            if suggestion.is_none() { return; }
+            let (cmd, desc) = suggestion.unwrap();
+
+            let cmd_string = cmd.to_string().replace(name_filter, "");
+
+            printer.with_style(
+                subtle,
+                |p| p.print(XY::new(start, 0), cmd_string.as_str())
+            );
+
+            start += cmd_string.len() + 1;
+
+            printer.print(XY::new(start, 0), format!("({})", desc).as_str());
+        };
     }
 
     fn draw_job_type_filter(&self, printer: &Printer<'_, '_>) {
@@ -250,6 +328,7 @@ impl Omnibox {
             JobTypeFilter::USER,
             JobTypeFilter::AGENT,
             JobTypeFilter::DAEMON,
+            // TODO: also only not loaded
             JobTypeFilter::LOADED,
         ]
         .iter()

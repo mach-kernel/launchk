@@ -161,6 +161,7 @@ impl ServiceListView {
             })
             .collect();
 
+        // TODO: Place unsorted jobs on top, to avoid having an extra modal toggle for loading
         items.sort_by(|a, b| a.name.cmp(&b.name));
         Some(items)
     }
@@ -194,11 +195,14 @@ impl OmniboxSubscriber for ServiceListView {
             match mode {
                 OmniboxMode::NameFilter => { self.name_filter.replace(name_filter); },
                 OmniboxMode::JobTypeFilter => { self.job_type_filter.replace(job_type_filter); },
-                _ => {
+                OmniboxMode::Idle => {
                     self.name_filter.replace(name_filter);
                     self.job_type_filter.replace(job_type_filter);
                 }
+                _ => {},
             };
+        } else if let OmniboxEvent::Command(cmd) = event {
+            println!("slv recv cmd {}", cmd);
         }
 
         Ok(())
