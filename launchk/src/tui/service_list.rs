@@ -12,7 +12,7 @@ use tokio::runtime::Handle;
 
 use tokio::time::interval;
 
-use crate::tui::omnibox::{OmniboxEvent, OmniboxState, OmniboxMode};
+use crate::tui::omnibox::{OmniboxEvent, OmniboxState, OmniboxMode, OmniboxCommand, OmniboxError};
 use crate::tui::omnibox_subscribed_view::OmniboxSubscriber;
 use crate::tui::root::CbSinkMessage;
 use crate::launchd::config::{LABEL_TO_ENTRY_CONFIG};
@@ -24,6 +24,7 @@ use std::cell::RefCell;
 
 use crate::tui::job_type_filter::JobTypeFilter;
 use cursive::direction::Direction;
+use std::process::Command;
 
 async fn poll_running_jobs(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSinkMessage>) {
     let mut interval = interval(Duration::from_secs(1));
@@ -165,6 +166,52 @@ impl ServiceListView {
         items.sort_by(|a, b| a.name.cmp(&b.name));
         Some(items)
     }
+
+    fn handle_state_update(&mut self, state: OmniboxState) -> Result<(), OmniboxError> {
+        let OmniboxState {
+            mode,
+            name_filter,
+            job_type_filter,
+            ..
+        } = state;
+
+        match mode {
+            OmniboxMode::NameFilter => { self.name_filter.replace(name_filter); },
+            OmniboxMode::JobTypeFilter => { self.job_type_filter.replace(job_type_filter); },
+            OmniboxMode::Idle => {
+                self.name_filter.replace(name_filter);
+                self.job_type_filter.replace(job_type_filter);
+            }
+            _ => {},
+        };
+
+        Ok(())
+    }
+
+    fn handle_command(&mut self, cmd: OmniboxCommand) -> Result<(), OmniboxError> {
+        match cmd {
+            OmniboxCommand::Edit => {
+                let entry_config = self
+                    .table_list_view
+                    .get_highlighted_row()
+                    .and_then(|rc| rc.entry_info.entry_config.clone())
+                    .ok_or(OmniboxError::CommandError("Cannot find plist for entry".to_string()))?;
+
+                if entry_config.readonly {
+                    Err(OmniboxError::CommandError(format!("{} is read-only", entry_config.plist_path)))
+                } else {
+                    let vim = Command::new("vim")
+                        .arg(entry_config.plist_path)
+                        .status()
+                        .expect("Must get status");
+
+                    println!("vim exited {}", vim);
+                    Ok(())
+                }
+            }
+            _ => Ok(())
+        }
+    }
 }
 
 impl ViewWrapper for ServiceListView {
@@ -184,27 +231,11 @@ impl ViewWrapper for ServiceListView {
 }
 
 impl OmniboxSubscriber for ServiceListView {
-    fn on_omnibox(&mut self, event: OmniboxEvent) -> Result<(), ()> {
-        if let OmniboxEvent::StateUpdate(OmniboxState {
-            mode,
-            name_filter,
-            job_type_filter,
-            ..
-        }) = event
-        {
-            match mode {
-                OmniboxMode::NameFilter => { self.name_filter.replace(name_filter); },
-                OmniboxMode::JobTypeFilter => { self.job_type_filter.replace(job_type_filter); },
-                OmniboxMode::Idle => {
-                    self.name_filter.replace(name_filter);
-                    self.job_type_filter.replace(job_type_filter);
-                }
-                _ => {},
-            };
-        } else if let OmniboxEvent::Command(cmd) = event {
-            println!("slv recv cmd {}", cmd);
+    fn on_omnibox(&mut self, event: OmniboxEvent) -> Result<(), OmniboxError> {
+        match event {
+            OmniboxEvent::StateUpdate(state) => self.handle_state_update(state),
+            OmniboxEvent::Command(cmd) => self.handle_command(cmd),
+            _ => Ok(())
         }
-
-        Ok(())
     }
 }

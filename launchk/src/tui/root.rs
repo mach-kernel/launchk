@@ -1,10 +1,10 @@
-use cursive::view::ViewWrapper;
-use cursive::views::{LinearLayout, NamedView, Panel};
+use cursive::view::{ViewWrapper, Margins};
+use cursive::views::{LinearLayout, NamedView, Panel, Dialog, TextView, BoxedView};
 use cursive::{Cursive, Vec2, View};
 use tokio::runtime::Handle;
 use tokio::time::interval;
 
-use crate::tui::omnibox::{Omnibox, OmniboxEvent};
+use crate::tui::omnibox::{Omnibox, OmniboxEvent, OmniboxError};
 use crate::tui::service_list::ServiceListView;
 use crate::tui::sysinfo::SysInfo;
 use cursive::event::{Event, EventResult};
@@ -14,6 +14,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 
 use crate::tui::omnibox_subscribed_view::{OmniboxSubscribedView, OmniboxSubscriber, Subscribable};
+use std::rc::Rc;
 
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 
@@ -128,10 +129,18 @@ impl RootLayout {
             return;
         }
 
-        target
-            .unwrap()
-            .on_omnibox(recv)
-            .expect("Must deliver Omnibox message");
+        match target.unwrap().on_omnibox(recv) {
+            Err(OmniboxError::CommandError(s)) => {
+                self.cbsink_channel.send(Box::new(|siv: &mut Cursive| {
+                    let dialog = Dialog::around(TextView::new(s))
+                        .button("Ok", |s| { s.pop_layer(); })
+                        .title("Error");
+
+                    siv.add_layer(dialog);
+                }));
+            }
+            _ => {}
+        }
     }
 }
 

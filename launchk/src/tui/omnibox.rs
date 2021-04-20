@@ -44,6 +44,12 @@ static OMNIBOX_COMNANDS: [(OmniboxCommand, &str); 3] = [
     (OmniboxCommand::Edit, "Edit plist with $EDITOR, then reload job")
 ];
 
+#[derive(Debug, Clone)]
+pub enum OmniboxError {
+    StandardError,
+    CommandError(String),
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum OmniboxMode {
     CommandFilter,

@@ -9,6 +9,7 @@ use std::marker::PhantomData;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, channel, Sender};
+use std::rc::Rc;
 
 pub trait TableListItem {
     fn as_row(&self) -> Vec<String>;
@@ -113,6 +114,10 @@ impl<T: 'static + TableListItem> TableListView<T> {
         sv.set_selection(current_selection);
     }
 
+    pub fn get_highlighted_row(&self) -> Option<Rc<T>> {
+        self.get_selectview().selection()
+    }
+
     /// "Responsive"
     fn compute_sizes(&mut self) {
         let (user_col_sizes, user_col_sizes_total) = &*self.user_col_sizes;
@@ -154,6 +159,19 @@ impl<T: 'static + TableListItem> TableListView<T> {
             .and_then(|v| Some(v.get_inner_mut()))
             .and_then(|v| Some(v.get_inner_mut()))
             .and_then(|v| Some(v.get_inner_mut()))
+            .expect("Unable to get SelectView")
+    }
+
+    fn get_selectview(&self) -> &SelectView<T> {
+        self
+            .linear_layout
+            .get_child(1)
+            .and_then(|c| {
+                c.as_any().downcast_ref::<ScrollView<ResizedView<ResizedView<SelectView<T>>>>>()
+            })
+            .and_then(|v| Some(v.get_inner()))
+            .and_then(|v| Some(v.get_inner()))
+            .and_then(|v| Some(v.get_inner()))
             .expect("Unable to get SelectView")
     }
 }
