@@ -25,6 +25,7 @@ use std::cell::RefCell;
 use crate::tui::job_type_filter::JobTypeFilter;
 use cursive::direction::Direction;
 use std::process::Command;
+use std::cmp::Ordering;
 
 async fn poll_running_jobs(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSinkMessage>) {
     let mut interval = interval(Duration::from_secs(1));
@@ -105,7 +106,7 @@ impl ServiceListView {
         Self {
             running_jobs: arc_svc.clone(),
             name_filter: RefCell::new("".into()),
-            job_type_filter: RefCell::new(JobTypeFilter::default()),
+            job_type_filter: RefCell::new(JobTypeFilter::launchk_default()),
             table_list_view: TableListView::new(vec![
                 ("Name", None),
                 ("Session", Some(12)),
@@ -147,7 +148,7 @@ impl ServiceListView {
                     .entry_config
                     .as_ref()
                     .map(|ec| ec.job_type_filter(is_loaded))
-                    .unwrap_or(JobTypeFilter::empty());
+                    .unwrap_or(if is_loaded { JobTypeFilter::LOADED } else { JobTypeFilter::default() });
 
                 if !job_type_filter.is_empty() && !entry_job_type_filter.intersects(*job_type_filter)
                 {
@@ -162,8 +163,20 @@ impl ServiceListView {
             })
             .collect();
 
-        // TODO: Place unsorted jobs on top, to avoid having an extra modal toggle for loading
-        items.sort_by(|a, b| a.name.cmp(&b.name));
+        items.sort_by(|a, b| {
+            let loaded_a = a.job_type_filter.intersects(JobTypeFilter::LOADED);
+            let loaded_b = b.job_type_filter.intersects(JobTypeFilter::LOADED);
+            let name_cmp = a.name.cmp(&b.name);
+
+            if !loaded_a && loaded_b {
+                Ordering::Less
+            } else if loaded_a && !loaded_b {
+                Ordering::Greater
+            } else {
+                name_cmp
+            }
+        });
+
         Some(items)
     }
 
@@ -198,16 +211,16 @@ impl ServiceListView {
                     .ok_or(OmniboxError::CommandError("Cannot find plist for entry".to_string()))?;
 
                 if entry_config.readonly {
-                    Err(OmniboxError::CommandError(format!("{} is read-only", entry_config.plist_path)))
-                } else {
-                    let vim = Command::new("vim")
-                        .arg(entry_config.plist_path)
-                        .status()
-                        .expect("Must get status");
-
-                    println!("vim exited {}", vim);
-                    Ok(())
+                    return Err(OmniboxError::CommandError(format!("{} is read-only", entry_config.plist_path)))
                 }
+
+                let vim = Command::new("vim")
+                    .arg(entry_config.plist_path)
+                    .status()
+                    .expect("Must get status");
+
+                println!("vim exited {}", vim);
+                Ok(())
             }
             _ => Ok(())
         }

@@ -92,7 +92,7 @@ impl OmniboxState {
 
         OMNIBOX_COMNANDS
             .iter()
-            .filter(|(c, d)| c.to_string().contains(name_filter))
+            .filter(|(c, _)| c.to_string().contains(name_filter))
             .next()
             .map(|s| s.clone())
     }
@@ -104,12 +104,12 @@ impl Default for OmniboxState {
             mode: OmniboxMode::Idle,
             tick: SystemTime::now(),
             name_filter: "".to_string(),
-            job_type_filter: JobTypeFilter::default(),
+            job_type_filter: JobTypeFilter::launchk_default(),
         }
     }
 }
 
-/// Move OmniboxState back to some time after the user stops
+/// Move OmniboxState back to idle some time after the user stops
 /// interacting with it
 async fn omnibox_tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>) {
     let mut tick_rate = interval(Duration::from_millis(500));
@@ -280,7 +280,6 @@ impl Omnibox {
         };
 
         // Print command header
-        // let width = (self.last_size.borrow().x / 2) - cmd_header.len();
         printer.with_style(modal_hilight, |p| p.print(XY::new(0, 0), cmd_header));
 
         // Print string filter
@@ -334,7 +333,6 @@ impl Omnibox {
             JobTypeFilter::USER,
             JobTypeFilter::AGENT,
             JobTypeFilter::DAEMON,
-            // TODO: also only not loaded
             JobTypeFilter::LOADED,
         ]
         .iter()

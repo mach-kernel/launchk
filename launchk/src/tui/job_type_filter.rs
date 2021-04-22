@@ -15,6 +15,14 @@ bitflags! {
     }
 }
 
+impl JobTypeFilter {
+    pub fn launchk_default() -> Self {
+        let mut jtf = JobTypeFilter::default();
+        jtf.toggle(JobTypeFilter::LOADED);
+        jtf
+    }
+}
+
 /// Represent the bitmask as a string for easy TUI check for styling
 /// hotkey status
 impl fmt::Display for JobTypeFilter {

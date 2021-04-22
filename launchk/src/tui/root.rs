@@ -26,7 +26,6 @@ pub struct RootLayout {
     cbsink_channel: Sender<CbSinkMessage>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 enum RootLayoutChildren {
     SysInfo,
@@ -130,17 +129,24 @@ impl RootLayout {
         }
 
         match target.unwrap().on_omnibox(recv) {
-            Err(OmniboxError::CommandError(s)) => {
-                self.cbsink_channel.send(Box::new(|siv: &mut Cursive| {
-                    let dialog = Dialog::around(TextView::new(s))
-                        .button("Ok", |s| { s.pop_layer(); })
-                        .title("Error");
+            Err(OmniboxError::CommandError(s)) =>
+                self.cbsink_channel.send(Self::show_error(s)),
+            _ => Ok(())
+        };
 
-                    siv.add_layer(dialog);
-                }));
-            }
-            _ => {}
-        }
+        self.cbsink_channel.send(Box::new(|siv: &mut Cursive| siv.clear()));
+    }
+
+    fn show_error(err: String) -> CbSinkMessage {
+        let cl = |siv: &mut Cursive| {
+            let dialog = Dialog::around(TextView::new(err))
+                .button("Ok", |s| { s.pop_layer(); })
+                .title("Error");
+
+            siv.add_layer(dialog);
+        };
+
+        Box::new(cl)
     }
 }
 
@@ -149,10 +155,10 @@ impl ViewWrapper for RootLayout {
 
     fn wrap_on_event(&mut self, event: Event) -> EventResult {
         let ev = match event {
-            Event::Char('/') | Event::Char(':') | Event::CtrlChar('u') => {
-                self.focus_and_forward(RootLayoutChildren::Omnibox, event)
-            }
-            Event::Char('s')
+            Event::Char('/')
+            | Event::Char(':')
+            | Event::CtrlChar('u')
+            | Event::Char('s')
             | Event::Char('g')
             | Event::Char('u')
             | Event::Char('a')
