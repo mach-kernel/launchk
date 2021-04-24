@@ -158,7 +158,7 @@ impl ServiceListView {
                     .map(|ec| ec.job_type_filter(is_loaded))
                     .unwrap_or(if is_loaded { JobTypeFilter::LOADED } else { JobTypeFilter::default() });
 
-                if !job_type_filter.is_empty() && !entry_job_type_filter.intersects(*job_type_filter)
+                if !job_type_filter.is_empty() && !entry_job_type_filter.contains(*job_type_filter)
                 {
                     return None;
                 }
