@@ -17,7 +17,7 @@ use crate::tui::omnibox_subscribed_view::OmniboxSubscriber;
 use crate::tui::root::CbSinkMessage;
 use crate::launchd::config::{LABEL_TO_ENTRY_CONFIG};
 
-use crate::launchd::service::{find_entry_info, list_all, LaunchdEntryInfo};
+use crate::launchd::query::{find_entry_info, list_all, LaunchdEntryInfo, load};
 use crate::tui::table::table_list_view::{TableListItem, TableListView};
 use std::borrow::Borrow;
 use std::cell::RefCell;
@@ -27,6 +27,11 @@ use cursive::direction::Direction;
 use std::process::Command;
 use std::cmp::Ordering;
 
+lazy_static! {
+    static ref EDITOR: &'static str = option_env!("EDITOR").unwrap_or("vim");
+}
+
+/// Polls XPC for job list
 async fn poll_running_jobs(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSinkMessage>) {
     let mut interval = interval(Duration::from_secs(1));
 
@@ -217,7 +222,7 @@ impl ServiceListView {
                     return Err(OmniboxError::CommandError(format!("{} is read-only", entry_config.plist_path)))
                 }
 
-                let exit = Command::new("vim")
+                let exit = Command::new(*EDITOR)
                     .arg(entry_config.plist_path)
                     .status()
                     .expect("Must get status");
@@ -227,8 +232,19 @@ impl ServiceListView {
                 if exit.success() {
                     Ok(())
                 } else {
-                    Err(OmniboxError::CommandError("vim didn't exit cleanly".to_string()))
+                    Err(OmniboxError::CommandError(format!("{} didn't exit 0", *EDITOR)))
                 }
+            }
+            OmniboxCommand::Load => {
+                let entry_config = self
+                    .table_list_view
+                    .get_highlighted_row()
+                    .and_then(|rc| rc.entry_info.entry_config.clone())
+                    .ok_or(OmniboxError::CommandError("Cannot find plist for entry".to_string()))?;
+
+                load(entry_config.plist_path)
+                    .map(|r| ())
+                    .map_err(|e| OmniboxError::CommandError(e.to_string()))
             }
             _ => Ok(())
         }

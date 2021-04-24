@@ -1,8 +1,5 @@
 use crate::objects::xpc_type::XPCType;
-use crate::{
-    mach_port_t, xpc_bool_create, xpc_copy_description, xpc_double_create, xpc_int64_create,
-    xpc_mach_send_create, xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
-};
+use crate::{mach_port_t, xpc_bool_create, xpc_copy_description, xpc_double_create, xpc_int64_create, xpc_mach_send_create, xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create, xpc_array_create, xpc_array_append_value};
 use std::ffi::{CStr, CString};
 use std::ptr::null_mut;
 use std::sync::Arc;
@@ -98,6 +95,17 @@ impl From<&str> for XPCObject {
     fn from(slice: &str) -> Self {
         let cstr = CString::new(slice).unwrap();
         unsafe { XPCObject::new(xpc_string_create(cstr.as_ptr())) }
+    }
+}
+
+impl From<Vec<XPCObject>> for XPCObject {
+    fn from(slice: Vec<XPCObject>) -> Self {
+        let xpc_array = unsafe { xpc_array_create(null_mut(), 0) };
+        for object in slice {
+            unsafe { xpc_array_append_value(xpc_array, object.as_ptr()) }
+        }
+
+        XPCObject::new(xpc_array)
     }
 }
 

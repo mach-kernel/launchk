@@ -197,6 +197,7 @@ impl Omnibox {
             .map(|(cmd, _)| cmd);
 
         match (event, mode) {
+            // User -> string filter
             (Event::Char(c), OmniboxMode::NameFilter)
             | (Event::Char(c), OmniboxMode::CommandFilter) => {
                 Some(state.update_existing(None, Some(format!("{}{}", name_filter, c)), None))
@@ -212,6 +213,7 @@ impl Omnibox {
                 }
             }
             (ev, OmniboxMode::JobTypeFilter) => Self::handle_job_type_filter(ev, state),
+            // Complete suggestion
             (Event::Key(Key::Tab), OmniboxMode::CommandFilter) => {
                 let suggestion = state.suggest_command();
                 if suggestion.is_none() { return None; }
@@ -221,6 +223,7 @@ impl Omnibox {
                 // highlighting before flushing back out is confirmation that it did something
                 Some(state.update_existing(None, Some(cmd.to_string()), None))
             },
+            // Submit command only if string filter eq suggestion (i.e. requires you to tab-complete first)
             (Event::Key(Key::Enter), OmniboxMode::CommandFilter) if matched_command.is_some() => {
                 Some(state.update_existing(Some(OmniboxMode::CommandConfirm(matched_command.unwrap())), None, None))
             }
@@ -289,23 +292,28 @@ impl Omnibox {
         // Print string filter
         printer.print(XY::new(cmd_header.len(), 0),name_filter);
 
+        // Print command suggestion
         if let OmniboxMode::CommandFilter = mode {
-            let mut start = cmd_header.len() + name_filter.len();
-            let suggestion = read.suggest_command();
-            if suggestion.is_none() { return; }
-            let (cmd, desc) = suggestion.unwrap();
-
-            let cmd_string = cmd.to_string().replace(name_filter, "");
-
-            printer.with_style(
-                subtle,
-                |p| p.print(XY::new(start, 0), cmd_string.as_str())
-            );
-
-            start += cmd_string.len() + 1;
-
-            printer.print(XY::new(start, 0), format!("({})", desc).as_str());
+            let sub = printer.offset(XY::new(cmd_header.len() + name_filter.len(), 0));
+            self.draw_command_suggestion(&sub);
         };
+    }
+
+    fn draw_command_suggestion(&self, printer: &Printer<'_, '_>) {
+        let state = self.state.read().expect("Must read");
+        let suggestion = state.suggest_command();
+
+        if suggestion.is_none() { return; }
+        let (cmd, desc) = suggestion.unwrap();
+        let cmd_string = cmd.to_string().replace(&state.name_filter, "");
+
+        printer.with_style(
+            Style::from(Color::Light(BaseColor::Black)),
+            |p| p.print(XY::new(0, 0), cmd_string.as_str())
+        );
+
+        let start = cmd_string.len() + 1;
+        printer.print(XY::new(start, 0), format!("({})", desc).as_str());
     }
 
     fn draw_job_type_filter(&self, printer: &Printer<'_, '_>) {
@@ -346,6 +354,7 @@ impl Omnibox {
                 mask_string.truncate(1);
             }
 
+            // No space at end if expanded
             if *mask == JobTypeFilter::LOADED && *mode == OmniboxMode::JobTypeFilter {
                 mask_string.truncate(mask_string.len() - 1);
             }

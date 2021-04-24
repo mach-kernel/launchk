@@ -1,7 +1,7 @@
 pub mod message;
 
 /// queries (sorta?)
-pub mod service;
+pub mod query;
 
 /// plist management
 pub mod config;

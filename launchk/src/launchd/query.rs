@@ -6,7 +6,7 @@ use std::fmt;
 use std::sync::Mutex;
 use xpc_sys::objects::xpc_object::XPCObject;
 use xpc_sys::objects::xpc_type;
-use xpc_sys::traits::xpc_pipeable::XPCPipeable;
+use xpc_sys::traits::xpc_pipeable::{XPCPipeable, XPCPipeResult};
 use xpc_sys::traits::xpc_value::TryXPCValue;
 
 use crate::launchd::config::LaunchdEntryConfig;
@@ -17,9 +17,16 @@ use std::time::{SystemTime, Duration};
 
 const ENTRY_INFO_QUERY_TTL: u64 = 15; // seconds
 
+#[link(name = "c")]
+extern "C" {
+    fn geteuid() -> u32;
+}
+
 lazy_static! {
     static ref ENTRY_INFO_CACHE: Mutex<HashMap<String, LaunchdEntryInfo>> =
         Mutex::new(HashMap::new());
+
+    static ref IS_ROOT: bool = unsafe { geteuid() } == 0;
 }
 
 /// LimitLoadToSessionType key in XPC response
@@ -140,7 +147,7 @@ pub fn list_all() -> HashSet<String> {
 }
 
 /// Get more information about a unit from its label
-pub fn find_entry_info<T: Into<String>>(label: T) -> LaunchdEntryInfo {
+pub fn find_entry_info<S: Into<String>>(label: S) -> LaunchdEntryInfo {
     let label_string = label.into();
     let mut cache = ENTRY_INFO_CACHE.try_lock().unwrap();
 
@@ -161,7 +168,7 @@ pub fn find_entry_info<T: Into<String>>(label: T) -> LaunchdEntryInfo {
     meta
 }
 
-fn build_entry_info<T: Into<String>>(label: T) -> LaunchdEntryInfo {
+fn build_entry_info<S: Into<String>>(label: S) -> LaunchdEntryInfo {
     let label_string = label.into();
     let response = find_in_all(label_string.clone());
 
@@ -189,4 +196,26 @@ fn build_entry_info<T: Into<String>>(label: T) -> LaunchdEntryInfo {
         pid,
         tick: SystemTime::now(),
     }
+}
+
+pub fn load<S: Into<String>>(plist_path: S) -> XPCPipeResult {
+    let mut message: HashMap<&str, XPCObject> = HashMap::new();
+    message.insert("routine", XPCObject::from(800 as u64));
+    message.insert("subsystem", XPCObject::from(3 as u64));
+    message.insert("handle", XPCObject::from(0 as u64));
+    message.insert("legacy", XPCObject::from(true));
+    message.insert("legacy-load", XPCObject::from(true));
+    message.insert("enable", XPCObject::from(false));
+
+    message.insert("type", if *IS_ROOT {
+        XPCObject::from(1 as u64)
+    } else {
+        XPCObject::from(7 as u64)
+    });
+
+    let paths = vec![XPCObject::from(plist_path.into())];
+    message.insert("paths", XPCObject::from(paths));
+
+    let message: XPCObject = message.into();
+    message.pipe_routine()
 }
