@@ -7,7 +7,7 @@ use tokio::time::interval;
 use crate::tui::omnibox::{Omnibox, OmniboxEvent, OmniboxError};
 use crate::tui::service_list::ServiceListView;
 use crate::tui::sysinfo::SysInfo;
-use cursive::event::{Event, EventResult};
+use cursive::event::{Event, EventResult, Key};
 use cursive::traits::{Resizable, Scrollable};
 use std::cell::RefCell;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -15,6 +15,8 @@ use std::time::Duration;
 
 use crate::tui::omnibox_subscribed_view::{OmniboxSubscribedView, OmniboxSubscriber, Subscribable};
 use std::rc::Rc;
+use log::Level;
+use std::collections::VecDeque;
 
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 
@@ -24,6 +26,7 @@ pub struct RootLayout {
     last_focus_index: RefCell<usize>,
     runtime_handle: Handle,
     cbsink_channel: Sender<CbSinkMessage>,
+    key_ring: VecDeque<Event>,
 }
 
 #[derive(Debug)]
@@ -43,6 +46,7 @@ impl RootLayout {
             last_focus_index: RefCell::new(RootLayoutChildren::ServiceList as usize),
             cbsink_channel: RootLayout::cbsink_channel(siv, runtime_handle),
             runtime_handle: runtime_handle.clone(),
+            key_ring: VecDeque::with_capacity(3),
         };
 
         new.setup(omnibox);
@@ -111,6 +115,8 @@ impl RootLayout {
 
         let recv = recv.unwrap();
 
+        log::info!("[root/poll_omnibox]: {:?}", recv);
+
         // Triggered by Omnibox when toggling to idle
         if recv == OmniboxEvent::FocusServiceList {
             self.layout
@@ -130,11 +136,26 @@ impl RootLayout {
 
         match target.unwrap().on_omnibox(recv) {
             Err(OmniboxError::CommandError(s)) =>
-                self.cbsink_channel.send(Self::show_error(s)),
-            _ => Ok(())
+                self.cbsink_channel.send(Self::show_error(s)).expect("Must show error"),
+            _ => {}
         };
+    }
 
-        self.cbsink_channel.send(Box::new(|siv: &mut Cursive| siv.clear()));
+    fn ring_to_arrows(&mut self) -> Option<Event> {
+        if self.key_ring.len() < 3 {
+            None
+        } else {
+            let res = match self.key_ring.iter().take(3).collect::<Vec<&Event>>().as_slice() {
+                [Event::Key(Key::Esc), Event::Char('['), Event::Char('A')] => Some(Event::Key(Key::Up)),
+                [Event::Key(Key::Esc), Event::Char('['), Event::Char('B')] => Some(Event::Key(Key::Down)),
+                [Event::Key(Key::Esc), Event::Char('['), Event::Char('C')] => Some(Event::Key(Key::Right)),
+                [Event::Key(Key::Esc), Event::Char('['), Event::Char('D')] => Some(Event::Key(Key::Left)),
+                _ => None
+            };
+
+            self.key_ring.truncate(0);
+            res
+        }
     }
 
     fn show_error(err: String) -> CbSinkMessage {
@@ -154,6 +175,8 @@ impl ViewWrapper for RootLayout {
     wrap_impl!(self.layout: LinearLayout);
 
     fn wrap_on_event(&mut self, event: Event) -> EventResult {
+        log::debug!("[root/event]: {:?}", event);
+
         let ev = match event {
             Event::Char('/')
             | Event::Char(':')
@@ -164,6 +187,16 @@ impl ViewWrapper for RootLayout {
             | Event::Char('a')
             | Event::Char('d')
             | Event::Char('l') => self.focus_and_forward(RootLayoutChildren::Omnibox, event),
+            Event::Key(Key::Esc)
+            | Event::Char('[')
+            | Event::Char('A')
+            | Event::Char('B')
+            | Event::Char('C')
+            | Event::Char('D') => {
+                self.key_ring.push_back(event.clone());
+                let event = self.ring_to_arrows().unwrap_or(event);
+                self.layout.on_event(event)
+            },
             _ => self.layout.on_event(event),
         };
 

@@ -94,16 +94,19 @@ pub struct ServiceListView {
     table_list_view: TableListView<ServiceListItem>,
     name_filter: RefCell<String>,
     job_type_filter: RefCell<JobTypeFilter>,
+    cb_sink: Sender<CbSinkMessage>,
 }
 
 impl ServiceListView {
     pub fn new(runtime_handle: &Handle, cb_sink: Sender<CbSinkMessage>) -> Self {
         let arc_svc = Arc::new(RwLock::new(HashSet::new()));
         let ref_clone = arc_svc.clone();
+        let cb_sink_clone = cb_sink.clone();
 
-        runtime_handle.spawn(async move { poll_running_jobs(ref_clone, cb_sink).await });
+        runtime_handle.spawn(async move { poll_running_jobs(ref_clone, cb_sink_clone).await });
 
         Self {
+            cb_sink,
             running_jobs: arc_svc.clone(),
             name_filter: RefCell::new("".into()),
             job_type_filter: RefCell::new(JobTypeFilter::launchk_default()),
@@ -214,13 +217,18 @@ impl ServiceListView {
                     return Err(OmniboxError::CommandError(format!("{} is read-only", entry_config.plist_path)))
                 }
 
-                let vim = Command::new("vim")
+                let exit = Command::new("vim")
                     .arg(entry_config.plist_path)
                     .status()
                     .expect("Must get status");
 
-                println!("vim exited {}", vim);
-                Ok(())
+                self.cb_sink.send(Box::new(Cursive::clear)).expect("Must clear");
+
+                if exit.success() {
+                    Ok(())
+                } else {
+                    Err(OmniboxError::CommandError("vim didn't exit cleanly".to_string()))
+                }
             }
             _ => Ok(())
         }

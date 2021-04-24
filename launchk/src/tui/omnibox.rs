@@ -111,7 +111,7 @@ impl Default for OmniboxState {
 
 /// Move OmniboxState back to idle some time after the user stops
 /// interacting with it
-async fn omnibox_tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>) {
+async fn tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>) {
     let mut tick_rate = interval(Duration::from_millis(500));
 
     loop {
@@ -119,6 +119,8 @@ async fn omnibox_tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>
 
         let read = state.read().expect("Must read state");
         let OmniboxState { mode, tick, .. } = &*read;
+
+        log::trace!("[omnibox/tick]: {:?}", &*read);
 
         if let OmniboxMode::CommandConfirm(cmd) = mode {
             tx.send(OmniboxEvent::Command(cmd.clone())).expect("Must confirm command");
@@ -149,6 +151,8 @@ async fn omnibox_tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>
             msg.as_ref().expect("Must send");
         }
 
+        log::debug!("[omnibox/tick]: New state: {:?}", &new);
+
         *write = new;
     }
 }
@@ -170,7 +174,7 @@ impl Omnibox {
         let tx_state = state.clone();
         let tx_tick = tx.clone();
 
-        handle.spawn(async move { omnibox_tick(tx_state, tx_tick).await });
+        handle.spawn(async move { tick(tx_state, tx_tick).await });
 
         (
             Self {
