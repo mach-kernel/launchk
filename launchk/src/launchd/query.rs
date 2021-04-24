@@ -14,6 +14,7 @@ use std::iter::FromIterator;
 use xpc_sys::objects::xpc_dictionary::XPCDictionary;
 use xpc_sys::objects::xpc_error::XPCError;
 use std::time::{SystemTime, Duration};
+use xpc_sys::{getaudit_addr, mach_port_t, get_bootstrap_port};
 
 const ENTRY_INFO_QUERY_TTL: u64 = 15; // seconds
 
@@ -172,19 +173,17 @@ fn build_entry_info<S: Into<String>>(label: S) -> LaunchdEntryInfo {
     let label_string = label.into();
     let response = find_in_all(label_string.clone());
 
-    if response.is_err() {
-        return LaunchdEntryInfo::default();
-    }
-
-    let response = response.unwrap();
-
     let pid: i64 = response
-        .get(&["service", "PID"])
+        .as_ref()
+        .map_err(|e| e.clone())
+        .and_then(|r| r.get(&["service", "PID"]))
         .and_then(|o| o.xpc_value())
         .unwrap_or(0);
 
     let limit_load_to_session_type = response
-        .get(&["service", "LimitLoadToSessionType"])
+        .as_ref()
+        .map_err(|e| e.clone())
+        .and_then(|r| r.get(&["service", "LimitLoadToSessionType"]))
         .and_then(|o| o.try_into())
         .unwrap_or(LimitLoadToSessionType::Unknown);
 
@@ -207,6 +206,11 @@ pub fn load<S: Into<String>>(plist_path: S) -> XPCPipeResult {
     message.insert("legacy-load", XPCObject::from(true));
     message.insert("enable", XPCObject::from(false));
 
+    message.insert(
+        "domain-port",
+        XPCObject::from(get_bootstrap_port() as mach_port_t),
+    );
+
     message.insert("type", if *IS_ROOT {
         XPCObject::from(1 as u64)
     } else {
@@ -215,6 +219,7 @@ pub fn load<S: Into<String>>(plist_path: S) -> XPCPipeResult {
 
     let paths = vec![XPCObject::from(plist_path.into())];
     message.insert("paths", XPCObject::from(paths));
+    message.insert("session", XPCObject::from("Aqua"));
 
     let message: XPCObject = message.into();
     message.pipe_routine()

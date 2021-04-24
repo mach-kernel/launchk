@@ -396,6 +396,12 @@ impl View for Omnibox {
                     .expect("Must focus");
                 Some(OmniboxState::default())
             }
+            (Event::Key(Key::Esc), _) => {
+                self.tx
+                    .send(OmniboxEvent::FocusServiceList)
+                    .expect("Must focus");
+                Some(state.update_existing(Some(OmniboxMode::Idle), None, None))
+            }
             (e, OmniboxMode::Idle) => Self::handle_idle(&e, &*state),
             (e, _) => Self::handle_active(&e, &*state),
         };
