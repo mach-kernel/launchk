@@ -224,3 +224,32 @@ pub fn load<S: Into<String>>(plist_path: S) -> XPCPipeResult {
     let message: XPCObject = message.into();
     message.pipe_routine()
 }
+
+pub fn unload<S: Into<String>>(plist_path: S) -> XPCPipeResult {
+    let mut message: HashMap<&str, XPCObject> = HashMap::new();
+    message.insert("routine", XPCObject::from(801 as u64));
+    message.insert("subsystem", XPCObject::from(3 as u64));
+    message.insert("handle", XPCObject::from(0 as u64));
+    message.insert("legacy", XPCObject::from(true));
+    message.insert("legacy-load", XPCObject::from(true));
+    message.insert("no-einprogress", XPCObject::from(true));
+    message.insert("disable", XPCObject::from(false));
+
+    message.insert(
+        "domain-port",
+        XPCObject::from(get_bootstrap_port() as mach_port_t),
+    );
+
+    message.insert("type", if *IS_ROOT {
+        XPCObject::from(1 as u64)
+    } else {
+        XPCObject::from(7 as u64)
+    });
+
+    let paths = vec![XPCObject::from(plist_path.into())];
+    message.insert("paths", XPCObject::from(paths));
+    message.insert("session", XPCObject::from("Aqua"));
+
+    let message: XPCObject = message.into();
+    message.pipe_routine()
+}

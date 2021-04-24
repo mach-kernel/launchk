@@ -17,7 +17,7 @@ use crate::tui::omnibox_subscribed_view::OmniboxSubscriber;
 use crate::tui::root::CbSinkMessage;
 use crate::launchd::config::{LABEL_TO_ENTRY_CONFIG};
 
-use crate::launchd::query::{find_entry_info, list_all, LaunchdEntryInfo, load};
+use crate::launchd::query::{find_entry_info, list_all, LaunchdEntryInfo, load, unload};
 use crate::tui::table::table_list_view::{TableListItem, TableListView};
 use std::borrow::Borrow;
 use std::cell::RefCell;
@@ -234,7 +234,7 @@ impl ServiceListView {
                 } else {
                     Err(OmniboxError::CommandError(format!("{} didn't exit 0", *EDITOR)))
                 }
-            }
+            },
             OmniboxCommand::Load => {
                 let entry_config = self
                     .table_list_view
@@ -243,9 +243,20 @@ impl ServiceListView {
                     .ok_or(OmniboxError::CommandError("Cannot find plist for entry".to_string()))?;
 
                 load(entry_config.plist_path)
-                    .map(|r| ())
+                    .map(|_| ())
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
-            }
+            },
+            OmniboxCommand::Unload => {
+                let entry_config = self
+                    .table_list_view
+                    .get_highlighted_row()
+                    .and_then(|rc| rc.entry_info.entry_config.clone())
+                    .ok_or(OmniboxError::CommandError("Cannot find plist for entry".to_string()))?;
+
+                unload(entry_config.plist_path)
+                    .map(|_| ())
+                    .map_err(|e| OmniboxError::CommandError(e.to_string()))
+            },
             _ => Ok(())
         }
     }
