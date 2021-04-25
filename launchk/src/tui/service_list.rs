@@ -97,7 +97,7 @@ impl TableListItem for ServiceListItem {
 pub struct ServiceListView {
     running_jobs: Arc<RwLock<HashSet<String>>>,
     table_list_view: TableListView<ServiceListItem>,
-    name_filter: RefCell<String>,
+    label_filter: RefCell<String>,
     job_type_filter: RefCell<JobTypeFilter>,
     cb_sink: Sender<CbSinkMessage>,
 }
@@ -113,7 +113,7 @@ impl ServiceListView {
         Self {
             cb_sink,
             running_jobs: arc_svc.clone(),
-            name_filter: RefCell::new("".into()),
+            label_filter: RefCell::new("".into()),
             job_type_filter: RefCell::new(JobTypeFilter::launchk_default()),
             table_list_view: TableListView::new(vec![
                 ("Name", None),
@@ -129,7 +129,7 @@ impl ServiceListView {
         let plists = LABEL_TO_ENTRY_CONFIG.read().ok()?;
         let running = self.running_jobs.read().ok()?;
 
-        let name_filter = self.name_filter.borrow();
+        let name_filter = self.label_filter.borrow();
         let job_type_filter = self.job_type_filter.borrow();
 
         let running_no_plist = running
@@ -191,16 +191,16 @@ impl ServiceListView {
     fn handle_state_update(&mut self, state: OmniboxState) -> Result<(), OmniboxError> {
         let OmniboxState {
             mode,
-            name_filter,
+            label_filter,
             job_type_filter,
             ..
         } = state;
 
         match mode {
-            OmniboxMode::NameFilter => { self.name_filter.replace(name_filter); },
+            OmniboxMode::LabelFilter => { self.label_filter.replace(label_filter); }
             OmniboxMode::JobTypeFilter => { self.job_type_filter.replace(job_type_filter); },
             OmniboxMode::Idle => {
-                self.name_filter.replace(name_filter);
+                self.label_filter.replace(label_filter);
                 self.job_type_filter.replace(job_type_filter);
             }
             _ => {},
@@ -235,29 +235,23 @@ impl ServiceListView {
                     Err(OmniboxError::CommandError(format!("{} didn't exit 0", *EDITOR)))
                 }
             },
-            OmniboxCommand::Load => {
+            OmniboxCommand::Load | OmniboxCommand::Unload => {
                 let entry_config = self
                     .table_list_view
                     .get_highlighted_row()
                     .and_then(|rc| rc.entry_info.entry_config.clone())
                     .ok_or(OmniboxError::CommandError("Cannot find plist for entry".to_string()))?;
 
-                load(entry_config.plist_path)
-                    .map(|_| ())
-                    .map_err(|e| OmniboxError::CommandError(e.to_string()))
-            },
-            OmniboxCommand::Unload => {
-                let entry_config = self
-                    .table_list_view
-                    .get_highlighted_row()
-                    .and_then(|rc| rc.entry_info.entry_config.clone())
-                    .ok_or(OmniboxError::CommandError("Cannot find plist for entry".to_string()))?;
+                let xpc_query = if cmd == OmniboxCommand::Load {
+                    load
+                } else {
+                    unload
+                };
 
-                unload(entry_config.plist_path)
+                xpc_query(entry_config.plist_path)
                     .map(|_| ())
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
-            },
-            _ => Ok(())
+            }
         }
     }
 }
