@@ -24,7 +24,7 @@ pub type xpc_pipe_t = *mut c_void;
 /// https://developer.apple.com/documentation/kernel/mach
 /// https://chromium.googlesource.com/chromium/src.git/+/47.0.2507.2/sandbox/mac/xpc_private_stubs.sig
 extern "C" {
-    // Seems to give same output as strerror ¯\_(ツ)_/¯
+    // Can decode i64 returned in "errors" for XPC responses
     pub fn xpc_strerror(err: c_int) -> *const c_char;
 
     pub static errno: c_int;

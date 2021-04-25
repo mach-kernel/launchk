@@ -197,7 +197,7 @@ fn build_entry_info<S: Into<String>>(label: S) -> LaunchdEntryInfo {
     }
 }
 
-pub fn load<S: Into<String>>(plist_path: S) -> XPCPipeResult {
+pub fn load<S: Into<String>>(label: S, plist_path: S) -> XPCPipeResult {
     let mut message: HashMap<&str, XPCObject> = HashMap::new();
     message.insert("routine", XPCObject::from(800 as u64));
     message.insert("subsystem", XPCObject::from(3 as u64));
@@ -205,6 +205,7 @@ pub fn load<S: Into<String>>(plist_path: S) -> XPCPipeResult {
     message.insert("legacy", XPCObject::from(true));
     message.insert("legacy-load", XPCObject::from(true));
     message.insert("enable", XPCObject::from(false));
+    message.insert("no-einprogress", XPCObject::from(true));
 
     message.insert(
         "domain-port",
@@ -222,10 +223,17 @@ pub fn load<S: Into<String>>(plist_path: S) -> XPCPipeResult {
     message.insert("session", XPCObject::from("Aqua"));
 
     let message: XPCObject = message.into();
+
+    // Invalidate cache
+    ENTRY_INFO_CACHE
+        .lock()
+        .expect("Must invalidate")
+        .remove(label.into().as_str());
+
     handle_load_unload_errors(message.pipe_routine())
 }
 
-pub fn unload<S: Into<String>>(plist_path: S) -> XPCPipeResult {
+pub fn unload<S: Into<String>>(label: S, plist_path: S) -> XPCPipeResult {
     let mut message: HashMap<&str, XPCObject> = HashMap::new();
     message.insert("routine", XPCObject::from(801 as u64));
     message.insert("subsystem", XPCObject::from(3 as u64));
@@ -251,6 +259,13 @@ pub fn unload<S: Into<String>>(plist_path: S) -> XPCPipeResult {
     message.insert("session", XPCObject::from("Aqua"));
 
     let message: XPCObject = message.into();
+
+    // Invalidate cache
+    ENTRY_INFO_CACHE
+        .lock()
+        .expect("Must invalidate")
+        .remove(label.into().as_str());
+    
     handle_load_unload_errors(message.pipe_routine())
 }
 
@@ -263,6 +278,9 @@ fn handle_load_unload_errors(result: XPCPipeResult) -> XPCPipeResult {
     } else {
         let mut error_string = "".to_string();
         let XPCDictionary(hm) = error_dict.unwrap();
+
+        if hm.is_empty() { return result; }
+
         for (path, errcode) in hm {
             let errcode: i64 = errcode.xpc_value().unwrap();
             error_string.push_str(format!("{}: {}\n", path, xpc_sys::str_xpc_errno(errcode as i32)).as_str());

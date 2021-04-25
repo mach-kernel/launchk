@@ -233,11 +233,19 @@ impl ServiceListView {
                 }
             },
             OmniboxCommand::Load | OmniboxCommand::Unload => {
-                let entry_config = self
+                let item = self
                     .table_list_view
-                    .get_highlighted_row()
+                    .get_highlighted_row();
+
+                let entry_config = item
+                    .as_ref()
                     .and_then(|rc| rc.entry_info.entry_config.clone())
                     .ok_or(OmniboxError::CommandError("Cannot find plist for entry".to_string()))?;
+
+                let label = item
+                    .as_ref()
+                    .and_then(|rc| Some(rc.name.clone()))
+                    .ok_or(OmniboxError::CommandError("Cannot find label for entry".to_string()))?;
 
                 let xpc_query = if cmd == OmniboxCommand::Load {
                     load
@@ -245,7 +253,7 @@ impl ServiceListView {
                     unload
                 };
 
-                xpc_query(entry_config.plist_path)
+                xpc_query(label, entry_config.plist_path)
                     .map(|_| ())
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
             }
