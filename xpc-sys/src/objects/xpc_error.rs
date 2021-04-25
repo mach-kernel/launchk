@@ -1,4 +1,4 @@
-use crate::objects::xpc_error::XPCError::{DictionaryError, PipeError};
+use crate::objects::xpc_error::XPCError::{DictionaryError, PipeError, QueryError};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
@@ -7,6 +7,7 @@ pub enum XPCError {
     DictionaryError(String),
     PipeError(String),
     ValueError(String),
+    QueryError(String),
     StandardError,
     NotFound,
 }
@@ -16,6 +17,7 @@ impl Display for XPCError {
         let err = match self {
             DictionaryError(e) => e,
             PipeError(e) => e,
+            QueryError(e) => e,
             _ => "",
         };
 

@@ -137,6 +137,14 @@ pub fn read_xpc_global_data() -> Option<&'static xpc_global_data> {
     unsafe { gd.as_ref() }
 }
 
+pub fn str_xpc_errno(err: i32) -> String {
+    unsafe {
+        CStr::from_ptr(xpc_strerror(err))
+            .to_string_lossy()
+            .to_string()
+    }
+}
+
 pub fn str_errno(err: Option<i32>) -> String {
     let unwrapped = err.unwrap_or(unsafe { errno });
     unsafe {

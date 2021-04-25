@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
-use crate::{mach_port_t, xpc_get_type, xpc_object_t, xpc_type_t};
+use crate::{mach_port_t, xpc_get_type, xpc_object_t, xpc_type_t, _xpc_type_array, xpc_array_create};
 
 use crate::objects::xpc_object::XPCObject;
+use std::ptr::null_mut;
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,4 +66,6 @@ lazy_static! {
     pub static ref String: XPCType = XPCObject::from("").into();
     pub static ref Bool: XPCType = XPCObject::from(true).into();
     pub static ref MachPort: XPCType = XPCObject::from(0 as mach_port_t).into();
+    pub static ref Array: XPCType = unsafe { XPCType(&_xpc_type_array) };
+    // pub static ref Array: XPCType = unsafe { XPCObject::from(xpc_array_create(null_mut(), 0)).into() };
 }

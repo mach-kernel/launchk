@@ -222,7 +222,7 @@ pub fn load<S: Into<String>>(plist_path: S) -> XPCPipeResult {
     message.insert("session", XPCObject::from("Aqua"));
 
     let message: XPCObject = message.into();
-    message.pipe_routine()
+    handle_load_unload_errors(message.pipe_routine())
 }
 
 pub fn unload<S: Into<String>>(plist_path: S) -> XPCPipeResult {
@@ -251,5 +251,23 @@ pub fn unload<S: Into<String>>(plist_path: S) -> XPCPipeResult {
     message.insert("session", XPCObject::from("Aqua"));
 
     let message: XPCObject = message.into();
-    message.pipe_routine()
+    handle_load_unload_errors(message.pipe_routine())
+}
+
+fn handle_load_unload_errors(result: XPCPipeResult) -> XPCPipeResult {
+    let dict: XPCDictionary = result.as_ref().map_err(|e| e.clone())?.try_into()?;
+    let error_dict = dict.get_as_dictionary(&["errors"]);
+
+    if error_dict.is_err() {
+        result
+    } else {
+        let mut error_string = "".to_string();
+        let XPCDictionary(hm) = error_dict.unwrap();
+        for (path, errcode) in hm {
+            let errcode: i64 = errcode.xpc_value().unwrap();
+            error_string.push_str(format!("{}: {}\n", path, xpc_sys::str_xpc_errno(errcode as i32)).as_str());
+        }
+
+        Err(XPCError::QueryError(error_string))
+    }
 }

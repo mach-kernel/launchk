@@ -2,14 +2,14 @@ use std::ffi::CStr;
 
 use crate::objects::xpc_object::XPCObject;
 use crate::objects::xpc_type;
-use crate::{
-    xpc_bool_get_value, xpc_int64_get_value, xpc_string_get_string_ptr, xpc_type_get_name,
-    xpc_uint64_get_value,
-};
+use crate::{xpc_bool_get_value, xpc_int64_get_value, xpc_string_get_string_ptr, xpc_type_get_name, xpc_uint64_get_value, xpc_object_t, xpc_retain, xpc_array_apply};
 
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::ValueError;
 use crate::objects::xpc_type::XPCType;
+use block::ConcreteBlock;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 /// Implement to get data out of xpc_type_t and into
 /// a Rust native data type
@@ -73,6 +73,34 @@ impl TryXPCValue<bool> for XPCObject {
         Ok(unsafe { xpc_bool_get_value(**obj_pointer) })
     }
 }
+
+// impl TryXPCValue<Vec<XPCObject>> for XPCObject {
+//     fn xpc_value(&self) -> Result<Vec<XPCObject>, XPCError> {
+//         // check_xpc_type(&self, &xpc_type::Array)?;
+//         let XPCObject(obj_pointer, _) = self;
+//
+//         let vec: Rc<RefCell<Vec<XPCObject>>> = Rc::new(RefCell::new(vec![]));
+//         let vec_rc_clone = vec.clone();
+//
+//         let block = ConcreteBlock::new(move |obj: xpc_object_t| {
+//             unsafe { xpc_retain(obj) };
+//             vec_rc_clone.borrow_mut().push(obj.into());
+//         });
+//
+//         let ok = unsafe {
+//             xpc_array_apply(**obj_pointer, &*block as *const _ as *mut _)
+//         };
+//
+//         if ok {
+//             match Rc::try_unwrap(vec) {
+//                 Ok(cell) => Ok(cell.into_inner()),
+//                 Err(_) => Err(ValueError("Unable to unwrap Rc".to_string())),
+//             }
+//         } else {
+//             Err(ValueError("xpc_dictionary_apply failed".to_string()))
+//         }
+//     }
+// }
 
 // TODO: can this be read as just uint?
 // impl TryXPCValue<mach_port_t> for XPCObject {

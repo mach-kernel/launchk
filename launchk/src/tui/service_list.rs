@@ -69,7 +69,7 @@ impl TableListItem for ServiceListItem {
             .map(|ec| format!("{}/{}", ec.entry_location, ec.entry_type))
             .unwrap_or("-".to_string());
 
-        let pid = if self.entry_info.pid > 0 {
+        let pid = if self.entry_info.pid > 0 && self.job_type_filter.intersects(JobTypeFilter::LOADED) {
             format!("{}", self.entry_info.pid)
         } else {
             "-".to_string()
