@@ -75,13 +75,10 @@ impl TableListItem for ServiceListItem {
             "-".to_string()
         };
 
-        // TODO: This would be cute and stuff, but truncate() panics
         let loaded = if self.job_type_filter.intersects(JobTypeFilter::LOADED) {
-            "y"
-            // "✓"
+            "✔"
         } else {
-            "n"
-            // "✗"
+            "✘"
         };
 
         vec![
