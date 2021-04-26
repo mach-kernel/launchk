@@ -1,10 +1,10 @@
-use crate::tui::omnibox::{OmniboxEvent, OmniboxError};
 use cursive::view::{Selector, ViewWrapper};
 use cursive::views::{Panel, ResizedView, ScrollView};
 use cursive::{Printer, Rect, Vec2, View};
 
 use cursive::direction::Direction;
 use cursive::event::{Event, EventResult};
+use crate::tui::omnibox::view::{OmniboxEvent, OmniboxError};
 
 /// Boxed view we can match against for sending Omnibox events
 pub struct OmniboxSubscribedView {

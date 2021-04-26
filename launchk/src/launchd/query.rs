@@ -1,4 +1,4 @@
-use crate::launchd::message::{from_msg, LIST_SERVICES};
+use crate::launchd::message::{from_msg, LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS};
 use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
@@ -198,19 +198,8 @@ fn build_entry_info<S: Into<String>>(label: S) -> LaunchdEntryInfo {
 }
 
 pub fn load<S: Into<String>>(label: S, plist_path: S) -> XPCPipeResult {
-    let mut message: HashMap<&str, XPCObject> = HashMap::new();
-    message.insert("routine", XPCObject::from(800 as u64));
-    message.insert("subsystem", XPCObject::from(3 as u64));
-    message.insert("handle", XPCObject::from(0 as u64));
-    message.insert("legacy", XPCObject::from(true));
-    message.insert("legacy-load", XPCObject::from(true));
-    message.insert("enable", XPCObject::from(false));
-    message.insert("no-einprogress", XPCObject::from(true));
-
-    message.insert(
-        "domain-port",
-        XPCObject::from(get_bootstrap_port() as mach_port_t),
-    );
+    let mut message: HashMap<&str, XPCObject> = from_msg(&LOAD_PATHS);
+    let label_string = label.into();
 
     message.insert("type", if *IS_ROOT {
         XPCObject::from(1 as u64)
@@ -224,29 +213,17 @@ pub fn load<S: Into<String>>(label: S, plist_path: S) -> XPCPipeResult {
 
     let message: XPCObject = message.into();
 
-    // Invalidate cache
     ENTRY_INFO_CACHE
         .lock()
         .expect("Must invalidate")
-        .remove(label.into().as_str());
+        .remove(&label_string);
 
-    handle_load_unload_errors(message.pipe_routine())
+    handle_load_unload_errors(label_string, message.pipe_routine()?)
 }
 
 pub fn unload<S: Into<String>>(label: S, plist_path: S) -> XPCPipeResult {
-    let mut message: HashMap<&str, XPCObject> = HashMap::new();
-    message.insert("routine", XPCObject::from(801 as u64));
-    message.insert("subsystem", XPCObject::from(3 as u64));
-    message.insert("handle", XPCObject::from(0 as u64));
-    message.insert("legacy", XPCObject::from(true));
-    message.insert("legacy-load", XPCObject::from(true));
-    message.insert("no-einprogress", XPCObject::from(true));
-    message.insert("disable", XPCObject::from(false));
-
-    message.insert(
-        "domain-port",
-        XPCObject::from(get_bootstrap_port() as mach_port_t),
-    );
+    let mut message: HashMap<&str, XPCObject> = from_msg(&UNLOAD_PATHS);
+    let label_string = label.into();
 
     message.insert("type", if *IS_ROOT {
         XPCObject::from(1 as u64)
@@ -260,30 +237,29 @@ pub fn unload<S: Into<String>>(label: S, plist_path: S) -> XPCPipeResult {
 
     let message: XPCObject = message.into();
 
-    // Invalidate cache
     ENTRY_INFO_CACHE
         .lock()
         .expect("Must invalidate")
-        .remove(label.into().as_str());
-    
-    handle_load_unload_errors(message.pipe_routine())
+        .remove(&label_string);
+
+    handle_load_unload_errors(label_string, message.pipe_routine()?)
 }
 
-fn handle_load_unload_errors(result: XPCPipeResult) -> XPCPipeResult {
-    let dict: XPCDictionary = result.as_ref().map_err(|e| e.clone())?.try_into()?;
+fn handle_load_unload_errors(label: String, result: XPCObject) -> XPCPipeResult {
+    let dict: XPCDictionary = result.clone().try_into()?;
     let error_dict = dict.get_as_dictionary(&["errors"]);
 
     if error_dict.is_err() {
-        result
+        Ok(result)
     } else {
         let mut error_string = "".to_string();
         let XPCDictionary(hm) = error_dict.unwrap();
 
-        if hm.is_empty() { return result; }
+        if hm.is_empty() { return Ok(result); }
 
-        for (path, errcode) in hm {
+        for (_, errcode) in hm {
             let errcode: i64 = errcode.xpc_value().unwrap();
-            error_string.push_str(format!("{}: {}\n", path, xpc_sys::str_xpc_errno(errcode as i32)).as_str());
+            error_string.push_str(format!("{}: {}\n", label, xpc_sys::str_xpc_errno(errcode as i32)).as_str());
         }
 
         Err(XPCError::QueryError(error_string))

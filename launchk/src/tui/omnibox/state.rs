@@ -1,0 +1,65 @@
+use std::time::SystemTime;
+
+use crate::tui::omnibox::view::{OmniboxCommand, OmniboxMode};
+use crate::tui::job_type_filter::JobTypeFilter;
+
+static OMNIBOX_COMMANDS: [(OmniboxCommand, &str); 3] = [
+    (OmniboxCommand::Load, "Load highlighted job"),
+    (OmniboxCommand::Unload, "Unload highlighted job"),
+    (OmniboxCommand::Edit, "Edit plist with $EDITOR, then reload job")
+];
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct OmniboxState {
+    pub mode: OmniboxMode,
+    pub tick: SystemTime,
+    pub label_filter: String,
+    pub command_filter: String,
+    pub job_type_filter: JobTypeFilter,
+}
+
+impl OmniboxState {
+    /// Produce new state
+    pub fn with_new(
+        &self,
+        mode: Option<OmniboxMode>,
+        label_filter: Option<String>,
+        command_filter: Option<String>,
+        job_type_filter: Option<JobTypeFilter>,
+    ) -> OmniboxState {
+        OmniboxState {
+            tick: SystemTime::now(),
+            mode: mode.unwrap_or(self.mode.clone()),
+            label_filter: label_filter.unwrap_or(self.label_filter.clone()),
+            command_filter: command_filter.unwrap_or(self.command_filter.clone()),
+            job_type_filter: job_type_filter.unwrap_or(self.job_type_filter.clone()),
+        }
+    }
+
+    /// Suggest a command based on name filter
+    pub fn suggest_command(&self) -> Option<(OmniboxCommand, &str)> {
+        let OmniboxState { mode, command_filter, .. } = self;
+
+        if *mode != OmniboxMode::CommandFilter || command_filter.is_empty() {
+            return None;
+        }
+
+        OMNIBOX_COMMANDS
+            .iter()
+            .filter(|(c, _)| c.to_string().contains(command_filter))
+            .next()
+            .map(|s| s.clone())
+    }
+}
+
+impl Default for OmniboxState {
+    fn default() -> Self {
+        Self {
+            mode: OmniboxMode::Idle,
+            tick: SystemTime::now(),
+            label_filter: "".to_string(),
+            command_filter: "".to_string(),
+            job_type_filter: JobTypeFilter::launchk_default(),
+        }
+    }
+}

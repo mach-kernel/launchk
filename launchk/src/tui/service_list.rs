@@ -12,8 +12,9 @@ use tokio::runtime::Handle;
 
 use tokio::time::interval;
 
-use crate::tui::omnibox::{OmniboxEvent, OmniboxState, OmniboxMode, OmniboxCommand, OmniboxError};
-use crate::tui::omnibox_subscribed_view::OmniboxSubscriber;
+use crate::tui::omnibox::view::{OmniboxEvent, OmniboxMode, OmniboxCommand, OmniboxError};
+use crate::tui::omnibox::state::{OmniboxState};
+use crate::tui::omnibox::subscribed_view::OmniboxSubscriber;
 use crate::tui::root::CbSinkMessage;
 use crate::launchd::config::{LABEL_TO_ENTRY_CONFIG};
 

@@ -1,5 +1,5 @@
 use crate::tui::table::table_headers::TableHeaders;
-use cursive::event::{Event, EventResult};
+use cursive::event::{Event, EventResult, Key};
 use cursive::traits::{Resizable, Scrollable};
 use cursive::view::ViewWrapper;
 use cursive::views::{LinearLayout, ResizedView, ScrollView, SelectView};
@@ -179,9 +179,13 @@ impl<T: 'static + TableListItem> TableListView<T> {
 impl<T: 'static + TableListItem> ViewWrapper for TableListView<T> {
     wrap_impl!(self.linear_layout: LinearLayout);
 
-    fn wrap_on_event(&mut self, ch: Event) -> EventResult {
-        self.linear_layout.set_focus_index(1).expect("Must focus");
-        self.linear_layout.on_event(ch)
+    fn wrap_on_event(&mut self, event: Event) -> EventResult {
+        if self.get_selectview().is_empty() {
+            EventResult::Consumed(None)
+        } else {
+            self.linear_layout.set_focus_index(1).expect("Must focus");
+            self.linear_layout.on_event(event)
+        }
     }
 
     fn wrap_layout(&mut self, size: Vec2) {

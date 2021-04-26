@@ -4,7 +4,7 @@ use cursive::{Cursive, Vec2, View};
 use tokio::runtime::Handle;
 use tokio::time::interval;
 
-use crate::tui::omnibox::{Omnibox, OmniboxEvent, OmniboxError};
+use crate::tui::omnibox::view::{OmniboxView, OmniboxEvent, OmniboxError};
 use crate::tui::service_list::ServiceListView;
 use crate::tui::sysinfo::SysInfo;
 use cursive::event::{Event, EventResult, Key};
@@ -13,7 +13,7 @@ use std::cell::RefCell;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 
-use crate::tui::omnibox_subscribed_view::{OmniboxSubscribedView, OmniboxSubscriber, Subscribable};
+use crate::tui::omnibox::subscribed_view::{OmniboxSubscribedView, OmniboxSubscriber, Subscribable};
 use std::rc::Rc;
 use log::Level;
 use std::collections::VecDeque;
@@ -38,7 +38,7 @@ enum RootLayoutChildren {
 
 impl RootLayout {
     pub fn new(siv: &mut Cursive, runtime_handle: &Handle) -> Self {
-        let (omnibox, omnibox_rx) = Omnibox::new(runtime_handle);
+        let (omnibox, omnibox_rx) = OmniboxView::new(runtime_handle);
 
         let mut new = Self {
             omnibox_rx,
@@ -53,7 +53,7 @@ impl RootLayout {
         new
     }
 
-    fn setup(&mut self, omnibox: Omnibox) {
+    fn setup(&mut self, omnibox: OmniboxView) {
         let sysinfo = Panel::new(SysInfo::default()).full_width();
 
         let omnibox = Panel::new(NamedView::new("omnibox", omnibox))
@@ -158,11 +158,13 @@ impl RootLayout {
         }
     }
 
+    /// The XPC "error(s)" key sometimes contains information that is not necessarily a failure,
+    /// so let's just call it "Notice" until we figure out what to do next.
     fn show_error(err: String) -> CbSinkMessage {
         let cl = |siv: &mut Cursive| {
             let dialog = Dialog::around(TextView::new(err))
                 .button("Ok", |s| { s.pop_layer(); })
-                .title("Error");
+                .title("Notice");
 
             siv.add_layer(dialog);
         };
@@ -187,6 +189,9 @@ impl ViewWrapper for RootLayout {
             | Event::Char('a')
             | Event::Char('d')
             | Event::Char('l') => self.focus_and_forward(RootLayoutChildren::Omnibox, event),
+            // TODO: wtf?
+            // After exiting $EDITOR, for some reason we get a termcap issue. iTerm and Apple Terminal
+            // exhibit the same behavior. This was the easiest way to solve the problem for now.
             Event::Key(Key::Esc)
             | Event::Char('[')
             | Event::Char('A')

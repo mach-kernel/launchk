@@ -15,6 +15,7 @@ use cursive::theme::{BaseColor, Color, Effect, Style};
 
 use crate::tui::job_type_filter::JobTypeFilter;
 use std::fmt::Formatter;
+use crate::tui::omnibox::state::OmniboxState;
 
 /// Consumers impl OmniboxSubscriber receive these commands
 /// via a channel in a wrapped view
@@ -38,12 +39,6 @@ impl fmt::Display for OmniboxCommand {
     }
 }
 
-static OMNIBOX_COMNANDS: [(OmniboxCommand, &str); 3] = [
-    (OmniboxCommand::Load, "Load highlighted job"),
-    (OmniboxCommand::Unload, "Unload highlighted job"),
-    (OmniboxCommand::Edit, "Edit plist with $EDITOR, then reload job")
-];
-
 #[derive(Debug, Clone)]
 pub enum OmniboxError {
     StandardError,
@@ -57,61 +52,6 @@ pub enum OmniboxMode {
     LabelFilter,
     JobTypeFilter,
     Idle,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct OmniboxState {
-    pub mode: OmniboxMode,
-    pub tick: SystemTime,
-    pub label_filter: String,
-    pub command_filter: String,
-    pub job_type_filter: JobTypeFilter,
-}
-
-impl OmniboxState {
-    /// Produce new state
-    pub fn with_new(
-        &self,
-        mode: Option<OmniboxMode>,
-        label_filter: Option<String>,
-        command_filter: Option<String>,
-        job_type_filter: Option<JobTypeFilter>,
-    ) -> OmniboxState {
-        OmniboxState {
-            tick: SystemTime::now(),
-            mode: mode.unwrap_or(self.mode.clone()),
-            label_filter: label_filter.unwrap_or(self.label_filter.clone()),
-            command_filter: command_filter.unwrap_or(self.command_filter.clone()),
-            job_type_filter: job_type_filter.unwrap_or(self.job_type_filter.clone()),
-        }
-    }
-
-    /// Suggest a command based on name filter
-    pub fn suggest_command(&self) -> Option<(OmniboxCommand, &str)> {
-        let OmniboxState { mode, command_filter, .. } = self;
-
-        if *mode != OmniboxMode::CommandFilter || command_filter.is_empty() {
-            return None;
-        }
-
-        OMNIBOX_COMNANDS
-            .iter()
-            .filter(|(c, _)| c.to_string().contains(command_filter))
-            .next()
-            .map(|s| s.clone())
-    }
-}
-
-impl Default for OmniboxState {
-    fn default() -> Self {
-        Self {
-            mode: OmniboxMode::Idle,
-            tick: SystemTime::now(),
-            label_filter: "".to_string(),
-            command_filter: "".to_string(),
-            job_type_filter: JobTypeFilter::launchk_default(),
-        }
-    }
 }
 
 /// Move OmniboxState back to idle some time after the user stops
@@ -159,13 +99,13 @@ async fn tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>) {
 
 /// Omnibox that pipes commands to a channel
 /// we consume in the root view
-pub struct Omnibox {
+pub struct OmniboxView {
     state: Arc<RwLock<OmniboxState>>,
     tx: Sender<OmniboxEvent>,
     last_size: RefCell<XY<usize>>,
 }
 
-impl Omnibox {
+impl OmniboxView {
     /// Create a new Omnibox and receive its rx on create
     pub fn new(handle: &Handle) -> (Self, Receiver<OmniboxEvent>) {
         let (tx, rx): (Sender<OmniboxEvent>, Receiver<OmniboxEvent>) = channel();
@@ -388,7 +328,7 @@ impl Omnibox {
     }
 }
 
-impl View for Omnibox {
+impl View for OmniboxView {
     fn draw(&self, printer: &Printer<'_, '_>) {
         self.draw_command_header(printer);
         self.draw_job_type_filter(printer);
