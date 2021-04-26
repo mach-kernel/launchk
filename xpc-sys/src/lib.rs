@@ -8,6 +8,7 @@ extern crate lazy_static;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_long, c_void};
 use std::ptr::null_mut;
+use log;
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
@@ -79,7 +80,7 @@ pub fn lookup_bootstrap_port() -> mach_port_t {
     let ret_port: mach_port_t = unsafe { *found_ports.offset(0) };
 
     #[cfg(feature = "log")]
-    println!(
+    log::info!(
         "{} ports for mach_task_self_, taking first: mach_port_t {}",
         num_ports, ret_port
     );
@@ -88,7 +89,10 @@ pub fn lookup_bootstrap_port() -> mach_port_t {
     unsafe {
         for i in 1..num_ports {
             let port = *found_ports.offset(i as isize);
-            println!("Deallocating mach_port_t {}", port);
+
+            #[cfg(feature = "log")]
+            log::info!("Deallocating mach_port_t {}", port);
+
             mach_port_deallocate(mach_task_self_, port);
         }
     }
@@ -101,11 +105,11 @@ pub fn get_bootstrap_port() -> mach_port_t {
     unsafe {
         if bootstrap_port == MACH_PORT_NULL {
             #[cfg(feature = "log")]
-            println!("Bootstrap port is null! Querying for port");
+            log::info!("Bootstrap port is null! Querying for port");
             lookup_bootstrap_port()
         } else {
             #[cfg(feature = "log")]
-            println!("Found bootstrap port {}", bootstrap_port);
+            log::info!("Found bootstrap port {}", bootstrap_port);
             bootstrap_port
         }
     }
@@ -117,16 +121,17 @@ pub fn get_xpc_bootstrap_pipe() -> xpc_pipe_t {
         Some(xpcgd) => {
             #[cfg(feature = "log")]
             unsafe {
-                println!(
+                log::info!(
                     "Found _os_alloc_once_table: {:?}",
                     &_os_alloc_once_table as *const _
                 );
-                println!("Found xpc_bootstrap_pipe: {:?}", xpcgd.xpc_bootstrap_pipe);
+                log::info!("Found xpc_bootstrap_pipe: {:?}", xpcgd.xpc_bootstrap_pipe);
             }
             xpcgd.xpc_bootstrap_pipe
         }
         None => unsafe {
-            println!("Can't find _os_alloc_once_table, creating new bootstrap pipe");
+            #[cfg(feature = "log")]
+            log::info!("Can't find _os_alloc_once_table, creating new bootstrap pipe");
             xpc_pipe_create_from_port(get_bootstrap_port(), 0)
         },
     }

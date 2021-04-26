@@ -20,12 +20,11 @@ use log::LevelFilter;
 
 mod launchd;
 mod tui;
-mod logger;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.contains(&"debug".to_string()) {
-        logger::bind().expect("Must bind logger");
+        env_logger::init();
     }
 
     let runtime = tokio::runtime::Builder::new_multi_thread()
