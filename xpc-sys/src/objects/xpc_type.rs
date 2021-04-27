@@ -67,5 +67,4 @@ lazy_static! {
     pub static ref Bool: XPCType = XPCObject::from(true).into();
     pub static ref MachPort: XPCType = XPCObject::from(0 as mach_port_t).into();
     pub static ref Array: XPCType = unsafe { XPCType(&_xpc_type_array) };
-    // pub static ref Array: XPCType = unsafe { XPCObject::from(xpc_array_create(null_mut(), 0)).into() };
 }
