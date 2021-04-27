@@ -5,6 +5,9 @@
 #[macro_use]
 extern crate lazy_static;
 
+#[macro_use]
+extern crate bitflags;
+
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_long, c_void};
 use std::ptr::null_mut;
@@ -27,7 +30,6 @@ pub type xpc_pipe_t = *mut c_void;
 extern "C" {
     // Can decode i64 returned in "errors" for XPC responses
     pub fn xpc_strerror(err: c_int) -> *const c_char;
-
     pub static errno: c_int;
 
     pub fn xpc_pipe_create_from_port(port: mach_port_t, flags: u64) -> xpc_pipe_t;
@@ -142,7 +144,7 @@ pub fn read_xpc_global_data() -> Option<&'static xpc_global_data> {
     unsafe { gd.as_ref() }
 }
 
-pub fn str_xpc_errno(err: i32) -> String {
+pub fn rs_xpc_strerror(err: i32) -> String {
     unsafe {
         CStr::from_ptr(xpc_strerror(err))
             .to_string_lossy()
@@ -150,31 +152,22 @@ pub fn str_xpc_errno(err: i32) -> String {
     }
 }
 
-pub fn str_errno(err: Option<i32>) -> String {
-    let unwrapped = err.unwrap_or(unsafe { errno });
+pub fn rs_strerror(err: i32) -> String {
     unsafe {
-        CStr::from_ptr(strerror(unwrapped))
+        CStr::from_ptr(strerror(err))
             .to_string_lossy()
             .to_string()
     }
 }
 
-pub fn print_errno(err: Option<i32>) {
-    println!(
-        "Error {}: {}",
-        err.unwrap_or(unsafe { errno }),
-        str_errno(err)
-    );
-}
-
-pub fn sysctlbyname_string(name: &str) -> Option<String> {
-    let sysctlname = CString::new(name).unwrap();
+pub fn rs_sysctlbyname(name: &str) -> Option<String> {
+    let name = CString::new(name).unwrap();
     let mut ret_buf: [c_char; 256] = [0; 256];
     let mut size = ret_buf.len() as u64;
 
     let err = unsafe {
         sysctlbyname(
-            sysctlname.as_ptr(),
+            name.as_ptr(),
             ret_buf.as_mut_ptr() as *mut _,
             &mut size,
             null_mut(),

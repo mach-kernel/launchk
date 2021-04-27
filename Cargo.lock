@@ -1387,6 +1387,7 @@ name = "xpc-sys"
 version = "0.1.0"
 dependencies = [
  "bindgen",
+ "bitflags",
  "block",
  "lazy_static",
  "log",

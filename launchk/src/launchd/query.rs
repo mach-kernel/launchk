@@ -259,7 +259,7 @@ fn handle_load_unload_errors(label: String, result: XPCObject) -> XPCPipeResult 
 
         for (_, errcode) in hm {
             let errcode: i64 = errcode.xpc_value().unwrap();
-            error_string.push_str(format!("{}: {}\n", label, xpc_sys::str_xpc_errno(errcode as i32)).as_str());
+            error_string.push_str(format!("{}: {}\n", label, xpc_sys::rs_xpc_strerror(errcode as i32)).as_str());
         }
 
         Err(XPCError::QueryError(error_string))
