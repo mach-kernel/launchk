@@ -2,7 +2,7 @@ use std::ffi::CStr;
 
 use crate::objects::xpc_object::XPCObject;
 use crate::objects::xpc_type;
-use crate::{xpc_bool_get_value, xpc_int64_get_value, xpc_string_get_string_ptr, xpc_type_get_name, xpc_uint64_get_value, xpc_object_t, xpc_retain, xpc_array_apply, size_t};
+use crate::{xpc_bool_get_value, xpc_int64_get_value, xpc_string_get_string_ptr, xpc_type_get_name, xpc_uint64_get_value, xpc_object_t, xpc_retain, xpc_array_apply, size_t, mach_port_t};
 
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::ValueError;
@@ -105,14 +105,6 @@ impl TryXPCValue<Vec<XPCObject>> for XPCObject {
         }
     }
 }
-
-// TODO: can this be read as just uint?
-// impl TryXPCValue<mach_port_t> for XPCObject {
-//     fn xpc_value(&self) -> Result<mach_port_t, XPCError> {
-//         let XPCObject(obj_pointer, _) = self;
-//         unsafe { xpc_mach_send_get_value(**obj_pointer) }
-//     }
-// }
 
 #[cfg(test)]
 mod tests {
