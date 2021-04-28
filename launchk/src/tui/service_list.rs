@@ -3,9 +3,10 @@ use cursive::view::ViewWrapper;
 use cursive::{Cursive, View, XY};
 
 use std::collections::HashSet;
+use std::thread;
 
-use std::sync::mpsc::Sender;
-use std::sync::{Arc, RwLock};
+use std::sync::mpsc::{Sender, channel, Receiver};
+use std::sync::{Arc, RwLock, Mutex};
 
 use std::time::Duration;
 use tokio::runtime::Handle;
@@ -27,6 +28,8 @@ use crate::tui::job_type_filter::JobTypeFilter;
 use cursive::direction::Direction;
 use std::process::Command;
 use std::cmp::Ordering;
+use std::rc::Rc;
+use cursive::views::{Dialog, TextView};
 
 lazy_static! {
     static ref EDITOR: &'static str = option_env!("EDITOR").unwrap_or("vim");
@@ -207,46 +210,81 @@ impl ServiceListView {
         Ok(())
     }
 
+    fn get_active_list_item(&self) -> Result<Rc<ServiceListItem>, OmniboxError> {
+        self.table_list_view
+            .get_highlighted_row()
+            .ok_or_else(|| OmniboxError::CommandError("Cannot get highlighted row".to_string()))
+    }
+
+    // fn load_unload_with_prompt(&self, name: String, plist_path: String) -> Result<(), OmniboxError> {
+    //     let (tx, rx): (Sender<Result<(), OmniboxError>>, Receiver<Result<(), OmniboxError>>) = channel();
+    //     let tx_no = tx.clone();
+    //
+    //     self.cb_sink.send(Box::new(move |siv| {
+    //         let ask = Dialog::around(TextView::new(format!("Reload {}?", name.clone())))
+    //             .button("Yes", move |s| {
+    //                 let result = load(name.clone(), plist_path.clone())
+    //                     .and_then(|_| unload(name.clone(), plist_path.clone()))
+    //                     .map(|_| ())
+    //                     .map_err(|e| OmniboxError::CommandError(e.to_string()));
+    //
+    //                 tx
+    //                     .send(result)
+    //                     .expect("Must send result");
+    //
+    //                 s.pop_layer();
+    //             })
+    //             .button("No", move |s| {
+    //                 tx_no
+    //                     .send(Ok(()))
+    //                     .expect("Must send result");
+    //                 s.pop_layer();
+    //             })
+    //             .title("Notice");
+    //
+    //         siv.add_layer(ask);
+    //     })).expect("Must do cb");
+    //
+    //     rx.recv().expect("Must read result")
+    // }
+
     fn handle_command(&mut self, cmd: OmniboxCommand) -> Result<(), OmniboxError> {
         match cmd {
             OmniboxCommand::Edit => {
-                let entry_config = self
-                    .table_list_view
-                    .get_highlighted_row()
-                    .and_then(|rc| rc.entry_info.entry_config.clone())
-                    .ok_or(OmniboxError::CommandError("Cannot find plist for entry".to_string()))?;
+                let ServiceListItem { name, entry_info, .. } =
+                    &*self.get_active_list_item()?;
+
+                let entry_config = entry_info
+                    .entry_config
+                    .as_ref()
+                    .ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
 
                 if entry_config.readonly {
                     return Err(OmniboxError::CommandError(format!("{} is read-only", entry_config.plist_path)))
                 }
 
                 let exit = Command::new(*EDITOR)
-                    .arg(entry_config.plist_path)
+                    .arg(&entry_config.plist_path)
                     .status()
-                    .expect("Must get status");
+                    .map_err(|e| OmniboxError::CommandError(format!("{} failed: {}", *EDITOR, e.to_string())))?;
 
                 self.cb_sink.send(Box::new(Cursive::clear)).expect("Must clear");
 
                 if exit.success() {
                     Ok(())
+                    // self.load_unload_with_prompt(name.clone(), entry_config.plist_path.clone())
                 } else {
                     Err(OmniboxError::CommandError(format!("{} didn't exit 0", *EDITOR)))
                 }
             },
             OmniboxCommand::Load | OmniboxCommand::Unload => {
-                let item = self
-                    .table_list_view
-                    .get_highlighted_row();
+                let ServiceListItem { name, entry_info, .. } =
+                    &*self.get_active_list_item()?;
 
-                let entry_config = item
+                let entry_config = entry_info
+                    .entry_config
                     .as_ref()
-                    .and_then(|rc| rc.entry_info.entry_config.clone())
-                    .ok_or(OmniboxError::CommandError("Cannot find plist for entry".to_string()))?;
-
-                let label = item
-                    .as_ref()
-                    .and_then(|rc| Some(rc.name.clone()))
-                    .ok_or(OmniboxError::CommandError("Cannot find label for entry".to_string()))?;
+                    .ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
 
                 let xpc_query = if cmd == OmniboxCommand::Load {
                     load
@@ -254,7 +292,7 @@ impl ServiceListView {
                     unload
                 };
 
-                xpc_query(label, entry_config.plist_path)
+                xpc_query(name, &entry_config.plist_path)
                     .map(|_| ())
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
             }
