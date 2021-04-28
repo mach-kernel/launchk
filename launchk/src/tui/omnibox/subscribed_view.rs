@@ -4,7 +4,7 @@ use cursive::{Printer, Rect, Vec2, View};
 
 use cursive::direction::Direction;
 use cursive::event::{Event, EventResult};
-use crate::tui::omnibox::view::{OmniboxEvent, OmniboxError};
+use crate::tui::omnibox::view::{OmniboxEvent, OmniboxError, OmniboxCommand};
 
 /// Boxed view we can match against for sending Omnibox events
 pub struct OmniboxSubscribedView {
@@ -46,31 +46,33 @@ pub trait Subscribable: View + OmniboxSubscriber {
 
 impl<T> Subscribable for T where T: OmniboxSubscriber {}
 
+pub type OmniboxResult = Result<Option<OmniboxCommand>, OmniboxError>;
+
 /// Implement for a view to be able to invoke subscribable()
 pub trait OmniboxSubscriber: View {
-    fn on_omnibox(&mut self, cmd: OmniboxEvent) -> Result<(), OmniboxError>;
+    fn on_omnibox(&mut self, cmd: OmniboxEvent) -> OmniboxResult;
 }
 
 impl<T: OmniboxSubscriber> OmniboxSubscriber for ResizedView<T> {
-    fn on_omnibox(&mut self, cmd: OmniboxEvent) -> Result<(), OmniboxError> {
+    fn on_omnibox(&mut self, cmd: OmniboxEvent) -> OmniboxResult {
         self.with_view_mut(|v| v.on_omnibox(cmd)).unwrap_or(Err(OmniboxError::StandardError))
     }
 }
 
 impl<T: OmniboxSubscriber> OmniboxSubscriber for ScrollView<T> {
-    fn on_omnibox(&mut self, cmd: OmniboxEvent) -> Result<(), OmniboxError> {
+    fn on_omnibox(&mut self, cmd: OmniboxEvent) -> OmniboxResult {
         self.get_inner_mut().on_omnibox(cmd)
     }
 }
 
 impl<T: OmniboxSubscriber> OmniboxSubscriber for Panel<T> {
-    fn on_omnibox(&mut self, cmd: OmniboxEvent) -> Result<(), OmniboxError> {
+    fn on_omnibox(&mut self, cmd: OmniboxEvent) -> OmniboxResult {
         self.get_inner_mut().on_omnibox(cmd)
     }
 }
 
 impl OmniboxSubscriber for OmniboxSubscribedView {
-    fn on_omnibox(&mut self, cmd: OmniboxEvent) -> Result<(), OmniboxError> {
+    fn on_omnibox(&mut self, cmd: OmniboxEvent) -> OmniboxResult {
         self.inner.on_omnibox(cmd)
     }
 }

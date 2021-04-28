@@ -4,7 +4,7 @@ use cursive::{Cursive, Vec2, View};
 use tokio::runtime::Handle;
 use tokio::time::interval;
 
-use crate::tui::omnibox::view::{OmniboxView, OmniboxEvent, OmniboxError};
+use crate::tui::omnibox::view::{OmniboxView, OmniboxEvent, OmniboxError, OmniboxCommand};
 use crate::tui::service_list::ServiceListView;
 use crate::tui::sysinfo::SysInfo;
 use cursive::event::{Event, EventResult, Key};
@@ -23,6 +23,7 @@ pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 pub struct RootLayout {
     layout: LinearLayout,
     omnibox_rx: Receiver<OmniboxEvent>,
+    omnibox_tx: Sender<OmniboxEvent>,
     last_focus_index: RefCell<usize>,
     runtime_handle: Handle,
     cbsink_channel: Sender<CbSinkMessage>,
@@ -38,9 +39,10 @@ enum RootLayoutChildren {
 
 impl RootLayout {
     pub fn new(siv: &mut Cursive, runtime_handle: &Handle) -> Self {
-        let (omnibox, omnibox_rx) = OmniboxView::new(runtime_handle);
+        let (omnibox, omnibox_tx, omnibox_rx) = OmniboxView::new(runtime_handle);
 
         let mut new = Self {
+            omnibox_tx,
             omnibox_rx,
             layout: LinearLayout::vertical(),
             last_focus_index: RefCell::new(RootLayoutChildren::ServiceList as usize),
@@ -117,13 +119,20 @@ impl RootLayout {
 
         log::info!("[root/poll_omnibox]: {:?}", recv);
 
-        // Triggered by Omnibox when toggling to idle
-        if recv == OmniboxEvent::FocusServiceList {
-            self.layout
-                .set_focus_index(RootLayoutChildren::ServiceList as usize)
-                .expect("Must focus SL");
-            return;
-        }
+        match recv {
+            // Triggered when toggling to idle
+            OmniboxEvent::FocusServiceList => {
+                self.layout
+                    .set_focus_index(RootLayoutChildren::ServiceList as usize)
+                    .expect("Must focus SL");
+                return;
+            },
+            OmniboxEvent::Command(OmniboxCommand::Prompt(p, c)) => {
+                self.show_prompt(p, c);
+                return;
+            }
+            _ => {}
+        };
 
         let target = self
             .layout
@@ -170,6 +179,24 @@ impl RootLayout {
         };
 
         Box::new(cl)
+    }
+
+    fn show_prompt(&self, prompt: String, commands: Vec<OmniboxCommand>) {
+        let tx = self.omnibox_tx.clone();
+
+        self.cbsink_channel.send(Box::new(move |siv| {
+            let ask = Dialog::around(TextView::new(prompt))
+                .button("Yes", move |s| {
+                    for cmd in &commands {
+                        tx.send(OmniboxEvent::Command(cmd.clone())).expect("Must send command");
+                    }
+                    // s.pop_layer();
+                })
+                .button("No", |s| { s.pop_layer(); })
+                .title("Notice");
+
+            siv.add_layer(ask);
+        })).expect("Must send prompt");
     }
 }
 

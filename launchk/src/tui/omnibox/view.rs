@@ -31,6 +31,8 @@ pub enum OmniboxCommand {
     Load,
     Unload,
     Edit,
+    // (message, on ok)
+    Prompt(String, Vec<OmniboxCommand>)
 }
 
 impl fmt::Display for OmniboxCommand {
@@ -107,7 +109,7 @@ pub struct OmniboxView {
 
 impl OmniboxView {
     /// Create a new Omnibox and receive its rx on create
-    pub fn new(handle: &Handle) -> (Self, Receiver<OmniboxEvent>) {
+    pub fn new(handle: &Handle) -> (Self, Sender<OmniboxEvent>, Receiver<OmniboxEvent>) {
         let (tx, rx): (Sender<OmniboxEvent>, Receiver<OmniboxEvent>) = channel();
         let state = Arc::new(RwLock::new(OmniboxState::default()));
 
@@ -119,9 +121,10 @@ impl OmniboxView {
         (
             Self {
                 state,
-                tx,
+                tx: tx.clone(),
                 last_size: RefCell::new(XY::new(0, 0)),
             },
+            tx,
             rx,
         )
     }

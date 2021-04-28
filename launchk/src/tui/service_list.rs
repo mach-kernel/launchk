@@ -15,7 +15,7 @@ use tokio::time::interval;
 
 use crate::tui::omnibox::view::{OmniboxEvent, OmniboxMode, OmniboxCommand, OmniboxError};
 use crate::tui::omnibox::state::{OmniboxState};
-use crate::tui::omnibox::subscribed_view::OmniboxSubscriber;
+use crate::tui::omnibox::subscribed_view::{OmniboxSubscriber, OmniboxResult};
 use crate::tui::root::CbSinkMessage;
 use crate::launchd::config::{LABEL_TO_ENTRY_CONFIG};
 
@@ -189,7 +189,7 @@ impl ServiceListView {
         Some(items)
     }
 
-    fn handle_state_update(&mut self, state: OmniboxState) -> Result<(), OmniboxError> {
+    fn handle_state_update(&mut self, state: OmniboxState) -> OmniboxResult {
         let OmniboxState {
             mode,
             label_filter,
@@ -207,7 +207,7 @@ impl ServiceListView {
             _ => {},
         };
 
-        Ok(())
+        Ok(None)
     }
 
     fn get_active_list_item(&self) -> Result<Rc<ServiceListItem>, OmniboxError> {
@@ -216,39 +216,7 @@ impl ServiceListView {
             .ok_or_else(|| OmniboxError::CommandError("Cannot get highlighted row".to_string()))
     }
 
-    // fn load_unload_with_prompt(&self, name: String, plist_path: String) -> Result<(), OmniboxError> {
-    //     let (tx, rx): (Sender<Result<(), OmniboxError>>, Receiver<Result<(), OmniboxError>>) = channel();
-    //     let tx_no = tx.clone();
-    //
-    //     self.cb_sink.send(Box::new(move |siv| {
-    //         let ask = Dialog::around(TextView::new(format!("Reload {}?", name.clone())))
-    //             .button("Yes", move |s| {
-    //                 let result = load(name.clone(), plist_path.clone())
-    //                     .and_then(|_| unload(name.clone(), plist_path.clone()))
-    //                     .map(|_| ())
-    //                     .map_err(|e| OmniboxError::CommandError(e.to_string()));
-    //
-    //                 tx
-    //                     .send(result)
-    //                     .expect("Must send result");
-    //
-    //                 s.pop_layer();
-    //             })
-    //             .button("No", move |s| {
-    //                 tx_no
-    //                     .send(Ok(()))
-    //                     .expect("Must send result");
-    //                 s.pop_layer();
-    //             })
-    //             .title("Notice");
-    //
-    //         siv.add_layer(ask);
-    //     })).expect("Must do cb");
-    //
-    //     rx.recv().expect("Must read result")
-    // }
-
-    fn handle_command(&mut self, cmd: OmniboxCommand) -> Result<(), OmniboxError> {
+    fn handle_command(&mut self, cmd: OmniboxCommand) -> OmniboxResult {
         match cmd {
             OmniboxCommand::Edit => {
                 let ServiceListItem { name, entry_info, .. } =
@@ -271,8 +239,7 @@ impl ServiceListView {
                 self.cb_sink.send(Box::new(Cursive::clear)).expect("Must clear");
 
                 if exit.success() {
-                    Ok(())
-                    // self.load_unload_with_prompt(name.clone(), entry_config.plist_path.clone())
+                    Ok(Some(OmniboxCommand::Prompt(format!("Unload {}?", name), vec![OmniboxCommand::Unload, OmniboxCommand::Load])))
                 } else {
                     Err(OmniboxError::CommandError(format!("{} didn't exit 0", *EDITOR)))
                 }
@@ -293,9 +260,10 @@ impl ServiceListView {
                 };
 
                 xpc_query(name, &entry_config.plist_path)
-                    .map(|_| ())
+                    .map(|_| None)
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
-            }
+            },
+            _ => Ok(None)
         }
     }
 }
@@ -317,11 +285,11 @@ impl ViewWrapper for ServiceListView {
 }
 
 impl OmniboxSubscriber for ServiceListView {
-    fn on_omnibox(&mut self, event: OmniboxEvent) -> Result<(), OmniboxError> {
+    fn on_omnibox(&mut self, event: OmniboxEvent) -> OmniboxResult {
         match event {
             OmniboxEvent::StateUpdate(state) => self.handle_state_update(state),
             OmniboxEvent::Command(cmd) => self.handle_command(cmd),
-            _ => Ok(())
+            _ => Ok(None)
         }
     }
 }
