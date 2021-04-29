@@ -1,10 +1,9 @@
-use cursive::view::{Selector, ViewWrapper};
+use cursive::view::ViewWrapper;
 use cursive::views::{Panel, ResizedView, ScrollView};
-use cursive::{Printer, Rect, Vec2, View};
+use cursive::View;
 
-use cursive::direction::Direction;
-use cursive::event::{Event, EventResult};
-use crate::tui::omnibox::view::{OmniboxEvent, OmniboxError, OmniboxCommand};
+use crate::tui::omnibox::command::OmniboxCommand;
+use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent};
 
 /// Boxed view we can match against for sending Omnibox events
 pub struct OmniboxSubscribedView {
@@ -15,13 +14,17 @@ pub struct OmniboxSubscribedView {
 impl ViewWrapper for OmniboxSubscribedView {
     type V = dyn OmniboxSubscriber;
 
-    fn with_view<F, R>(&self, f: F) -> Option<R> where
-        F: FnOnce(&Self::V) -> R {
+    fn with_view<F, R>(&self, f: F) -> Option<R>
+    where
+        F: FnOnce(&Self::V) -> R,
+    {
         Some(f(&*self.inner))
     }
 
-    fn with_view_mut<F, R>(&mut self, f: F) -> Option<R> where
-        F: FnOnce(&mut Self::V) -> R {
+    fn with_view_mut<F, R>(&mut self, f: F) -> Option<R>
+    where
+        F: FnOnce(&mut Self::V) -> R,
+    {
         Some(f(&mut *self.inner))
     }
 }
@@ -55,7 +58,8 @@ pub trait OmniboxSubscriber: View {
 
 impl<T: OmniboxSubscriber> OmniboxSubscriber for ResizedView<T> {
     fn on_omnibox(&mut self, cmd: OmniboxEvent) -> OmniboxResult {
-        self.with_view_mut(|v| v.on_omnibox(cmd)).unwrap_or(Err(OmniboxError::StandardError))
+        self.with_view_mut(|v| v.on_omnibox(cmd))
+            .unwrap_or(Err(OmniboxError::StandardError))
     }
 }
 

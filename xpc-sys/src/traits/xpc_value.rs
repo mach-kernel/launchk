@@ -2,14 +2,17 @@ use std::ffi::CStr;
 
 use crate::objects::xpc_object::XPCObject;
 use crate::objects::xpc_type;
-use crate::{xpc_bool_get_value, xpc_int64_get_value, xpc_string_get_string_ptr, xpc_type_get_name, xpc_uint64_get_value, xpc_object_t, xpc_retain, xpc_array_apply, size_t, mach_port_t};
+use crate::{
+    size_t, xpc_array_apply, xpc_bool_get_value, xpc_int64_get_value, xpc_object_t, xpc_retain,
+    xpc_string_get_string_ptr, xpc_type_get_name, xpc_uint64_get_value,
+};
 
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::ValueError;
 use crate::objects::xpc_type::XPCType;
 use block::ConcreteBlock;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 /// Implement to get data out of xpc_type_t and into
 /// a Rust native data type
@@ -89,9 +92,7 @@ impl TryXPCValue<Vec<XPCObject>> for XPCObject {
 
         let block = block.copy();
 
-        let ok = unsafe {
-            xpc_array_apply(**arc, &*block as *const _ as *mut _)
-        };
+        let ok = unsafe { xpc_array_apply(**arc, &*block as *const _ as *mut _) };
 
         drop(block);
 

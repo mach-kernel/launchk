@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::os::raw::c_int;
 
 pub type csr_config_t = u32;

@@ -22,15 +22,17 @@ impl View for SysInfo {
         let middle = self.current_size.get().x / 2;
 
         let mac_os_label = "macOS:";
-        let osproductversion =
-            rs_sysctlbyname("kern.osproductversion").unwrap_or("".to_string());
+        let osproductversion = rs_sysctlbyname("kern.osproductversion").unwrap_or("".to_string());
         let osversion = rs_sysctlbyname("kern.osversion").unwrap_or("".to_string());
         let mac_os_data = format!("{} ({})", osproductversion, osversion);
 
         // If granted CSR_ALLOW_UNTRUSTED_KEXTS, SIP is probably off
         let sip_label = "SIP:";
         let sip_data = unsafe {
-            format!("{}", csr_check(CsrConfig::ALLOW_UNTRUSTED_KEXTS.bits()) != 0)
+            format!(
+                "{}",
+                csr_check(CsrConfig::ALLOW_UNTRUSTED_KEXTS.bits()) != 0
+            )
         };
 
         let bold = Style::from(Color::Light(BaseColor::White));

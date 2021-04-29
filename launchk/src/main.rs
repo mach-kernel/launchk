@@ -9,23 +9,17 @@ extern crate bitflags;
 
 extern crate plist;
 
+use crate::launchd::config::{init_label_map, LABEL_MAP_INIT};
 use crate::tui::root::RootLayout;
 use cursive::view::Resizable;
 use cursive::views::Panel;
 use cursive::Cursive;
-use crate::launchd::config::{init_label_map, LABEL_MAP_INIT};
-use std::env;
-use log;
-use log::LevelFilter;
 
 mod launchd;
 mod tui;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.contains(&"debug".to_string()) {
-        env_logger::init();
-    }
+    env_logger::init();
 
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -33,10 +27,11 @@ fn main() {
         .expect("Must build tokio runtime");
 
     // Cache launchd job plists, spawn fsnotify to keep up with changes
-    LABEL_MAP_INIT.call_once(|| { init_label_map(runtime.handle()) });
+    LABEL_MAP_INIT.call_once(|| init_label_map(runtime.handle()));
 
     let mut siv: Cursive = cursive::default();
-    siv.load_toml(include_str!("tui/style.toml")).expect("Must load styles");
+    siv.load_toml(include_str!("tui/style.toml"))
+        .expect("Must load styles");
 
     let root_layout = RootLayout::new(&mut siv, runtime.handle());
 

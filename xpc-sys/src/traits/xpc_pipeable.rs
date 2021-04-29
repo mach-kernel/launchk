@@ -2,7 +2,10 @@ use crate::objects::xpc_dictionary::XPCDictionary;
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::PipeError;
 use crate::objects::xpc_object::XPCObject;
-use crate::{get_xpc_bootstrap_pipe, xpc_object_t, xpc_pipe_routine, xpc_pipe_routine_with_flags, rs_strerror};
+use crate::{
+    get_xpc_bootstrap_pipe, rs_strerror, xpc_object_t, xpc_pipe_routine,
+    xpc_pipe_routine_with_flags,
+};
 
 use std::ptr::null_mut;
 

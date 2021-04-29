@@ -11,7 +11,6 @@ extern crate bitflags;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_long, c_void};
 use std::ptr::null_mut;
-use log;
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
@@ -84,7 +83,8 @@ pub fn lookup_bootstrap_port() -> mach_port_t {
     #[cfg(feature = "log")]
     log::info!(
         "{} ports for mach_task_self_, taking first: mach_port_t {}",
-        num_ports, ret_port
+        num_ports,
+        ret_port
     );
 
     // Deallocate others
@@ -153,11 +153,7 @@ pub fn rs_xpc_strerror(err: i32) -> String {
 }
 
 pub fn rs_strerror(err: i32) -> String {
-    unsafe {
-        CStr::from_ptr(strerror(err))
-            .to_string_lossy()
-            .to_string()
-    }
+    unsafe { CStr::from_ptr(strerror(err)).to_string_lossy().to_string() }
 }
 
 pub fn rs_sysctlbyname(name: &str) -> Option<String> {

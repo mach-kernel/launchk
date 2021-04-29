@@ -1,13 +1,8 @@
 use std::time::SystemTime;
 
-use crate::tui::omnibox::view::{OmniboxCommand, OmniboxMode};
-use crate::tui::job_type_filter::JobTypeFilter;
-
-static OMNIBOX_COMMANDS: [(OmniboxCommand, &str); 3] = [
-    (OmniboxCommand::Load, "Load highlighted job"),
-    (OmniboxCommand::Unload, "Unload highlighted job"),
-    (OmniboxCommand::Edit, "Edit plist with $EDITOR, then reload job")
-];
+use crate::launchd::job_type_filter::JobTypeFilter;
+use crate::tui::omnibox::command::{OmniboxCommand, OMNIBOX_COMMANDS};
+use crate::tui::omnibox::view::OmniboxMode;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct OmniboxState {
@@ -38,7 +33,11 @@ impl OmniboxState {
 
     /// Suggest a command based on name filter
     pub fn suggest_command(&self) -> Option<(OmniboxCommand, &str)> {
-        let OmniboxState { mode, command_filter, .. } = self;
+        let OmniboxState {
+            mode,
+            command_filter,
+            ..
+        } = self;
 
         if *mode != OmniboxMode::CommandFilter || command_filter.is_empty() {
             return None;

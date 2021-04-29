@@ -6,15 +6,14 @@ use std::fmt;
 use std::sync::Mutex;
 use xpc_sys::objects::xpc_object::XPCObject;
 use xpc_sys::objects::xpc_type;
-use xpc_sys::traits::xpc_pipeable::{XPCPipeable, XPCPipeResult};
+use xpc_sys::traits::xpc_pipeable::{XPCPipeResult, XPCPipeable};
 use xpc_sys::traits::xpc_value::TryXPCValue;
 
 use crate::launchd::config::LaunchdEntryConfig;
 use std::iter::FromIterator;
+use std::time::{Duration, SystemTime};
 use xpc_sys::objects::xpc_dictionary::XPCDictionary;
 use xpc_sys::objects::xpc_error::XPCError;
-use std::time::{SystemTime, Duration};
-use xpc_sys::{getaudit_addr, mach_port_t, get_bootstrap_port};
 
 const ENTRY_INFO_QUERY_TTL: u64 = 15; // seconds
 
@@ -26,7 +25,6 @@ extern "C" {
 lazy_static! {
     static ref ENTRY_INFO_CACHE: Mutex<HashMap<String, LaunchdEntryInfo>> =
         Mutex::new(HashMap::new());
-
     static ref IS_ROOT: bool = unsafe { geteuid() } == 0;
 }
 
@@ -201,11 +199,14 @@ pub fn load<S: Into<String>>(label: S, plist_path: S) -> XPCPipeResult {
     let mut message: HashMap<&str, XPCObject> = from_msg(&LOAD_PATHS);
     let label_string = label.into();
 
-    message.insert("type", if *IS_ROOT {
-        XPCObject::from(1 as u64)
-    } else {
-        XPCObject::from(7 as u64)
-    });
+    message.insert(
+        "type",
+        if *IS_ROOT {
+            XPCObject::from(1 as u64)
+        } else {
+            XPCObject::from(7 as u64)
+        },
+    );
 
     let paths = vec![XPCObject::from(plist_path.into())];
     message.insert("paths", XPCObject::from(paths));
@@ -225,11 +226,14 @@ pub fn unload<S: Into<String>>(label: S, plist_path: S) -> XPCPipeResult {
     let mut message: HashMap<&str, XPCObject> = from_msg(&UNLOAD_PATHS);
     let label_string = label.into();
 
-    message.insert("type", if *IS_ROOT {
-        XPCObject::from(1 as u64)
-    } else {
-        XPCObject::from(7 as u64)
-    });
+    message.insert(
+        "type",
+        if *IS_ROOT {
+            XPCObject::from(1 as u64)
+        } else {
+            XPCObject::from(7 as u64)
+        },
+    );
 
     let paths = vec![XPCObject::from(plist_path.into())];
     message.insert("paths", XPCObject::from(paths));
@@ -255,11 +259,15 @@ fn handle_load_unload_errors(label: String, result: XPCObject) -> XPCPipeResult 
         let mut error_string = "".to_string();
         let XPCDictionary(hm) = error_dict.unwrap();
 
-        if hm.is_empty() { return Ok(result); }
+        if hm.is_empty() {
+            return Ok(result);
+        }
 
         for (_, errcode) in hm {
             let errcode: i64 = errcode.xpc_value().unwrap();
-            error_string.push_str(format!("{}: {}\n", label, xpc_sys::rs_xpc_strerror(errcode as i32)).as_str());
+            error_string.push_str(
+                format!("{}: {}\n", label, xpc_sys::rs_xpc_strerror(errcode as i32)).as_str(),
+            );
         }
 
         Err(XPCError::QueryError(error_string))

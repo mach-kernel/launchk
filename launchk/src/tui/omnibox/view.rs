@@ -1,20 +1,19 @@
-
 use std::cell::RefCell;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, SystemTime};
-use std::fmt;
+use std::time::Duration;
 
 use tokio::runtime::Handle;
 use tokio::time::interval;
 
 use cursive::direction::Direction;
 use cursive::event::{Event, EventResult, Key};
-use cursive::{Printer, Vec2, View, XY};
 use cursive::theme::{BaseColor, Color, Effect, Style};
+use cursive::{Printer, Vec2, View, XY};
 
-use crate::tui::job_type_filter::JobTypeFilter;
-use std::fmt::Formatter;
+use crate::launchd::job_type_filter::JobTypeFilter;
+
+use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::state::OmniboxState;
 
 /// Consumers impl OmniboxSubscriber receive these commands
@@ -24,21 +23,6 @@ pub enum OmniboxEvent {
     FocusServiceList,
     StateUpdate(OmniboxState),
     Command(OmniboxCommand),
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum OmniboxCommand {
-    Load,
-    Unload,
-    Edit,
-    // (message, on ok)
-    Prompt(String, Vec<OmniboxCommand>)
-}
-
-impl fmt::Display for OmniboxCommand {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", format!("{:?}", self).to_ascii_lowercase())
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -71,13 +55,16 @@ async fn tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>) {
 
         // Confirm command immediately
         if let OmniboxMode::CommandConfirm(cmd) = mode {
-            tx.send(OmniboxEvent::Command(cmd.clone())).expect("Must confirm command");
+            tx.send(OmniboxEvent::Command(cmd.clone()))
+                .expect("Must confirm command");
         } else if *mode == OmniboxMode::Idle || tick.elapsed().unwrap() < Duration::from_secs(2) {
             continue;
         }
 
         let new = match *mode {
-            OmniboxMode::CommandFilter| OmniboxMode::CommandConfirm(_) => read.with_new(Some(OmniboxMode::Idle), None, Some("".to_string()), None),
+            OmniboxMode::CommandFilter | OmniboxMode::CommandConfirm(_) => {
+                read.with_new(Some(OmniboxMode::Idle), None, Some("".to_string()), None)
+            }
             _ => read.with_new(Some(OmniboxMode::Idle), None, None, None),
         };
 
@@ -131,7 +118,10 @@ impl OmniboxView {
 
     fn handle_active(event: &Event, state: &OmniboxState) -> Option<OmniboxState> {
         let OmniboxState {
-            mode, label_filter, command_filter, ..
+            mode,
+            label_filter,
+            command_filter,
+            ..
         } = &state;
 
         let suggested_command = state.suggest_command();
@@ -142,27 +132,40 @@ impl OmniboxView {
             .map(|(cmd, _)| cmd.clone());
 
         let (lf_char, cf_char) = match (event, mode) {
-            (Event::Char(c), OmniboxMode::LabelFilter) => (Some(format!("{}{}", label_filter, c)), None),
-            (Event::Char(c), OmniboxMode::CommandFilter) => (None, Some(format!("{}{}", command_filter, c))),
-            _ => (None, None)
+            (Event::Char(c), OmniboxMode::LabelFilter) => {
+                (Some(format!("{}{}", label_filter, c)), None)
+            }
+            (Event::Char(c), OmniboxMode::CommandFilter) => {
+                (None, Some(format!("{}{}", command_filter, c)))
+            }
+            _ => (None, None),
         };
 
         match (event, mode) {
+            (Event::Char(':'), OmniboxMode::JobTypeFilter) => {
+                Some(state.with_new(Some(OmniboxMode::CommandFilter), None, None, None))
+            }
+            (Event::Char('/'), OmniboxMode::JobTypeFilter) => {
+                Some(state.with_new(Some(OmniboxMode::LabelFilter), None, None, None))
+            }
             (ev, OmniboxMode::JobTypeFilter) => Self::handle_job_type_filter(ev, state),
             // User -> string filters
-            (Event::Char(_), OmniboxMode::LabelFilter) | (Event::Char(_), OmniboxMode::CommandFilter)  => {
+            (Event::Char(_), OmniboxMode::LabelFilter)
+            | (Event::Char(_), OmniboxMode::CommandFilter) => {
                 Some(state.with_new(None, lf_char, cf_char, None))
-            },
+            }
             (Event::Key(Key::Backspace), OmniboxMode::LabelFilter) if !label_filter.is_empty() => {
                 let mut lf = label_filter.clone();
                 lf.truncate(lf.len() - 1);
                 Some(state.with_new(None, Some(lf), None, None))
-            },
-            (Event::Key(Key::Backspace), OmniboxMode::CommandFilter) if !command_filter.is_empty() => {
+            }
+            (Event::Key(Key::Backspace), OmniboxMode::CommandFilter)
+                if !command_filter.is_empty() =>
+            {
                 let mut cf = command_filter.clone();
                 cf.truncate(cf.len() - 1);
                 Some(state.with_new(None, None, Some(cf), None))
-            },
+            }
             // Complete suggestion
             (Event::Key(Key::Tab), OmniboxMode::CommandFilter) if suggested_command.is_some() => {
                 let (cmd, _) = suggested_command.unwrap();
@@ -170,10 +173,15 @@ impl OmniboxView {
                 // Can submit from here, but catching a glimpse of the whole command
                 // highlighting before flushing back out is confirmation that it did something
                 Some(state.with_new(None, None, Some(cmd.to_string()), None))
-            },
+            }
             // Submit command only if string filter eq suggestion (i.e. requires you to tab-complete first)
             (Event::Key(Key::Enter), OmniboxMode::CommandFilter) if matched_command.is_some() => {
-                Some(state.with_new(Some(OmniboxMode::CommandConfirm(matched_command.unwrap())), None, None, None))
+                Some(state.with_new(
+                    Some(OmniboxMode::CommandConfirm(matched_command.unwrap())),
+                    None,
+                    None,
+                    None,
+                ))
             }
             _ => None,
         }
@@ -204,10 +212,10 @@ impl OmniboxView {
                 None,
             )),
             Event::Char(':') => Some(state.with_new(
-               Some(OmniboxMode::CommandFilter),
+                Some(OmniboxMode::CommandFilter),
                 None,
                 Some("".to_string()),
-                None
+                None,
             )),
             _ => Self::handle_job_type_filter(event, state),
         }
@@ -216,10 +224,13 @@ impl OmniboxView {
     fn draw_command_header(&self, printer: &Printer<'_, '_>) {
         let read = self.state.read().expect("Must read state");
         let OmniboxState {
-            command_filter, label_filter, mode, ..
+            command_filter,
+            label_filter,
+            mode,
+            ..
         } = &*read;
 
-        let cmd_header =  match *mode {
+        let cmd_header = match *mode {
             OmniboxMode::LabelFilter => "Filter > ",
             OmniboxMode::CommandFilter => "Command > ",
             OmniboxMode::CommandConfirm(_) => "OK! > ",
@@ -259,17 +270,18 @@ impl OmniboxView {
         let state = self.state.read().expect("Must read");
         let suggestion = state.suggest_command();
 
-        if suggestion.is_none() { return; }
+        if suggestion.is_none() {
+            return;
+        }
         let (cmd, desc) = suggestion.unwrap();
         let cmd_string = cmd.to_string().replace(&state.command_filter, "");
 
-        printer.with_style(
-            Style::from(Color::Light(BaseColor::Black)),
-            |p| p.print(XY::new(0, 0), cmd_string.as_str())
-        );
+        printer.with_style(Style::from(Color::Light(BaseColor::Black)), |p| {
+            p.print(XY::new(0, 0), cmd_string.as_str())
+        });
 
         let start = cmd_string.len() + 1;
-        printer.print(XY::new(start, 0), format!("({})", desc).as_str());
+        printer.print(XY::new(start, 0), format!("-- {}", desc).as_str());
     }
 
     fn draw_job_type_filter(&self, printer: &Printer<'_, '_>) {
@@ -356,7 +368,7 @@ impl View for OmniboxView {
                 self.tx
                     .send(OmniboxEvent::FocusServiceList)
                     .expect("Must focus");
-                Some(state.with_new(Some(OmniboxMode::Idle), None, None, None))
+                Some(state.with_new(Some(OmniboxMode::Idle), None, Some("".to_string()), None))
             }
             (e, OmniboxMode::Idle) => Self::handle_idle(&e, &*state),
             (e, _) => Self::handle_active(&e, &*state),

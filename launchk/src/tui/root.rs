@@ -1,10 +1,10 @@
-use cursive::view::{ViewWrapper, Margins};
-use cursive::views::{LinearLayout, NamedView, Panel, Dialog, TextView, BoxedView};
+use cursive::view::ViewWrapper;
+use cursive::views::{LinearLayout, NamedView, Panel};
 use cursive::{Cursive, Vec2, View};
 use tokio::runtime::Handle;
 use tokio::time::interval;
 
-use crate::tui::omnibox::view::{OmniboxView, OmniboxEvent, OmniboxError, OmniboxCommand};
+use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxView};
 use crate::tui::service_list::ServiceListView;
 use crate::tui::sysinfo::SysInfo;
 use cursive::event::{Event, EventResult, Key};
@@ -13,10 +13,14 @@ use std::cell::RefCell;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 
-use crate::tui::omnibox::subscribed_view::{OmniboxSubscribedView, OmniboxSubscriber, Subscribable};
-use std::rc::Rc;
-use log::Level;
+use crate::tui::omnibox::subscribed_view::{
+    OmniboxResult, OmniboxSubscribedView, OmniboxSubscriber, Subscribable,
+};
+
+use crate::tui::dialog;
+use crate::tui::omnibox::command::OmniboxCommand;
 use std::collections::VecDeque;
+use std::process::exit;
 
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 
@@ -107,7 +111,7 @@ impl RootLayout {
         self.layout.on_event(event)
     }
 
-    /// Check for Omnibox commands during Cursive's on_event
+    /// Poll for Omnibox commands without blocking
     fn poll_omnibox(&mut self) {
         let recv = self.omnibox_rx.try_recv();
 
@@ -116,24 +120,11 @@ impl RootLayout {
         }
 
         let recv = recv.unwrap();
-
         log::info!("[root/poll_omnibox]: {:?}", recv);
 
-        match recv {
-            // Triggered when toggling to idle
-            OmniboxEvent::FocusServiceList => {
-                self.layout
-                    .set_focus_index(RootLayoutChildren::ServiceList as usize)
-                    .expect("Must focus SL");
-                return;
-            },
-            OmniboxEvent::Command(OmniboxCommand::Prompt(p, c)) => {
-                self.show_prompt(p, c);
-                return;
-            }
-            _ => {}
-        };
+        self.on_omnibox(recv.clone());
 
+        // The Omnibox command is sent to the actively focused view
         let target = self
             .layout
             .get_child_mut(*self.last_focus_index.borrow())
@@ -144,8 +135,15 @@ impl RootLayout {
         }
 
         match target.unwrap().on_omnibox(recv) {
-            Err(OmniboxError::CommandError(s)) =>
-                self.cbsink_channel.send(Self::show_error(s)).expect("Must show error"),
+            // Forward Omnibox command responses from view
+            Ok(Some(c)) => self
+                .omnibox_tx
+                .send(OmniboxEvent::Command(c))
+                .expect("Must send response commands"),
+            Err(OmniboxError::CommandError(s)) => self
+                .cbsink_channel
+                .send(dialog::show_error(s))
+                .expect("Must show error"),
             _ => {}
         };
     }
@@ -154,49 +152,31 @@ impl RootLayout {
         if self.key_ring.len() < 3 {
             None
         } else {
-            let res = match self.key_ring.iter().take(3).collect::<Vec<&Event>>().as_slice() {
-                [Event::Key(Key::Esc), Event::Char('['), Event::Char('A')] => Some(Event::Key(Key::Up)),
-                [Event::Key(Key::Esc), Event::Char('['), Event::Char('B')] => Some(Event::Key(Key::Down)),
-                [Event::Key(Key::Esc), Event::Char('['), Event::Char('C')] => Some(Event::Key(Key::Right)),
-                [Event::Key(Key::Esc), Event::Char('['), Event::Char('D')] => Some(Event::Key(Key::Left)),
-                _ => None
+            let res = match self
+                .key_ring
+                .iter()
+                .take(3)
+                .collect::<Vec<&Event>>()
+                .as_slice()
+            {
+                [Event::Key(Key::Esc), Event::Char('['), Event::Char('A')] => {
+                    Some(Event::Key(Key::Up))
+                }
+                [Event::Key(Key::Esc), Event::Char('['), Event::Char('B')] => {
+                    Some(Event::Key(Key::Down))
+                }
+                [Event::Key(Key::Esc), Event::Char('['), Event::Char('C')] => {
+                    Some(Event::Key(Key::Right))
+                }
+                [Event::Key(Key::Esc), Event::Char('['), Event::Char('D')] => {
+                    Some(Event::Key(Key::Left))
+                }
+                _ => None,
             };
 
             self.key_ring.truncate(0);
             res
         }
-    }
-
-    /// The XPC "error(s)" key sometimes contains information that is not necessarily a failure,
-    /// so let's just call it "Notice" until we figure out what to do next.
-    fn show_error(err: String) -> CbSinkMessage {
-        let cl = |siv: &mut Cursive| {
-            let dialog = Dialog::around(TextView::new(err))
-                .button("Ok", |s| { s.pop_layer(); })
-                .title("Notice");
-
-            siv.add_layer(dialog);
-        };
-
-        Box::new(cl)
-    }
-
-    fn show_prompt(&self, prompt: String, commands: Vec<OmniboxCommand>) {
-        let tx = self.omnibox_tx.clone();
-
-        self.cbsink_channel.send(Box::new(move |siv| {
-            let ask = Dialog::around(TextView::new(prompt))
-                .button("Yes", move |s| {
-                    for cmd in &commands {
-                        tx.send(OmniboxEvent::Command(cmd.clone())).expect("Must send command");
-                    }
-                    // s.pop_layer();
-                })
-                .button("No", |s| { s.pop_layer(); })
-                .title("Notice");
-
-            siv.add_layer(ask);
-        })).expect("Must send prompt");
     }
 }
 
@@ -206,6 +186,7 @@ impl ViewWrapper for RootLayout {
     fn wrap_on_event(&mut self, event: Event) -> EventResult {
         log::debug!("[root/event]: {:?}", event);
 
+        self.poll_omnibox();
         let ev = match event {
             Event::Char('/')
             | Event::Char(':')
@@ -228,7 +209,7 @@ impl ViewWrapper for RootLayout {
                 self.key_ring.push_back(event.clone());
                 let event = self.ring_to_arrows().unwrap_or(event);
                 self.layout.on_event(event)
-            },
+            }
             _ => self.layout.on_event(event),
         };
 
@@ -240,5 +221,35 @@ impl ViewWrapper for RootLayout {
     fn wrap_layout(&mut self, size: Vec2) {
         self.poll_omnibox();
         self.layout.layout(size)
+    }
+}
+
+impl OmniboxSubscriber for RootLayout {
+    fn on_omnibox(&mut self, cmd: OmniboxEvent) -> OmniboxResult {
+        match cmd {
+            OmniboxEvent::Command(OmniboxCommand::Quit) => {
+                self.cbsink_channel
+                    .send(Box::new(|s| {
+                        s.quit();
+                        exit(0);
+                    }))
+                    .expect("Must quit");
+                Ok(None)
+            }
+            // Triggered when toggling to idle
+            OmniboxEvent::FocusServiceList => {
+                self.layout
+                    .set_focus_index(RootLayoutChildren::ServiceList as usize)
+                    .expect("Must focus SL");
+                Ok(None)
+            }
+            OmniboxEvent::Command(OmniboxCommand::Prompt(p, c)) => {
+                self.cbsink_channel
+                    .send(dialog::show_prompt(self.omnibox_tx.clone(), p, c))
+                    .expect("Must show prompt");
+                Ok(None)
+            }
+            _ => Ok(None),
+        }
     }
 }

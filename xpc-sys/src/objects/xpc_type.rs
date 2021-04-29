@@ -1,9 +1,10 @@
-use std::collections::HashMap;
-
-use crate::{mach_port_t, xpc_get_type, xpc_object_t, xpc_type_t, _xpc_type_array, xpc_array_create, _xpc_type_s, _xpc_type_int64, _xpc_type_string, _xpc_type_uint64, _xpc_type_double, _xpc_type_bool, _xpc_type_dictionary};
+use crate::{
+    _xpc_type_array, _xpc_type_bool, _xpc_type_dictionary, _xpc_type_double, _xpc_type_int64,
+    _xpc_type_s, _xpc_type_string, _xpc_type_uint64, mach_port_t, xpc_array_create, xpc_get_type,
+    xpc_object_t, xpc_type_t,
+};
 
 use crate::objects::xpc_object::XPCObject;
-use std::ptr::null_mut;
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,7 +52,8 @@ impl From<*const _xpc_type_s> for XPCType {
 */
 
 lazy_static! {
-    pub static ref Dictionary: XPCType = unsafe { (&_xpc_type_dictionary as *const _xpc_type_s).into() };
+    pub static ref Dictionary: XPCType =
+        unsafe { (&_xpc_type_dictionary as *const _xpc_type_s).into() };
     pub static ref Int64: XPCType = unsafe { (&_xpc_type_int64 as *const _xpc_type_s).into() };
     pub static ref UInt64: XPCType = unsafe { (&_xpc_type_uint64 as *const _xpc_type_s).into() };
     pub static ref Double: XPCType = unsafe { (&_xpc_type_double as *const _xpc_type_s).into() };

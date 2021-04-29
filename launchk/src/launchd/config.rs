@@ -3,15 +3,15 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fs;
 use std::path::Path;
-use std::sync::{Mutex, Once, RwLock};
+use std::sync::{Once, RwLock};
 
-use crate::tui::job_type_filter::JobTypeFilter;
+use crate::launchd::job_type_filter::JobTypeFilter;
+use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
 use std::fs::{DirEntry, ReadDir};
-use tokio::runtime::Handle;
-use std::sync::mpsc::{channel, Receiver, Sender};
-use notify::{watcher, DebouncedEvent, Watcher, RecursiveMode};
-use std::time::Duration;
 use std::iter::FilterMap;
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::time::Duration;
+use tokio::runtime::Handle;
 
 pub static LABEL_MAP_INIT: Once = Once::new();
 
@@ -91,8 +91,7 @@ pub const GLOBAL_LAUNCH_DAEMONS: &str = "/System/Library/LaunchDaemons";
 
 async fn fsnotify_subscriber() {
     let (tx, rx): (Sender<DebouncedEvent>, Receiver<DebouncedEvent>) = channel();
-    let mut watcher = watcher(tx, Duration::from_secs(5))
-        .expect("Must make fsnotify watcher");
+    let mut watcher = watcher(tx, Duration::from_secs(5)).expect("Must make fsnotify watcher");
 
     // Register plist paths
     let watchers = [
@@ -159,19 +158,24 @@ fn build_label_map_entry(plist_path: DirEntry) -> Option<(String, LaunchdEntryCo
         LaunchdEntryLocation::System
     };
 
-    Some((label?.to_string(), LaunchdEntryConfig {
-        entry_location,
-        entry_type,
-        plist_path: path_string,
-        readonly: path
-            .metadata()
-            .map(|m| m.permissions().readonly())
-            .unwrap_or(true),
-    }))
+    Some((
+        label?.to_string(),
+        LaunchdEntryConfig {
+            entry_location,
+            entry_type,
+            plist_path: path_string,
+            readonly: path
+                .metadata()
+                .map(|m| m.permissions().readonly())
+                .unwrap_or(true),
+        },
+    ))
 }
 
-fn readdir_filter_plists(rd: ReadDir) -> FilterMap<ReadDir, fn(futures::io::Result<DirEntry>) -> Option<DirEntry>> {
-    rd.filter_map(|e|  {
+fn readdir_filter_plists(
+    rd: ReadDir,
+) -> FilterMap<ReadDir, fn(futures::io::Result<DirEntry>) -> Option<DirEntry>> {
+    rd.filter_map(|e| {
         if e.is_err() {
             return None;
         }
@@ -180,9 +184,10 @@ fn readdir_filter_plists(rd: ReadDir) -> FilterMap<ReadDir, fn(futures::io::Resu
 
         if path.is_dir()
             || path
-            .extension()
-            .map(|ex| ex.to_string_lossy().ne("plist"))
-            .unwrap_or(true) {
+                .extension()
+                .map(|ex| ex.to_string_lossy().ne("plist"))
+                .unwrap_or(true)
+        {
             None
         } else {
             Some(e.unwrap())
@@ -190,12 +195,14 @@ fn readdir_filter_plists(rd: ReadDir) -> FilterMap<ReadDir, fn(futures::io::Resu
     })
 }
 
-fn insert_plists(plists: impl Iterator<Item=DirEntry>) {
+fn insert_plists(plists: impl Iterator<Item = DirEntry>) {
     let mut label_map = LABEL_TO_ENTRY_CONFIG.write().expect("Must update");
 
     for plist_path in plists {
         let entry = build_label_map_entry(plist_path);
-        if entry.is_none() { continue; }
+        if entry.is_none() {
+            continue;
+        }
         let (label, entry) = entry.unwrap();
         label_map.insert(label, entry);
     }

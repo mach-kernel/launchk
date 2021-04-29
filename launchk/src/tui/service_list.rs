@@ -3,33 +3,32 @@ use cursive::view::ViewWrapper;
 use cursive::{Cursive, View, XY};
 
 use std::collections::HashSet;
-use std::thread;
 
-use std::sync::mpsc::{Sender, channel, Receiver};
-use std::sync::{Arc, RwLock, Mutex};
+use std::sync::mpsc::Sender;
+use std::sync::{Arc, RwLock};
 
 use std::time::Duration;
 use tokio::runtime::Handle;
 
 use tokio::time::interval;
 
-use crate::tui::omnibox::view::{OmniboxEvent, OmniboxMode, OmniboxCommand, OmniboxError};
-use crate::tui::omnibox::state::{OmniboxState};
-use crate::tui::omnibox::subscribed_view::{OmniboxSubscriber, OmniboxResult};
+use crate::launchd::config::LABEL_TO_ENTRY_CONFIG;
+use crate::tui::omnibox::command::OmniboxCommand;
+use crate::tui::omnibox::state::OmniboxState;
+use crate::tui::omnibox::subscribed_view::{OmniboxResult, OmniboxSubscriber};
+use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxMode};
 use crate::tui::root::CbSinkMessage;
-use crate::launchd::config::{LABEL_TO_ENTRY_CONFIG};
 
-use crate::launchd::query::{find_entry_info, list_all, LaunchdEntryInfo, load, unload};
+use crate::launchd::query::{find_entry_info, list_all, load, unload, LaunchdEntryInfo};
 use crate::tui::table::table_list_view::{TableListItem, TableListView};
 use std::borrow::Borrow;
 use std::cell::RefCell;
 
-use crate::tui::job_type_filter::JobTypeFilter;
+use crate::launchd::job_type_filter::JobTypeFilter;
 use cursive::direction::Direction;
-use std::process::Command;
 use std::cmp::Ordering;
+use std::process::Command;
 use std::rc::Rc;
-use cursive::views::{Dialog, TextView};
 
 lazy_static! {
     static ref EDITOR: &'static str = option_env!("EDITOR").unwrap_or("vim");
@@ -73,11 +72,12 @@ impl TableListItem for ServiceListItem {
             .map(|ec| format!("{}/{}", ec.entry_location, ec.entry_type))
             .unwrap_or("-".to_string());
 
-        let pid = if self.entry_info.pid > 0 && self.job_type_filter.intersects(JobTypeFilter::LOADED) {
-            format!("{}", self.entry_info.pid)
-        } else {
-            "-".to_string()
-        };
+        let pid =
+            if self.entry_info.pid > 0 && self.job_type_filter.intersects(JobTypeFilter::LOADED) {
+                format!("{}", self.entry_info.pid)
+            } else {
+                "-".to_string()
+            };
 
         let loaded = if self.job_type_filter.intersects(JobTypeFilter::LOADED) {
             "✔"
@@ -133,9 +133,7 @@ impl ServiceListView {
         let name_filter = self.label_filter.borrow();
         let job_type_filter = self.job_type_filter.borrow();
 
-        let running_no_plist = running
-            .iter()
-            .filter(|r| !plists.contains_key(*r));
+        let running_no_plist = running.iter().filter(|r| !plists.contains_key(*r));
 
         let mut items: Vec<ServiceListItem> = plists
             .keys()
@@ -157,7 +155,11 @@ impl ServiceListView {
                     .entry_config
                     .as_ref()
                     .map(|ec| ec.job_type_filter(is_loaded))
-                    .unwrap_or(if is_loaded { JobTypeFilter::LOADED } else { JobTypeFilter::default() });
+                    .unwrap_or(if is_loaded {
+                        JobTypeFilter::LOADED
+                    } else {
+                        JobTypeFilter::default()
+                    });
 
                 if !job_type_filter.is_empty() && !entry_job_type_filter.contains(*job_type_filter)
                 {
@@ -198,13 +200,17 @@ impl ServiceListView {
         } = state;
 
         match mode {
-            OmniboxMode::LabelFilter => { self.label_filter.replace(label_filter); }
-            OmniboxMode::JobTypeFilter => { self.job_type_filter.replace(job_type_filter); },
+            OmniboxMode::LabelFilter => {
+                self.label_filter.replace(label_filter);
+            }
+            OmniboxMode::JobTypeFilter => {
+                self.job_type_filter.replace(job_type_filter);
+            }
             OmniboxMode::Idle => {
                 self.label_filter.replace(label_filter);
                 self.job_type_filter.replace(job_type_filter);
             }
-            _ => {},
+            _ => {}
         };
 
         Ok(None)
@@ -219,8 +225,9 @@ impl ServiceListView {
     fn handle_command(&mut self, cmd: OmniboxCommand) -> OmniboxResult {
         match cmd {
             OmniboxCommand::Edit => {
-                let ServiceListItem { name, entry_info, .. } =
-                    &*self.get_active_list_item()?;
+                let ServiceListItem {
+                    name, entry_info, ..
+                } = &*self.get_active_list_item()?;
 
                 let entry_config = entry_info
                     .entry_config
@@ -228,25 +235,39 @@ impl ServiceListView {
                     .ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
 
                 if entry_config.readonly {
-                    return Err(OmniboxError::CommandError(format!("{} is read-only", entry_config.plist_path)))
+                    return Err(OmniboxError::CommandError(format!(
+                        "{} is read-only",
+                        entry_config.plist_path
+                    )));
                 }
 
                 let exit = Command::new(*EDITOR)
                     .arg(&entry_config.plist_path)
                     .status()
-                    .map_err(|e| OmniboxError::CommandError(format!("{} failed: {}", *EDITOR, e.to_string())))?;
+                    .map_err(|e| {
+                        OmniboxError::CommandError(format!("{} failed: {}", *EDITOR, e.to_string()))
+                    })?;
 
-                self.cb_sink.send(Box::new(Cursive::clear)).expect("Must clear");
+                self.cb_sink
+                    .send(Box::new(Cursive::clear))
+                    .expect("Must clear");
 
                 if exit.success() {
-                    Ok(Some(OmniboxCommand::Prompt(format!("Unload {}?", name), vec![OmniboxCommand::Unload, OmniboxCommand::Load])))
+                    Ok(Some(OmniboxCommand::Prompt(
+                        format!("Unload {}?", name),
+                        vec![OmniboxCommand::Unload, OmniboxCommand::Load],
+                    )))
                 } else {
-                    Err(OmniboxError::CommandError(format!("{} didn't exit 0", *EDITOR)))
+                    Err(OmniboxError::CommandError(format!(
+                        "{} didn't exit 0",
+                        *EDITOR
+                    )))
                 }
-            },
+            }
             OmniboxCommand::Load | OmniboxCommand::Unload => {
-                let ServiceListItem { name, entry_info, .. } =
-                    &*self.get_active_list_item()?;
+                let ServiceListItem {
+                    name, entry_info, ..
+                } = &*self.get_active_list_item()?;
 
                 let entry_config = entry_info
                     .entry_config
@@ -262,8 +283,8 @@ impl ServiceListView {
                 xpc_query(name, &entry_config.plist_path)
                     .map(|_| None)
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
-            },
-            _ => Ok(None)
+            }
+            _ => Ok(None),
         }
     }
 }
@@ -289,7 +310,7 @@ impl OmniboxSubscriber for ServiceListView {
         match event {
             OmniboxEvent::StateUpdate(state) => self.handle_state_update(state),
             OmniboxEvent::Command(cmd) => self.handle_command(cmd),
-            _ => Ok(None)
+            _ => Ok(None),
         }
     }
 }
