@@ -13,10 +13,10 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 use tokio::runtime::Handle;
 
-pub static LABEL_MAP_INIT: Once = Once::new();
+pub static PLIST_MAP_INIT: Once = Once::new();
 
 lazy_static! {
-    pub static ref LABEL_TO_ENTRY_CONFIG: RwLock<HashMap<String, LaunchdEntryConfig>> =
+    pub static ref LABEL_TO_ENTRY_CONFIG: RwLock<HashMap<String, LaunchdPlist>> =
         RwLock::new(HashMap::new());
 }
 
@@ -39,7 +39,7 @@ pub enum LaunchdEntryLocation {
     /// macOS system provided agent or daemon
     System,
     /// "Administrator provided" agent or daemon
-    /// TODO: Global? Local? What's right?
+    /// TODO: is 'global' appropriate?
     Global,
     /// User provided agent
     User,
@@ -52,14 +52,14 @@ impl fmt::Display for LaunchdEntryLocation {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct LaunchdEntryConfig {
+pub struct LaunchdPlist {
     pub entry_type: LaunchdEntryType,
     pub entry_location: LaunchdEntryLocation,
     pub plist_path: String,
     pub readonly: bool,
 }
 
-impl LaunchdEntryConfig {
+impl LaunchdPlist {
     pub fn job_type_filter(&self, is_loaded: bool) -> JobTypeFilter {
         let mut jtf = JobTypeFilter::default();
 
@@ -130,7 +130,7 @@ async fn fsnotify_subscriber() {
     }
 }
 
-fn build_label_map_entry(plist_path: DirEntry) -> Option<(String, LaunchdEntryConfig)> {
+fn build_label_map_entry(plist_path: DirEntry) -> Option<(String, LaunchdPlist)> {
     let path = plist_path.path();
     let path_string = path.to_string_lossy().to_string();
 
@@ -160,7 +160,7 @@ fn build_label_map_entry(plist_path: DirEntry) -> Option<(String, LaunchdEntryCo
 
     Some((
         label?.to_string(),
-        LaunchdEntryConfig {
+        LaunchdPlist {
             entry_location,
             entry_type,
             plist_path: path_string,
@@ -211,7 +211,7 @@ fn insert_plists(plists: impl Iterator<Item = DirEntry>) {
 /// Unsure if this is overkill, since the filenames
 /// usually match the label property. Still looking for
 /// a way to do dumpstate, dumpjpcategory without parsing the string
-pub fn init_label_map(runtime_handle: &Handle) {
+pub fn init_plist_map(runtime_handle: &Handle) {
     let dirs = [
         USER_LAUNCH_AGENTS,
         GLOBAL_LAUNCH_AGENTS,
@@ -232,8 +232,8 @@ pub fn init_label_map(runtime_handle: &Handle) {
     runtime_handle.spawn(async { fsnotify_subscriber().await });
 }
 
-/// Get plist + fs meta for an entry by its label
-pub fn for_entry<S: Into<String>>(label: S) -> Option<LaunchdEntryConfig> {
+/// Get plist for a label
+pub fn for_label<S: Into<String>>(label: S) -> Option<LaunchdPlist> {
     let label_map = LABEL_TO_ENTRY_CONFIG.read().ok()?;
     label_map.get(label.into().as_str()).map(|c| c.clone())
 }

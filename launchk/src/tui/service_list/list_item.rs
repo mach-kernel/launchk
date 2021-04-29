@@ -1,13 +1,13 @@
 use std::borrow::Borrow;
 
 use crate::launchd::job_type_filter::JobTypeFilter;
-use crate::launchd::query::LaunchdEntryInfo;
+use crate::launchd::entry_status::LaunchdEntryStatus;
 use crate::tui::table::table_list_view::TableListItem;
 
 #[derive(Debug)]
 pub struct ServiceListItem {
     pub name: String,
-    pub entry_info: LaunchdEntryInfo,
+    pub entry_info: LaunchdEntryStatus,
     pub job_type_filter: JobTypeFilter,
 }
 

@@ -4,5 +4,6 @@ pub mod message;
 pub mod query;
 
 /// plist management
-pub mod config;
+pub mod plist;
 pub mod job_type_filter;
+pub mod entry_status;

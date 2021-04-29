@@ -1,3 +1,6 @@
+use block::ConcreteBlock;
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::ffi::CStr;
 
 use crate::objects::xpc_object::XPCObject;
@@ -9,38 +12,12 @@ use crate::{
 
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::ValueError;
-use crate::objects::xpc_type::XPCType;
-use block::ConcreteBlock;
-use std::cell::RefCell;
-use std::rc::Rc;
+use crate::objects::xpc_type::{XPCType, check_xpc_type};
 
 /// Implement to get data out of xpc_type_t and into
 /// a Rust native data type
 pub trait TryXPCValue<Out> {
     fn xpc_value(&self) -> Result<Out, XPCError>;
-}
-
-fn check_xpc_type(object: &XPCObject, xpc_type: &XPCType) -> Result<(), XPCError> {
-    let XPCObject(_, obj_type) = object;
-    if *obj_type == *xpc_type {
-        return Ok(());
-    }
-
-    let obj_str = unsafe {
-        let XPCType(ptr) = object.xpc_type();
-        CStr::from_ptr(xpc_type_get_name(ptr))
-            .to_string_lossy()
-            .to_string()
-    };
-
-    let req_str = unsafe {
-        let XPCType(ptr) = xpc_type;
-        CStr::from_ptr(xpc_type_get_name(*ptr))
-            .to_string_lossy()
-            .to_string()
-    };
-
-    Err(ValueError(format!("Cannot get {} as {}", obj_str, req_str)))
 }
 
 impl TryXPCValue<i64> for XPCObject {
@@ -115,7 +92,7 @@ mod tests {
     use crate::traits::xpc_value::TryXPCValue;
 
     #[test]
-    fn deserialize_as_wrong_type() {
+    fn xpc_to_rs_with_wrong_type() {
         let an_i64 = XPCObject::from(42 as i64);
         let as_u64: Result<u64, XPCError> = an_i64.xpc_value();
 
@@ -131,5 +108,26 @@ mod tests {
         let vec: Vec<XPCObject> = xpc_array.xpc_value().unwrap();
         let ohai: String = vec.get(0).unwrap().xpc_value().unwrap();
         assert_eq!(ohai, "ohai");
+    }
+
+    #[test]
+    fn xpc_value_bool() {
+        let xpc_bool = XPCObject::from(true);
+        let rs_bool: bool = xpc_bool.xpc_value().unwrap();
+        assert_eq!(true, rs_bool);
+    }
+
+    #[test]
+    fn xpc_value_i64() {
+        let xpc_i64 = XPCObject::from(std::i64::MAX);
+        let rs_i64: i64 = xpc_i64.xpc_value().unwrap();
+        assert_eq!(std::i64::MAX, rs_i64);
+    }
+
+    #[test]
+    fn xpc_value_u64() {
+        let xpc_u64 = XPCObject::from(std::u64::MAX);
+        let rs_u64: u64 = xpc_u64.xpc_value().unwrap();
+        assert_eq!(std::u64::MAX, rs_u64);
     }
 }

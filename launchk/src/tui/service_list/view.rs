@@ -14,9 +14,10 @@ use cursive::{Cursive, View, XY};
 use tokio::runtime::Handle;
 use tokio::time::interval;
 
-use crate::launchd::config::LABEL_TO_ENTRY_CONFIG;
+use crate::launchd::plist::LABEL_TO_ENTRY_CONFIG;
 use crate::launchd::job_type_filter::JobTypeFilter;
-use crate::launchd::query::{find_entry_info, list_all, load, unload};
+use crate::launchd::entry_status::get_entry_status;
+use crate::launchd::query::{list_all, load, unload};
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::state::OmniboxState;
 use crate::tui::omnibox::subscribed_view::{OmniboxResult, OmniboxSubscriber};
@@ -101,7 +102,7 @@ impl ServiceListView {
                     return None;
                 }
 
-                let entry_info = find_entry_info(label);
+                let entry_info = get_entry_status(label);
                 let is_loaded = running.contains(label);
 
                 let entry_job_type_filter = entry_info
