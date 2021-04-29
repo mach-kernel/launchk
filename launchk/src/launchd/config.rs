@@ -3,15 +3,21 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fs;
 use std::path::Path;
-use std::sync::{Mutex, Once};
+use std::sync::{Once, RwLock};
 
-use crate::tui::job_type_filter::JobTypeFilter;
+use crate::launchd::job_type_filter::JobTypeFilter;
+use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
+use std::fs::{DirEntry, ReadDir};
+use std::iter::FilterMap;
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::time::Duration;
+use tokio::runtime::Handle;
 
-static LABEL_MAP_INIT: Once = Once::new();
+pub static LABEL_MAP_INIT: Once = Once::new();
 
 lazy_static! {
-    static ref LABEL_TO_PLIST: Mutex<HashMap<String, LaunchdEntryConfig>> =
-        Mutex::new(HashMap::new());
+    pub static ref LABEL_TO_ENTRY_CONFIG: RwLock<HashMap<String, LaunchdEntryConfig>> =
+        RwLock::new(HashMap::new());
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -54,7 +60,7 @@ pub struct LaunchdEntryConfig {
 }
 
 impl LaunchdEntryConfig {
-    pub fn job_type_filter(&self) -> JobTypeFilter {
+    pub fn job_type_filter(&self, is_loaded: bool) -> JobTypeFilter {
         let mut jtf = JobTypeFilter::default();
 
         match self.entry_location {
@@ -68,6 +74,10 @@ impl LaunchdEntryConfig {
             LaunchdEntryType::Daemon => jtf.toggle(JobTypeFilter::DAEMON),
         };
 
+        if is_loaded {
+            jtf.toggle(JobTypeFilter::LOADED);
+        }
+
         jtf
     }
 }
@@ -79,10 +89,129 @@ pub const SYSTEM_LAUNCH_AGENTS: &str = "/System/Library/LaunchAgents";
 pub const ADMIN_LAUNCH_DAEMONS: &str = "/Library/LaunchDaemons";
 pub const GLOBAL_LAUNCH_DAEMONS: &str = "/System/Library/LaunchDaemons";
 
+async fn fsnotify_subscriber() {
+    let (tx, rx): (Sender<DebouncedEvent>, Receiver<DebouncedEvent>) = channel();
+    let mut watcher = watcher(tx, Duration::from_secs(5)).expect("Must make fsnotify watcher");
+
+    // Register plist paths
+    let watchers = [
+        watcher.watch(Path::new(USER_LAUNCH_AGENTS), RecursiveMode::Recursive),
+        watcher.watch(Path::new(GLOBAL_LAUNCH_AGENTS), RecursiveMode::Recursive),
+        watcher.watch(Path::new(SYSTEM_LAUNCH_AGENTS), RecursiveMode::Recursive),
+        watcher.watch(Path::new(ADMIN_LAUNCH_DAEMONS), RecursiveMode::Recursive),
+        watcher.watch(Path::new(GLOBAL_LAUNCH_DAEMONS), RecursiveMode::Recursive),
+    ];
+
+    for sub in watchers.iter() {
+        sub.as_ref().expect("Must subscribe to fs events");
+    }
+
+    loop {
+        let event = rx.recv();
+        if event.is_err() {
+            continue;
+        }
+
+        let event = event.unwrap();
+
+        let reload_plists = match event {
+            DebouncedEvent::Create(pb) => fs::read_dir(pb),
+            DebouncedEvent::Write(pb) => fs::read_dir(pb),
+            DebouncedEvent::Remove(pb) => fs::read_dir(pb),
+            DebouncedEvent::Rename(_, new) => fs::read_dir(new),
+            _ => continue,
+        };
+
+        if reload_plists.is_err() {
+            continue;
+        }
+
+        insert_plists(readdir_filter_plists(reload_plists.unwrap()));
+    }
+}
+
+fn build_label_map_entry(plist_path: DirEntry) -> Option<(String, LaunchdEntryConfig)> {
+    let path = plist_path.path();
+    let path_string = path.to_string_lossy().to_string();
+
+    let label = plist::Value::from_file(path.clone()).ok()?;
+    let label = label
+        .as_dictionary()
+        .and_then(|d| d.get("Label"))
+        .and_then(|v| v.as_string());
+
+    let entry_type = if path_string.contains(ADMIN_LAUNCH_DAEMONS)
+        || path_string.contains(GLOBAL_LAUNCH_DAEMONS)
+    {
+        LaunchdEntryType::Daemon
+    } else {
+        LaunchdEntryType::Agent
+    };
+
+    let entry_location = if path_string.contains(USER_LAUNCH_AGENTS) {
+        LaunchdEntryLocation::User
+    } else if path_string.contains(GLOBAL_LAUNCH_AGENTS)
+        || path_string.contains(ADMIN_LAUNCH_DAEMONS)
+    {
+        LaunchdEntryLocation::Global
+    } else {
+        LaunchdEntryLocation::System
+    };
+
+    Some((
+        label?.to_string(),
+        LaunchdEntryConfig {
+            entry_location,
+            entry_type,
+            plist_path: path_string,
+            readonly: path
+                .metadata()
+                .map(|m| m.permissions().readonly())
+                .unwrap_or(true),
+        },
+    ))
+}
+
+fn readdir_filter_plists(
+    rd: ReadDir,
+) -> FilterMap<ReadDir, fn(futures::io::Result<DirEntry>) -> Option<DirEntry>> {
+    rd.filter_map(|e| {
+        if e.is_err() {
+            return None;
+        }
+
+        let path = e.borrow().as_ref().unwrap().path();
+
+        if path.is_dir()
+            || path
+                .extension()
+                .map(|ex| ex.to_string_lossy().ne("plist"))
+                .unwrap_or(true)
+        {
+            None
+        } else {
+            Some(e.unwrap())
+        }
+    })
+}
+
+fn insert_plists(plists: impl Iterator<Item = DirEntry>) {
+    let mut label_map = LABEL_TO_ENTRY_CONFIG.write().expect("Must update");
+
+    for plist_path in plists {
+        let entry = build_label_map_entry(plist_path);
+        if entry.is_none() {
+            continue;
+        }
+        let (label, entry) = entry.unwrap();
+        label_map.insert(label, entry);
+    }
+}
+
 /// Unsure if this is overkill, since the filenames
 /// usually match the label property. Still looking for
 /// a way to do dumpstate, dumpjpcategory without parsing the string
-fn init_label_map() {
+pub fn init_label_map(runtime_handle: &Handle) {
     let dirs = [
         USER_LAUNCH_AGENTS,
         GLOBAL_LAUNCH_AGENTS,
@@ -95,84 +224,16 @@ fn init_label_map() {
     let plists = dirs
         .iter()
         .filter_map(|&dirname| fs::read_dir(Path::new(dirname)).ok())
-        .flat_map(|rd| {
-            rd.flat_map(|e| {
-                if e.is_err() {
-                    return e.into_iter();
-                }
-                let path = e.borrow().as_ref().unwrap().path();
+        .flat_map(readdir_filter_plists);
 
-                if path.is_dir()
-                    || path
-                        .extension()
-                        .map(|ex| ex.to_string_lossy().ne("plist"))
-                        .unwrap_or(true)
-                {
-                    Err(()).into_iter()
-                } else {
-                    e.into_iter()
-                }
-            })
-        });
+    insert_plists(plists);
 
-    let mut label_map = LABEL_TO_PLIST.lock().unwrap();
-
-    for plist_path in plists {
-        let path = plist_path.path();
-        let path_string = path.to_string_lossy().to_string();
-
-        let label = plist::Value::from_file(path.clone());
-
-        if label.is_err() {
-            continue;
-        }
-
-        let label = label.unwrap();
-        let label = label
-            .as_dictionary()
-            .and_then(|d| d.get("Label"))
-            .and_then(|v| v.as_string());
-
-        if label.is_none() {
-            continue;
-        }
-
-        let entry_type = if path_string.contains(ADMIN_LAUNCH_DAEMONS)
-            || path_string.contains(GLOBAL_LAUNCH_DAEMONS)
-        {
-            LaunchdEntryType::Daemon
-        } else {
-            LaunchdEntryType::Agent
-        };
-
-        let entry_location = if path_string.contains(USER_LAUNCH_AGENTS) {
-            LaunchdEntryLocation::User
-        } else if path_string.contains(GLOBAL_LAUNCH_AGENTS)
-            || path_string.contains(ADMIN_LAUNCH_DAEMONS)
-        {
-            LaunchdEntryLocation::Global
-        } else {
-            LaunchdEntryLocation::System
-        };
-
-        label_map.insert(
-            label.unwrap().to_string(),
-            LaunchdEntryConfig {
-                entry_location,
-                entry_type,
-                plist_path: path_string,
-                readonly: path
-                    .metadata()
-                    .map(|m| m.permissions().readonly())
-                    .unwrap_or(true),
-            },
-        );
-    }
+    // Spawn fsnotify subscriber
+    runtime_handle.spawn(async { fsnotify_subscriber().await });
 }
 
 /// Get plist + fs meta for an entry by its label
 pub fn for_entry<S: Into<String>>(label: S) -> Option<LaunchdEntryConfig> {
-    LABEL_MAP_INIT.call_once(init_label_map);
-    let label_map = LABEL_TO_PLIST.try_lock().ok()?;
+    let label_map = LABEL_TO_ENTRY_CONFIG.read().ok()?;
     label_map.get(label.into().as_str()).map(|c| c.clone())
 }

@@ -1,7 +1,6 @@
-pub mod job_type_filter;
-pub mod omnibox;
-pub mod omnibox_subscribed_view;
+mod dialog;
+mod omnibox;
 pub mod root;
-pub mod service_list;
-pub mod sysinfo;
-pub mod table;
+mod service_list;
+mod sysinfo;
+mod table;

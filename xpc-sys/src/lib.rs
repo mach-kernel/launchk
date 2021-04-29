@@ -5,6 +5,9 @@
 #[macro_use]
 extern crate lazy_static;
 
+#[macro_use]
+extern crate bitflags;
+
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_long, c_void};
 use std::ptr::null_mut;
@@ -24,9 +27,8 @@ pub type xpc_pipe_t = *mut c_void;
 /// https://developer.apple.com/documentation/kernel/mach
 /// https://chromium.googlesource.com/chromium/src.git/+/47.0.2507.2/sandbox/mac/xpc_private_stubs.sig
 extern "C" {
-    // Seems to give same output as strerror ¯\_(ツ)_/¯
+    // Can decode i64 returned in "errors" for XPC responses
     pub fn xpc_strerror(err: c_int) -> *const c_char;
-
     pub static errno: c_int;
 
     pub fn xpc_pipe_create_from_port(port: mach_port_t, flags: u64) -> xpc_pipe_t;
@@ -79,16 +81,20 @@ pub fn lookup_bootstrap_port() -> mach_port_t {
     let ret_port: mach_port_t = unsafe { *found_ports.offset(0) };
 
     #[cfg(feature = "log")]
-    println!(
+    log::info!(
         "{} ports for mach_task_self_, taking first: mach_port_t {}",
-        num_ports, ret_port
+        num_ports,
+        ret_port
     );
 
     // Deallocate others
     unsafe {
         for i in 1..num_ports {
             let port = *found_ports.offset(i as isize);
-            println!("Deallocating mach_port_t {}", port);
+
+            #[cfg(feature = "log")]
+            log::info!("Deallocating mach_port_t {}", port);
+
             mach_port_deallocate(mach_task_self_, port);
         }
     }
@@ -101,11 +107,11 @@ pub fn get_bootstrap_port() -> mach_port_t {
     unsafe {
         if bootstrap_port == MACH_PORT_NULL {
             #[cfg(feature = "log")]
-            println!("Bootstrap port is null! Querying for port");
+            log::info!("Bootstrap port is null! Querying for port");
             lookup_bootstrap_port()
         } else {
             #[cfg(feature = "log")]
-            println!("Found bootstrap port {}", bootstrap_port);
+            log::info!("Found bootstrap port {}", bootstrap_port);
             bootstrap_port
         }
     }
@@ -117,16 +123,17 @@ pub fn get_xpc_bootstrap_pipe() -> xpc_pipe_t {
         Some(xpcgd) => {
             #[cfg(feature = "log")]
             unsafe {
-                println!(
+                log::info!(
                     "Found _os_alloc_once_table: {:?}",
                     &_os_alloc_once_table as *const _
                 );
-                println!("Found xpc_bootstrap_pipe: {:?}", xpcgd.xpc_bootstrap_pipe);
+                log::info!("Found xpc_bootstrap_pipe: {:?}", xpcgd.xpc_bootstrap_pipe);
             }
             xpcgd.xpc_bootstrap_pipe
         }
         None => unsafe {
-            println!("Can't find _os_alloc_once_table, creating new bootstrap pipe");
+            #[cfg(feature = "log")]
+            log::info!("Can't find _os_alloc_once_table, creating new bootstrap pipe");
             xpc_pipe_create_from_port(get_bootstrap_port(), 0)
         },
     }
@@ -137,31 +144,26 @@ pub fn read_xpc_global_data() -> Option<&'static xpc_global_data> {
     unsafe { gd.as_ref() }
 }
 
-pub fn str_errno(err: Option<i32>) -> String {
-    let unwrapped = err.unwrap_or(unsafe { errno });
+pub fn rs_xpc_strerror(err: i32) -> String {
     unsafe {
-        CStr::from_ptr(strerror(unwrapped))
+        CStr::from_ptr(xpc_strerror(err))
             .to_string_lossy()
             .to_string()
     }
 }
 
-pub fn print_errno(err: Option<i32>) {
-    println!(
-        "Error {}: {}",
-        err.unwrap_or(unsafe { errno }),
-        str_errno(err)
-    );
+pub fn rs_strerror(err: i32) -> String {
+    unsafe { CStr::from_ptr(strerror(err)).to_string_lossy().to_string() }
 }
 
-pub fn sysctlbyname_string(name: &str) -> Option<String> {
-    let sysctlname = CString::new(name).unwrap();
+pub fn rs_sysctlbyname(name: &str) -> Option<String> {
+    let name = CString::new(name).unwrap();
     let mut ret_buf: [c_char; 256] = [0; 256];
     let mut size = ret_buf.len() as u64;
 
     let err = unsafe {
         sysctlbyname(
-            sysctlname.as_ptr(),
+            name.as_ptr(),
             ret_buf.as_mut_ptr() as *mut _,
             &mut size,
             null_mut(),

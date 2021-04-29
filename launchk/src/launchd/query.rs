@@ -1,4 +1,4 @@
-use crate::launchd::message::{from_msg, LIST_SERVICES};
+use crate::launchd::message::{from_msg, LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS};
 use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
@@ -6,17 +6,26 @@ use std::fmt;
 use std::sync::Mutex;
 use xpc_sys::objects::xpc_object::XPCObject;
 use xpc_sys::objects::xpc_type;
-use xpc_sys::traits::xpc_pipeable::XPCPipeable;
+use xpc_sys::traits::xpc_pipeable::{XPCPipeResult, XPCPipeable};
 use xpc_sys::traits::xpc_value::TryXPCValue;
 
 use crate::launchd::config::LaunchdEntryConfig;
 use std::iter::FromIterator;
+use std::time::{Duration, SystemTime};
 use xpc_sys::objects::xpc_dictionary::XPCDictionary;
 use xpc_sys::objects::xpc_error::XPCError;
+
+const ENTRY_INFO_QUERY_TTL: u64 = 15; // seconds
+
+#[link(name = "c")]
+extern "C" {
+    fn geteuid() -> u32;
+}
 
 lazy_static! {
     static ref ENTRY_INFO_CACHE: Mutex<HashMap<String, LaunchdEntryInfo>> =
         Mutex::new(HashMap::new());
+    static ref IS_ROOT: bool = unsafe { geteuid() } == 0;
 }
 
 /// LimitLoadToSessionType key in XPC response
@@ -76,6 +85,7 @@ pub struct LaunchdEntryInfo {
     pub limit_load_to_session_type: LimitLoadToSessionType,
     // So, there is a pid_t, but it's i32, and the XPC response has an i64?
     pub pid: i64,
+    tick: SystemTime,
 }
 
 impl Default for LaunchdEntryInfo {
@@ -84,6 +94,7 @@ impl Default for LaunchdEntryInfo {
             limit_load_to_session_type: LimitLoadToSessionType::Unknown,
             entry_config: None,
             pid: 0,
+            tick: SystemTime::now(),
         }
     }
 }
@@ -135,11 +146,20 @@ pub fn list_all() -> HashSet<String> {
 }
 
 /// Get more information about a unit from its label
-pub fn find_entry_info<T: Into<String>>(label: T) -> LaunchdEntryInfo {
+pub fn find_entry_info<S: Into<String>>(label: S) -> LaunchdEntryInfo {
     let label_string = label.into();
     let mut cache = ENTRY_INFO_CACHE.try_lock().unwrap();
+
     if cache.contains_key(label_string.as_str()) {
-        return cache.get(label_string.as_str()).unwrap().clone();
+        let item = cache.get(label_string.as_str()).unwrap().clone();
+
+        if item.tick.elapsed().unwrap() > Duration::from_secs(ENTRY_INFO_QUERY_TTL) {
+            cache.remove(label_string.as_str());
+            drop(cache);
+            return find_entry_info(label_string);
+        }
+
+        return item;
     }
 
     let meta = build_entry_info(&label_string);
@@ -147,23 +167,21 @@ pub fn find_entry_info<T: Into<String>>(label: T) -> LaunchdEntryInfo {
     meta
 }
 
-fn build_entry_info<T: Into<String>>(label: T) -> LaunchdEntryInfo {
+fn build_entry_info<S: Into<String>>(label: S) -> LaunchdEntryInfo {
     let label_string = label.into();
     let response = find_in_all(label_string.clone());
 
-    if response.is_err() {
-        return LaunchdEntryInfo::default();
-    }
-
-    let response = response.unwrap();
-
     let pid: i64 = response
-        .get(&["service", "PID"])
+        .as_ref()
+        .map_err(|e| e.clone())
+        .and_then(|r| r.get(&["service", "PID"]))
         .and_then(|o| o.xpc_value())
         .unwrap_or(0);
 
     let limit_load_to_session_type = response
-        .get(&["service", "LimitLoadToSessionType"])
+        .as_ref()
+        .map_err(|e| e.clone())
+        .and_then(|r| r.get(&["service", "LimitLoadToSessionType"]))
         .and_then(|o| o.try_into())
         .unwrap_or(LimitLoadToSessionType::Unknown);
 
@@ -173,5 +191,85 @@ fn build_entry_info<T: Into<String>>(label: T) -> LaunchdEntryInfo {
         limit_load_to_session_type,
         entry_config,
         pid,
+        tick: SystemTime::now(),
+    }
+}
+
+pub fn load<S: Into<String>>(label: S, plist_path: S) -> XPCPipeResult {
+    let mut message: HashMap<&str, XPCObject> = from_msg(&LOAD_PATHS);
+    let label_string = label.into();
+
+    message.insert(
+        "type",
+        if *IS_ROOT {
+            XPCObject::from(1 as u64)
+        } else {
+            XPCObject::from(7 as u64)
+        },
+    );
+
+    let paths = vec![XPCObject::from(plist_path.into())];
+    message.insert("paths", XPCObject::from(paths));
+    message.insert("session", XPCObject::from("Aqua"));
+
+    let message: XPCObject = message.into();
+
+    ENTRY_INFO_CACHE
+        .lock()
+        .expect("Must invalidate")
+        .remove(&label_string);
+
+    handle_load_unload_errors(label_string, message.pipe_routine()?)
+}
+
+pub fn unload<S: Into<String>>(label: S, plist_path: S) -> XPCPipeResult {
+    let mut message: HashMap<&str, XPCObject> = from_msg(&UNLOAD_PATHS);
+    let label_string = label.into();
+
+    message.insert(
+        "type",
+        if *IS_ROOT {
+            XPCObject::from(1 as u64)
+        } else {
+            XPCObject::from(7 as u64)
+        },
+    );
+
+    let paths = vec![XPCObject::from(plist_path.into())];
+    message.insert("paths", XPCObject::from(paths));
+    message.insert("session", XPCObject::from("Aqua"));
+
+    let message: XPCObject = message.into();
+
+    ENTRY_INFO_CACHE
+        .lock()
+        .expect("Must invalidate")
+        .remove(&label_string);
+
+    handle_load_unload_errors(label_string, message.pipe_routine()?)
+}
+
+fn handle_load_unload_errors(label: String, result: XPCObject) -> XPCPipeResult {
+    let dict: XPCDictionary = result.clone().try_into()?;
+    let error_dict = dict.get_as_dictionary(&["errors"]);
+
+    if error_dict.is_err() {
+        Ok(result)
+    } else {
+        let mut error_string = "".to_string();
+        let XPCDictionary(hm) = error_dict.unwrap();
+
+        if hm.is_empty() {
+            return Ok(result);
+        }
+
+        for (_, errcode) in hm {
+            let errcode: i64 = errcode.xpc_value().unwrap();
+            error_string.push_str(
+                format!("{}: {}\n", label, xpc_sys::rs_xpc_strerror(errcode as i32)).as_str(),
+            );
+        }
+
+        Err(XPCError::QueryError(error_string))
     }
 }

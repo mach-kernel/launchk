@@ -1,6 +1,7 @@
-use std::collections::HashMap;
-
-use crate::{mach_port_t, xpc_get_type, xpc_object_t, xpc_type_t};
+use crate::{
+    _xpc_type_array, _xpc_type_bool, _xpc_type_dictionary, _xpc_type_double, _xpc_type_int64,
+    _xpc_type_s, _xpc_type_string, _xpc_type_uint64, xpc_get_type, xpc_object_t, xpc_type_t,
+};
 
 use crate::objects::xpc_object::XPCObject;
 
@@ -24,16 +25,11 @@ impl From<XPCObject> for XPCType {
     }
 }
 
-// TODO: Why is this broken? Even with lazy_static!
-// impl From<_xpc_type_s> for XPCType {
-//     /// Mostly for use with externs like _xpc_type_dictionary
-//     /// from bindgen
-//     fn from(value: _xpc_type_s) -> XPCType {
-//         let xpc_type: xpc_type_t = &value;
-//         XPCType(xpc_type)
-//     }
-// }
-// pub static ref Dictionary: XPCType = unsafe { _xpc_type_dictionary.into() };
+impl From<*const _xpc_type_s> for XPCType {
+    fn from(value: *const _xpc_type_s) -> Self {
+        XPCType(value)
+    }
+}
 
 /*
    All _xpc_type_* from bindings.rs
@@ -55,14 +51,12 @@ impl From<XPCObject> for XPCType {
 */
 
 lazy_static! {
-    pub static ref Dictionary: XPCType = {
-        let empty: HashMap<&str, XPCObject> = HashMap::new();
-        XPCObject::from(empty).xpc_type()
-    };
-    pub static ref Int64: XPCType = XPCObject::from(0 as i64).into();
-    pub static ref UInt64: XPCType = XPCObject::from(0 as u64).into();
-    pub static ref Double: XPCType = XPCObject::from(2.0 as f64).into();
-    pub static ref String: XPCType = XPCObject::from("").into();
-    pub static ref Bool: XPCType = XPCObject::from(true).into();
-    pub static ref MachPort: XPCType = XPCObject::from(0 as mach_port_t).into();
+    pub static ref Dictionary: XPCType =
+        unsafe { (&_xpc_type_dictionary as *const _xpc_type_s).into() };
+    pub static ref Int64: XPCType = unsafe { (&_xpc_type_int64 as *const _xpc_type_s).into() };
+    pub static ref UInt64: XPCType = unsafe { (&_xpc_type_uint64 as *const _xpc_type_s).into() };
+    pub static ref Double: XPCType = unsafe { (&_xpc_type_double as *const _xpc_type_s).into() };
+    pub static ref String: XPCType = unsafe { (&_xpc_type_string as *const _xpc_type_s).into() };
+    pub static ref Bool: XPCType = unsafe { (&_xpc_type_bool as *const _xpc_type_s).into() };
+    pub static ref Array: XPCType = unsafe { (&_xpc_type_array as *const _xpc_type_s).into() };
 }

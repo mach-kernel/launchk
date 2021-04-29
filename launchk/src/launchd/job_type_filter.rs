@@ -11,6 +11,15 @@ bitflags! {
         const USER   = (1 << 3);
         const AGENT  = (1 << 4);
         const DAEMON = (1 << 5);
+        const LOADED = (1 << 6);
+    }
+}
+
+impl JobTypeFilter {
+    pub fn launchk_default() -> Self {
+        let mut jtf = JobTypeFilter::default();
+        jtf.toggle(JobTypeFilter::LOADED);
+        jtf
     }
 }
 
@@ -38,6 +47,10 @@ impl fmt::Display for JobTypeFilter {
 
         if (*self & JobTypeFilter::DAEMON) == JobTypeFilter::DAEMON {
             display.push('d');
+        }
+
+        if (*self & JobTypeFilter::LOADED) == JobTypeFilter::LOADED {
+            display.push('l');
         }
 
         write!(f, "{}", display)

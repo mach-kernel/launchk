@@ -176,3 +176,77 @@ ok
 type 8
 strerr Domain does not support specified action
 ```
+
+#### `launchctl unload ~/Library/LaunchAgents/homebrew.mxcl.elasticsearch.plist`
+
+```
+<dictionary: 0x100305170> { count = 11, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xf048e68836ce456d>: 3
+	"handle" => <uint64: 0xf048e68836ce756d>: 0
+	"legacy-load" => <bool: 0x7fff800130b0>: true
+	"routine" => <uint64: 0xf048e68836fc656d>: 801
+	"paths" => <array: 0x100305740> { count = 1, capacity = 8, contents =
+		0: <string: 0x100305850> { length = 66, contents = "/Users/mach/Library/LaunchAgents/homebrew.mxcl.elasticsearch.plist" }
+	}
+	"no-einprogress" => <bool: 0x7fff800130b0>: true
+	"disable" => <bool: 0x7fff800130d0>: false
+	"type" => <uint64: 0xf048e68836ce056d>: 7
+	"legacy" => <bool: 0x7fff800130b0>: true
+	"session" => <string: 0x100305630> { length = 4, contents = "Aqua" }
+	"domain-port" => <mach send right: 0x100304fa0> { name = 1799, right = send, urefs = 5 }
+```
+
+Type seems same even if trying from `/Library`:
+
+```
+<dictionary: 0x100604420> { count = 11, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0x45e43765185d939b>: 3
+	"handle" => <uint64: 0x45e43765185da39b>: 0
+	"legacy-load" => <bool: 0x7fff800130b0>: true
+	"routine" => <uint64: 0x45e43765186fb39b>: 801
+	"paths" => <array: 0x100604680> { count = 1, capacity = 8, contents =
+		0: <string: 0x100604770> { length = 57, contents = "/Library/LaunchDaemons/com.adobe.ARMDC.Communicator.plist" }
+	}
+	"no-einprogress" => <bool: 0x7fff800130b0>: true
+	"disable" => <bool: 0x7fff800130d0>: false
+	"type" => <uint64: 0x45e43765185dd39b>: 7
+	"legacy" => <bool: 0x7fff800130b0>: true
+	"session" => <string: 0x1006045f0> { length = 4, contents = "Aqua" }
+	"domain-port" => <mach send right: 0x1006044b0> { name = 1799, right = send, urefs = 5 }
+```
+
+As root:
+
+```
+<dictionary: 0x100304550> { count = 9, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xb2614a0bcbc04b91>: 3
+	"handle" => <uint64: 0xb2614a0bcbc07b91>: 0
+	"legacy-load" => <bool: 0x7fff800130b0>: true
+	"routine" => <uint64: 0xb2614a0bcbf26b91>: 801
+	"paths" => <array: 0x100304730> { count = 1, capacity = 8, contents =
+		0: <string: 0x100304820> { length = 57, contents = "/Library/LaunchDaemons/com.adobe.ARMDC.Communicator.plist" }
+	}
+	"no-einprogress" => <bool: 0x7fff800130b0>: true
+	"disable" => <bool: 0x7fff800130d0>: false
+	"type" => <uint64: 0xb2614a0bcbc06b91>: 1
+	"legacy" => <bool: 0x7fff800130b0>: true
+```
+
+#### `launchctl load ~/Library/LaunchAgents/homebrew.mxcl.elasticsearch.plist`
+
+```
+<dictionary: 0x1006044b0> { count = 10, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xe9f0c2b9827fda95>: 3
+	"handle" => <uint64: 0xe9f0c2b9827fea95>: 0
+	"legacy-load" => <bool: 0x7fff800130b0>: true
+	"enable" => <bool: 0x7fff800130d0>: false
+	"routine" => <uint64: 0xe9f0c2b9824dea95>: 800
+	"paths" => <array: 0x1006046a0> { count = 1, capacity = 8, contents =
+		0: <string: 0x1006047b0> { length = 66, contents = "/Users/mach/Library/LaunchAgents/homebrew.mxcl.elasticsearch.plist" }
+	}
+	"type" => <uint64: 0xe9f0c2b9827f9a95>: 7
+	"legacy" => <bool: 0x7fff800130b0>: true
+	"session" => <string: 0x100604610> { length = 4, contents = "Aqua" }
+	"domain-port" => <mach send right: 0x100604540> { name = 1799, right = send, urefs = 5 }
+```
+

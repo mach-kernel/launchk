@@ -1,10 +1,9 @@
+use std::cell::Cell;
+
 use cursive::theme::{BaseColor, Color, Effect, Style};
 use cursive::{Printer, Vec2, View, XY};
-use xpc_sys::sysctlbyname_string;
-
-use std::cell::Cell;
-use xpc_sys::csr::CSR_ALLOW_UNTRUSTED_KEXTS;
-use xpc_sys::csr::CSR_STATUS;
+use xpc_sys::csr::{csr_check, CsrConfig};
+use xpc_sys::rs_sysctlbyname;
 
 pub struct SysInfo {
     current_size: Cell<XY<usize>>,
@@ -23,14 +22,18 @@ impl View for SysInfo {
         let middle = self.current_size.get().x / 2;
 
         let mac_os_label = "macOS:";
-        let osproductversion =
-            sysctlbyname_string("kern.osproductversion").unwrap_or("".to_string());
-        let osversion = sysctlbyname_string("kern.osversion").unwrap_or("".to_string());
+        let osproductversion = rs_sysctlbyname("kern.osproductversion").unwrap_or("".to_string());
+        let osversion = rs_sysctlbyname("kern.osversion").unwrap_or("".to_string());
         let mac_os_data = format!("{} ({})", osproductversion, osversion);
 
         // If granted CSR_ALLOW_UNTRUSTED_KEXTS, SIP is probably off
         let sip_label = "SIP:";
-        let sip_data = format!("{}", !CSR_STATUS.get(&CSR_ALLOW_UNTRUSTED_KEXTS).unwrap());
+        let sip_data = unsafe {
+            format!(
+                "{}",
+                csr_check(CsrConfig::ALLOW_UNTRUSTED_KEXTS.bits()) != 0
+            )
+        };
 
         let bold = Style::from(Color::Light(BaseColor::White));
         let bold = bold.combine(Effect::Bold);
