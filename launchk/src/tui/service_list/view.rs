@@ -29,6 +29,7 @@ use cursive::direction::Direction;
 use std::cmp::Ordering;
 use std::process::Command;
 use std::rc::Rc;
+use crate::tui::service_list::list_item::ServiceListItem;
 
 lazy_static! {
     static ref EDITOR: &'static str = option_env!("EDITOR").unwrap_or("vim");
@@ -50,48 +51,6 @@ async fn poll_running_jobs(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<C
         *write = list_all();
 
         cb_sink.send(Box::new(Cursive::noop)).unwrap();
-    }
-}
-
-#[derive(Debug)]
-pub struct ServiceListItem {
-    name: String,
-    entry_info: LaunchdEntryInfo,
-    job_type_filter: JobTypeFilter,
-}
-
-impl TableListItem for ServiceListItem {
-    fn as_row(&self) -> Vec<String> {
-        let session_type = self.entry_info.limit_load_to_session_type.to_string();
-
-        let entry_type = self
-            .entry_info
-            .entry_config
-            .borrow()
-            .as_ref()
-            .map(|ec| format!("{}/{}", ec.entry_location, ec.entry_type))
-            .unwrap_or("-".to_string());
-
-        let pid =
-            if self.entry_info.pid > 0 && self.job_type_filter.intersects(JobTypeFilter::LOADED) {
-                format!("{}", self.entry_info.pid)
-            } else {
-                "-".to_string()
-            };
-
-        let loaded = if self.job_type_filter.intersects(JobTypeFilter::LOADED) {
-            "✔"
-        } else {
-            "✘"
-        };
-
-        vec![
-            self.name.clone(),
-            session_type,
-            entry_type,
-            pid,
-            loaded.to_string(),
-        ]
     }
 }
 
@@ -254,7 +213,7 @@ impl ServiceListView {
 
                 if exit.success() {
                     Ok(Some(OmniboxCommand::Prompt(
-                        format!("Unload {}?", name),
+                        format!("Reload {}?", name),
                         vec![OmniboxCommand::Unload, OmniboxCommand::Load],
                     )))
                 } else {

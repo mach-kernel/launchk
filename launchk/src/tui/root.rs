@@ -5,7 +5,7 @@ use tokio::runtime::Handle;
 use tokio::time::interval;
 
 use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxView};
-use crate::tui::service_list::ServiceListView;
+use crate::tui::service_list::view::ServiceListView;
 use crate::tui::sysinfo::SysInfo;
 use cursive::event::{Event, EventResult, Key};
 use cursive::traits::{Resizable, Scrollable};
