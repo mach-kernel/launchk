@@ -1,15 +1,17 @@
-use crate::tui::table::table_headers::TableHeaders;
-use cursive::event::{Event, EventResult};
-use cursive::traits::{Resizable, Scrollable};
-use cursive::view::ViewWrapper;
-use cursive::views::{LinearLayout, ResizedView, ScrollView, SelectView};
-use cursive::{Vec2, View, XY};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
+
+use cursive::event::{Event, EventResult};
+use cursive::traits::{Resizable, Scrollable};
+use cursive::view::ViewWrapper;
+use cursive::views::{LinearLayout, ResizedView, ScrollView, SelectView};
+use cursive::{Vec2, View, XY};
+
+use crate::tui::table::table_headers::TableHeaders;
 
 pub trait TableListItem {
     fn as_row(&self) -> Vec<String>;

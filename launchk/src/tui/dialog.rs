@@ -1,9 +1,11 @@
+use std::sync::mpsc::Sender;
+
+use cursive::views::{Dialog, TextView};
+use cursive::Cursive;
+
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::view::OmniboxEvent;
 use crate::tui::root::CbSinkMessage;
-use cursive::views::{Dialog, TextView};
-use cursive::Cursive;
-use std::sync::mpsc::Sender;
 
 /// The XPC error key sometimes contains information that is not necessarily a failure,
 /// so let's just call it "Notice" until we figure out what to do next?

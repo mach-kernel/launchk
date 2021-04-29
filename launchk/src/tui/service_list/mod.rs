@@ -1,2 +1,2 @@
-pub mod view;
 mod list_item;
+pub mod view;

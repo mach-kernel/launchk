@@ -1,35 +1,29 @@
-use cursive::view::ViewWrapper;
-
-use cursive::{Cursive, View, XY};
-
+use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::collections::HashSet;
-
+use std::process::Command;
+use std::rc::Rc;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, RwLock};
-
 use std::time::Duration;
-use tokio::runtime::Handle;
 
+use cursive::direction::Direction;
+use cursive::view::ViewWrapper;
+use cursive::{Cursive, View, XY};
+
+use tokio::runtime::Handle;
 use tokio::time::interval;
 
 use crate::launchd::config::LABEL_TO_ENTRY_CONFIG;
+use crate::launchd::job_type_filter::JobTypeFilter;
+use crate::launchd::query::{find_entry_info, list_all, load, unload};
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::state::OmniboxState;
 use crate::tui::omnibox::subscribed_view::{OmniboxResult, OmniboxSubscriber};
 use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxMode};
 use crate::tui::root::CbSinkMessage;
-
-use crate::launchd::query::{find_entry_info, list_all, load, unload, LaunchdEntryInfo};
-use crate::tui::table::table_list_view::{TableListItem, TableListView};
-use std::borrow::Borrow;
-use std::cell::RefCell;
-
-use crate::launchd::job_type_filter::JobTypeFilter;
-use cursive::direction::Direction;
-use std::cmp::Ordering;
-use std::process::Command;
-use std::rc::Rc;
 use crate::tui::service_list::list_item::ServiceListItem;
+use crate::tui::table::table_list_view::TableListView;
 
 lazy_static! {
     static ref EDITOR: &'static str = option_env!("EDITOR").unwrap_or("vim");

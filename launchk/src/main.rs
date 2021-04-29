@@ -9,11 +9,13 @@ extern crate bitflags;
 
 extern crate plist;
 
-use crate::launchd::config::{init_label_map, LABEL_MAP_INIT};
-use crate::tui::root::RootLayout;
 use cursive::view::Resizable;
 use cursive::views::Panel;
 use cursive::Cursive;
+use std::process::exit;
+
+use crate::launchd::config::{init_label_map, LABEL_MAP_INIT};
+use crate::tui::root::RootLayout;
 
 mod launchd;
 mod tui;
@@ -42,4 +44,6 @@ fn main() {
 
     siv.add_layer(panel);
     siv.run();
+
+    exit(0);
 }

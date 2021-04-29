@@ -1,9 +1,10 @@
-use cursive::theme::{BaseColor, Color, Effect, Style};
-use cursive::{Printer, View, XY};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
+
+use cursive::theme::{BaseColor, Color, Effect, Style};
+use cursive::{Printer, View, XY};
 
 pub struct TableHeaders {
     columns: Vec<String>,

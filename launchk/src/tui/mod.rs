@@ -1,6 +1,6 @@
-pub mod root;
 mod dialog;
 mod omnibox;
+pub mod root;
+mod service_list;
 mod sysinfo;
 mod table;
-mod service_list;

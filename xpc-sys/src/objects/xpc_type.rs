@@ -1,7 +1,6 @@
 use crate::{
     _xpc_type_array, _xpc_type_bool, _xpc_type_dictionary, _xpc_type_double, _xpc_type_int64,
-    _xpc_type_s, _xpc_type_string, _xpc_type_uint64, mach_port_t, xpc_array_create, xpc_get_type,
-    xpc_object_t, xpc_type_t,
+    _xpc_type_s, _xpc_type_string, _xpc_type_uint64, xpc_get_type, xpc_object_t, xpc_type_t,
 };
 
 use crate::objects::xpc_object::XPCObject;

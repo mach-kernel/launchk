@@ -12,7 +12,6 @@ use cursive::theme::{BaseColor, Color, Effect, Style};
 use cursive::{Printer, Vec2, View, XY};
 
 use crate::launchd::job_type_filter::JobTypeFilter;
-
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::state::OmniboxState;
 

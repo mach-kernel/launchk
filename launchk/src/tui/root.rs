@@ -1,26 +1,25 @@
-use cursive::view::ViewWrapper;
-use cursive::views::{LinearLayout, NamedView, Panel};
-use cursive::{Cursive, Vec2, View};
-use tokio::runtime::Handle;
-use tokio::time::interval;
-
-use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxView};
-use crate::tui::service_list::view::ServiceListView;
-use crate::tui::sysinfo::SysInfo;
-use cursive::event::{Event, EventResult, Key};
-use cursive::traits::{Resizable, Scrollable};
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 
-use crate::tui::omnibox::subscribed_view::{
-    OmniboxResult, OmniboxSubscribedView, OmniboxSubscriber, Subscribable,
-};
+use cursive::event::{Event, EventResult, Key};
+use cursive::traits::{Resizable, Scrollable};
+use cursive::view::ViewWrapper;
+use cursive::views::{LinearLayout, NamedView, Panel};
+use cursive::{Cursive, Vec2, View};
+
+use tokio::runtime::Handle;
+use tokio::time::interval;
 
 use crate::tui::dialog;
 use crate::tui::omnibox::command::OmniboxCommand;
-use std::collections::VecDeque;
-use std::process::exit;
+use crate::tui::omnibox::subscribed_view::{
+    OmniboxResult, OmniboxSubscribedView, OmniboxSubscriber, Subscribable,
+};
+use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxView};
+use crate::tui::service_list::view::ServiceListView;
+use crate::tui::sysinfo::SysInfo;
 
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 
@@ -36,6 +35,7 @@ pub struct RootLayout {
 
 #[derive(Debug)]
 enum RootLayoutChildren {
+    #[allow(dead_code)]
     SysInfo,
     Omnibox,
     ServiceList,
@@ -122,7 +122,8 @@ impl RootLayout {
         let recv = recv.unwrap();
         log::info!("[root/poll_omnibox]: {:?}", recv);
 
-        self.on_omnibox(recv.clone());
+        self.on_omnibox(recv.clone())
+            .expect("Root for effects only");
 
         // The Omnibox command is sent to the actively focused view
         let target = self
@@ -231,7 +232,6 @@ impl OmniboxSubscriber for RootLayout {
                 self.cbsink_channel
                     .send(Box::new(|s| {
                         s.quit();
-                        exit(0);
                     }))
                     .expect("Must quit");
                 Ok(None)

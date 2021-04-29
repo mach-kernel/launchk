@@ -1,9 +1,9 @@
+use std::cell::Cell;
+
 use cursive::theme::{BaseColor, Color, Effect, Style};
 use cursive::{Printer, Vec2, View, XY};
-use xpc_sys::rs_sysctlbyname;
-
-use std::cell::Cell;
 use xpc_sys::csr::{csr_check, CsrConfig};
+use xpc_sys::rs_sysctlbyname;
 
 pub struct SysInfo {
     current_size: Cell<XY<usize>>,
