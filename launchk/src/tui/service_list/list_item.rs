@@ -7,25 +7,25 @@ use crate::tui::table::table_list_view::TableListItem;
 #[derive(Debug)]
 pub struct ServiceListItem {
     pub name: String,
-    pub entry_info: LaunchdEntryStatus,
+    pub status: LaunchdEntryStatus,
     pub job_type_filter: JobTypeFilter,
 }
 
 impl TableListItem for ServiceListItem {
     fn as_row(&self) -> Vec<String> {
-        let session_type = self.entry_info.limit_load_to_session_type.to_string();
+        let session_type = self.status.limit_load_to_session_type.to_string();
 
         let entry_type = self
-            .entry_info
-            .entry_config
+            .status
+            .plist
             .borrow()
             .as_ref()
             .map(|ec| format!("{}/{}", ec.entry_location, ec.entry_type))
             .unwrap_or("-".to_string());
 
         let pid =
-            if self.entry_info.pid > 0 && self.job_type_filter.intersects(JobTypeFilter::LOADED) {
-                format!("{}", self.entry_info.pid)
+            if self.status.pid > 0 && self.job_type_filter.intersects(JobTypeFilter::LOADED) {
+                format!("{}", self.status.pid)
             } else {
                 "-".to_string()
             };

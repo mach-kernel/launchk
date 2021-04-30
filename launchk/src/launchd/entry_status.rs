@@ -16,7 +16,7 @@ lazy_static! {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LaunchdEntryStatus {
-    pub entry_config: Option<LaunchdPlist>,
+    pub plist: Option<LaunchdPlist>,
     pub limit_load_to_session_type: LimitLoadToSessionType,
     // So, there is a pid_t, but it's i32, and the XPC response has an i64?
     pub pid: i64,
@@ -27,7 +27,7 @@ impl Default for LaunchdEntryStatus {
     fn default() -> Self {
         LaunchdEntryStatus {
             limit_load_to_session_type: LimitLoadToSessionType::Unknown,
-            entry_config: None,
+            plist: None,
             pid: 0,
             tick: SystemTime::now(),
         }
@@ -78,7 +78,7 @@ fn build_entry_status<S: Into<String>>(label: S) -> LaunchdEntryStatus {
 
     LaunchdEntryStatus {
         limit_load_to_session_type,
-        entry_config,
+        plist: entry_config,
         pid,
         tick: SystemTime::now(),
     }
