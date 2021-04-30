@@ -3,20 +3,16 @@ use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
-use std::sync::Mutex;
 use xpc_sys::objects::xpc_object::XPCObject;
 use xpc_sys::objects::xpc_type;
 use xpc_sys::traits::xpc_pipeable::{XPCPipeResult, XPCPipeable};
 use xpc_sys::traits::xpc_value::TryXPCValue;
 
-use crate::launchd::plist::LaunchdPlist;
+use crate::launchd::entry_status::ENTRY_STATUS_CACHE;
 use std::iter::FromIterator;
-use std::time::{Duration, SystemTime};
 use xpc_sys::objects::xpc_dictionary::XPCDictionary;
 use xpc_sys::objects::xpc_error::XPCError;
-use xpc_sys::objects::xpc_type::{check_xpc_type, XPCType};
-use crate::launchd::entry_status::{ENTRY_STATUS_CACHE, LaunchdEntryStatus};
-
+use xpc_sys::objects::xpc_type::check_xpc_type;
 
 #[link(name = "c")]
 extern "C" {

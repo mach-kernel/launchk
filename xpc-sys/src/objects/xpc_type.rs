@@ -1,13 +1,13 @@
 use crate::{
     _xpc_type_array, _xpc_type_bool, _xpc_type_dictionary, _xpc_type_double, _xpc_type_int64,
-    _xpc_type_s, _xpc_type_string, _xpc_type_uint64, xpc_get_type, xpc_object_t, xpc_type_t,
-    xpc_type_get_name
+    _xpc_type_s, _xpc_type_string, _xpc_type_uint64, xpc_get_type, xpc_object_t, xpc_type_get_name,
+    xpc_type_t,
 };
 
-use crate::objects::xpc_object::XPCObject;
 use crate::objects::xpc_error::XPCError;
-use std::ffi::CStr;
 use crate::objects::xpc_error::XPCError::ValueError;
+use crate::objects::xpc_object::XPCObject;
+use std::ffi::CStr;
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

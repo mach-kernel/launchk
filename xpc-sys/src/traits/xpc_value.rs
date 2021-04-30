@@ -1,18 +1,18 @@
 use block::ConcreteBlock;
 use std::cell::RefCell;
-use std::rc::Rc;
 use std::ffi::CStr;
+use std::rc::Rc;
 
 use crate::objects::xpc_object::XPCObject;
 use crate::objects::xpc_type;
 use crate::{
     size_t, xpc_array_apply, xpc_bool_get_value, xpc_int64_get_value, xpc_object_t, xpc_retain,
-    xpc_string_get_string_ptr, xpc_type_get_name, xpc_uint64_get_value,
+    xpc_string_get_string_ptr, xpc_uint64_get_value,
 };
 
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::ValueError;
-use crate::objects::xpc_type::{XPCType, check_xpc_type};
+use crate::objects::xpc_type::check_xpc_type;
 
 /// Implement to get data out of xpc_type_t and into
 /// a Rust native data type

@@ -7,20 +7,19 @@ use std::sync::{Once, RwLock};
 
 use crate::launchd::job_type_filter::JobTypeFilter;
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
-use std::fs::{DirEntry, ReadDir, File};
+use std::fs::{DirEntry, File, ReadDir};
+use std::io::Read;
 use std::iter::FilterMap;
+use std::process::Command;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::runtime::Handle;
-use std::io::{Read, Write};
-use std::process::{Command, ExitStatus};
 
 pub static PLIST_MAP_INIT: Once = Once::new();
 
 lazy_static! {
     pub static ref LABEL_TO_ENTRY_CONFIG: RwLock<HashMap<String, LaunchdPlist>> =
         RwLock::new(HashMap::new());
-
     static ref EDITOR: &'static str = option_env!("EDITOR").unwrap_or("vim");
 }
 
@@ -258,22 +257,28 @@ pub fn for_label<S: Into<String>>(label: S) -> Option<LaunchdPlist> {
 /// help show contents for binary encoded files
 pub fn edit_and_replace(plist_meta: &LaunchdPlist) -> Result<(), String> {
     if plist_meta.readonly {
-        return Err("plist is read-only!".to_string())
+        return Err("plist is read-only!".to_string());
     }
 
-    let mut file = File::open(&plist_meta.plist_path).map_err(|_| "Couldn't read file".to_string())?;
+    let mut file =
+        File::open(&plist_meta.plist_path).map_err(|_| "Couldn't read file".to_string())?;
 
     // We want to write back in the correct format,
     // can't assume we can safely write XML everywhere?
     let mut magic_buf: [u8; 8] = [0; 8];
-    file.read_exact(&mut magic_buf).map_err(|_| "Couldn't read magic".to_string())?;
-    let is_binary = std::str::from_utf8(&magic_buf).map_err(|_| "Couldn't read magic".to_string())? == PLIST_MAGIC;
+    file.read_exact(&mut magic_buf)
+        .map_err(|_| "Couldn't read magic".to_string())?;
+    let is_binary = std::str::from_utf8(&magic_buf)
+        .map_err(|_| "Couldn't read magic".to_string())?
+        == PLIST_MAGIC;
 
     // plist -> validate with crate -> temp file
     let plist = plist::Value::from_file(&plist_meta.plist_path).map_err(|e| e.to_string())?;
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).expect("Must get ts");
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Must get ts");
     let temp_path = Path::new(TMP_DIR).join(format!("{}", now.as_secs()));
-    plist.to_file_xml(&temp_path);
+    plist.to_file_xml(&temp_path).map_err(|e| e.to_string())?;
 
     // Start $EDITOR
     let exit = Command::new(*EDITOR)
