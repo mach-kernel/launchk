@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::HashSet;
-use std::process::Command;
 use std::rc::Rc;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, RwLock};
@@ -14,9 +13,10 @@ use cursive::{Cursive, View, XY};
 use tokio::runtime::Handle;
 use tokio::time::interval;
 
-use crate::launchd::config::LABEL_TO_ENTRY_CONFIG;
+use crate::launchd::entry_status::get_entry_status;
 use crate::launchd::job_type_filter::JobTypeFilter;
-use crate::launchd::query::{find_entry_info, list_all, load, unload};
+use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};
+use crate::launchd::query::{list_all, load, unload};
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::state::OmniboxState;
 use crate::tui::omnibox::subscribed_view::{OmniboxResult, OmniboxSubscriber};
@@ -24,10 +24,6 @@ use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxMode};
 use crate::tui::root::CbSinkMessage;
 use crate::tui::service_list::list_item::ServiceListItem;
 use crate::tui::table::table_list_view::TableListView;
-
-lazy_static! {
-    static ref EDITOR: &'static str = option_env!("EDITOR").unwrap_or("vim");
-}
 
 /// Polls XPC for job list
 async fn poll_running_jobs(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSinkMessage>) {
@@ -53,19 +49,16 @@ pub struct ServiceListView {
     table_list_view: TableListView<ServiceListItem>,
     label_filter: RefCell<String>,
     job_type_filter: RefCell<JobTypeFilter>,
-    cb_sink: Sender<CbSinkMessage>,
 }
 
 impl ServiceListView {
     pub fn new(runtime_handle: &Handle, cb_sink: Sender<CbSinkMessage>) -> Self {
         let arc_svc = Arc::new(RwLock::new(HashSet::new()));
         let ref_clone = arc_svc.clone();
-        let cb_sink_clone = cb_sink.clone();
 
-        runtime_handle.spawn(async move { poll_running_jobs(ref_clone, cb_sink_clone).await });
+        runtime_handle.spawn(async move { poll_running_jobs(ref_clone, cb_sink).await });
 
         Self {
-            cb_sink,
             running_jobs: arc_svc.clone(),
             label_filter: RefCell::new("".into()),
             job_type_filter: RefCell::new(JobTypeFilter::launchk_default()),
@@ -101,11 +94,11 @@ impl ServiceListView {
                     return None;
                 }
 
-                let entry_info = find_entry_info(label);
+                let entry_info = get_entry_status(label);
                 let is_loaded = running.contains(label);
 
                 let entry_job_type_filter = entry_info
-                    .entry_config
+                    .plist
                     .as_ref()
                     .map(|ec| ec.job_type_filter(is_loaded))
                     .unwrap_or(if is_loaded {
@@ -121,7 +114,7 @@ impl ServiceListView {
 
                 Some(ServiceListItem {
                     name: label.clone(),
-                    entry_info,
+                    status: entry_info,
                     job_type_filter: entry_job_type_filter,
                 })
             })
@@ -179,51 +172,31 @@ impl ServiceListView {
         match cmd {
             OmniboxCommand::Edit => {
                 let ServiceListItem {
-                    name, entry_info, ..
+                    name,
+                    status: entry_info,
+                    ..
                 } = &*self.get_active_list_item()?;
 
-                let entry_config = entry_info
-                    .entry_config
+                let plist = entry_info
+                    .plist
                     .as_ref()
                     .ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
 
-                if entry_config.readonly {
-                    return Err(OmniboxError::CommandError(format!(
-                        "{} is read-only",
-                        entry_config.plist_path
-                    )));
-                }
-
-                let exit = Command::new(*EDITOR)
-                    .arg(&entry_config.plist_path)
-                    .status()
-                    .map_err(|e| {
-                        OmniboxError::CommandError(format!("{} failed: {}", *EDITOR, e.to_string()))
-                    })?;
-
-                self.cb_sink
-                    .send(Box::new(Cursive::clear))
-                    .expect("Must clear");
-
-                if exit.success() {
-                    Ok(Some(OmniboxCommand::Prompt(
-                        format!("Reload {}?", name),
-                        vec![OmniboxCommand::Unload, OmniboxCommand::Load],
-                    )))
-                } else {
-                    Err(OmniboxError::CommandError(format!(
-                        "{} didn't exit 0",
-                        *EDITOR
-                    )))
-                }
+                edit_and_replace(plist).map_err(OmniboxError::CommandError)?;
+                Ok(Some(OmniboxCommand::Prompt(
+                    format!("Reload {}?", name),
+                    vec![OmniboxCommand::Unload, OmniboxCommand::Load],
+                )))
             }
             OmniboxCommand::Load | OmniboxCommand::Unload => {
                 let ServiceListItem {
-                    name, entry_info, ..
+                    name,
+                    status: entry_info,
+                    ..
                 } = &*self.get_active_list_item()?;
 
-                let entry_config = entry_info
-                    .entry_config
+                let plist = entry_info
+                    .plist
                     .as_ref()
                     .ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
 
@@ -233,7 +206,7 @@ impl ServiceListView {
                     unload
                 };
 
-                xpc_query(name, &entry_config.plist_path)
+                xpc_query(name, &plist.plist_path)
                     .map(|_| None)
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
             }

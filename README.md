@@ -14,7 +14,7 @@ Should work on macOS 10.10+ according to the availability sec. [in the docs](htt
 - Filter by system (/System/Library/), "global" (/Library), user (~/) `LaunchAgents` and `LaunchDaemons`
 - fsnotify detection for new plists added to above directories
 - `:load/:unload` -> `launchctl load/unload`
-- `:edit` -> Open plist in `$EDITOR`, defaulting to `vim` (TODO binary plist support)
+- `:edit` -> Open plist in `$EDITOR`, defaulting to `vim`. Supports binary plists -> shown as XML for edit, then marshalled back into binary format on save.
 
 ### xpc-sys crate
 

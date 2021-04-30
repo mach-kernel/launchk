@@ -14,7 +14,7 @@ use cursive::views::Panel;
 use cursive::Cursive;
 use std::process::exit;
 
-use crate::launchd::config::{init_label_map, LABEL_MAP_INIT};
+use crate::launchd::plist::{init_plist_map, PLIST_MAP_INIT};
 use crate::tui::root::RootLayout;
 
 mod launchd;
@@ -29,7 +29,7 @@ fn main() {
         .expect("Must build tokio runtime");
 
     // Cache launchd job plists, spawn fsnotify to keep up with changes
-    LABEL_MAP_INIT.call_once(|| init_label_map(runtime.handle()));
+    PLIST_MAP_INIT.call_once(|| init_plist_map(runtime.handle()));
 
     let mut siv: Cursive = cursive::default();
     siv.load_toml(include_str!("tui/style.toml"))

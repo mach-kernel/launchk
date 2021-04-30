@@ -3,19 +3,16 @@ use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
-use std::sync::Mutex;
 use xpc_sys::objects::xpc_object::XPCObject;
 use xpc_sys::objects::xpc_type;
 use xpc_sys::traits::xpc_pipeable::{XPCPipeResult, XPCPipeable};
 use xpc_sys::traits::xpc_value::TryXPCValue;
 
-use crate::launchd::config::LaunchdEntryConfig;
+use crate::launchd::entry_status::ENTRY_STATUS_CACHE;
 use std::iter::FromIterator;
-use std::time::{Duration, SystemTime};
 use xpc_sys::objects::xpc_dictionary::XPCDictionary;
 use xpc_sys::objects::xpc_error::XPCError;
-
-const ENTRY_INFO_QUERY_TTL: u64 = 15; // seconds
+use xpc_sys::objects::xpc_type::check_xpc_type;
 
 #[link(name = "c")]
 extern "C" {
@@ -23,8 +20,6 @@ extern "C" {
 }
 
 lazy_static! {
-    static ref ENTRY_INFO_CACHE: Mutex<HashMap<String, LaunchdEntryInfo>> =
-        Mutex::new(HashMap::new());
     static ref IS_ROOT: bool = unsafe { geteuid() } == 0;
 }
 
@@ -70,32 +65,9 @@ impl TryFrom<XPCObject> for LimitLoadToSessionType {
     type Error = XPCError;
 
     fn try_from(value: XPCObject) -> Result<Self, Self::Error> {
-        if value.xpc_type() != *xpc_type::String {
-            return Err(XPCError::ValueError("xpc_type must be string".to_string()));
-        }
-
+        check_xpc_type(&value, &xpc_type::String)?;
         let string: String = value.xpc_value().unwrap();
         Ok(string.into())
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct LaunchdEntryInfo {
-    pub entry_config: Option<LaunchdEntryConfig>,
-    pub limit_load_to_session_type: LimitLoadToSessionType,
-    // So, there is a pid_t, but it's i32, and the XPC response has an i64?
-    pub pid: i64,
-    tick: SystemTime,
-}
-
-impl Default for LaunchdEntryInfo {
-    fn default() -> Self {
-        LaunchdEntryInfo {
-            limit_load_to_session_type: LimitLoadToSessionType::Unknown,
-            entry_config: None,
-            pid: 0,
-            tick: SystemTime::now(),
-        }
     }
 }
 
@@ -145,56 +117,6 @@ pub fn list_all() -> HashSet<String> {
     HashSet::from_iter(everything)
 }
 
-/// Get more information about a unit from its label
-pub fn find_entry_info<S: Into<String>>(label: S) -> LaunchdEntryInfo {
-    let label_string = label.into();
-    let mut cache = ENTRY_INFO_CACHE.try_lock().unwrap();
-
-    if cache.contains_key(label_string.as_str()) {
-        let item = cache.get(label_string.as_str()).unwrap().clone();
-
-        if item.tick.elapsed().unwrap() > Duration::from_secs(ENTRY_INFO_QUERY_TTL) {
-            cache.remove(label_string.as_str());
-            drop(cache);
-            return find_entry_info(label_string);
-        }
-
-        return item;
-    }
-
-    let meta = build_entry_info(&label_string);
-    cache.insert(label_string, meta.clone());
-    meta
-}
-
-fn build_entry_info<S: Into<String>>(label: S) -> LaunchdEntryInfo {
-    let label_string = label.into();
-    let response = find_in_all(label_string.clone());
-
-    let pid: i64 = response
-        .as_ref()
-        .map_err(|e| e.clone())
-        .and_then(|r| r.get(&["service", "PID"]))
-        .and_then(|o| o.xpc_value())
-        .unwrap_or(0);
-
-    let limit_load_to_session_type = response
-        .as_ref()
-        .map_err(|e| e.clone())
-        .and_then(|r| r.get(&["service", "LimitLoadToSessionType"]))
-        .and_then(|o| o.try_into())
-        .unwrap_or(LimitLoadToSessionType::Unknown);
-
-    let entry_config = crate::launchd::config::for_entry(label_string.clone());
-
-    LaunchdEntryInfo {
-        limit_load_to_session_type,
-        entry_config,
-        pid,
-        tick: SystemTime::now(),
-    }
-}
-
 pub fn load<S: Into<String>>(label: S, plist_path: S) -> XPCPipeResult {
     let mut message: HashMap<&str, XPCObject> = from_msg(&LOAD_PATHS);
     let label_string = label.into();
@@ -214,7 +136,7 @@ pub fn load<S: Into<String>>(label: S, plist_path: S) -> XPCPipeResult {
 
     let message: XPCObject = message.into();
 
-    ENTRY_INFO_CACHE
+    ENTRY_STATUS_CACHE
         .lock()
         .expect("Must invalidate")
         .remove(&label_string);
@@ -241,7 +163,7 @@ pub fn unload<S: Into<String>>(label: S, plist_path: S) -> XPCPipeResult {
 
     let message: XPCObject = message.into();
 
-    ENTRY_INFO_CACHE
+    ENTRY_STATUS_CACHE
         .lock()
         .expect("Must invalidate")
         .remove(&label_string);

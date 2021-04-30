@@ -7,18 +7,31 @@ use std::sync::{Once, RwLock};
 
 use crate::launchd::job_type_filter::JobTypeFilter;
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
-use std::fs::{DirEntry, ReadDir};
+use std::fs::{DirEntry, File, ReadDir};
+use std::io::Read;
 use std::iter::FilterMap;
+use std::process::Command;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::runtime::Handle;
 
-pub static LABEL_MAP_INIT: Once = Once::new();
+pub static PLIST_MAP_INIT: Once = Once::new();
 
 lazy_static! {
-    pub static ref LABEL_TO_ENTRY_CONFIG: RwLock<HashMap<String, LaunchdEntryConfig>> =
+    pub static ref LABEL_TO_ENTRY_CONFIG: RwLock<HashMap<String, LaunchdPlist>> =
         RwLock::new(HashMap::new());
+    static ref EDITOR: &'static str = option_env!("EDITOR").unwrap_or("vim");
 }
+
+// TODO: fall back on /tmp
+static TMP_DIR: &str = env!("TMPDIR");
+
+/*
+od -xc binary.plist
+0000000      7062    696c    7473    3030
+            b   p   l   i   s   t   0   0
+*/
+static PLIST_MAGIC: &str = "bplist00";
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum LaunchdEntryType {
@@ -39,7 +52,7 @@ pub enum LaunchdEntryLocation {
     /// macOS system provided agent or daemon
     System,
     /// "Administrator provided" agent or daemon
-    /// TODO: Global? Local? What's right?
+    /// TODO: is 'global' appropriate?
     Global,
     /// User provided agent
     User,
@@ -52,14 +65,15 @@ impl fmt::Display for LaunchdEntryLocation {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct LaunchdEntryConfig {
+pub struct LaunchdPlist {
     pub entry_type: LaunchdEntryType,
     pub entry_location: LaunchdEntryLocation,
     pub plist_path: String,
     pub readonly: bool,
 }
 
-impl LaunchdEntryConfig {
+// TODO: This should be somewhere else
+impl LaunchdPlist {
     pub fn job_type_filter(&self, is_loaded: bool) -> JobTypeFilter {
         let mut jtf = JobTypeFilter::default();
 
@@ -130,7 +144,7 @@ async fn fsnotify_subscriber() {
     }
 }
 
-fn build_label_map_entry(plist_path: DirEntry) -> Option<(String, LaunchdEntryConfig)> {
+fn build_label_map_entry(plist_path: DirEntry) -> Option<(String, LaunchdPlist)> {
     let path = plist_path.path();
     let path_string = path.to_string_lossy().to_string();
 
@@ -160,7 +174,7 @@ fn build_label_map_entry(plist_path: DirEntry) -> Option<(String, LaunchdEntryCo
 
     Some((
         label?.to_string(),
-        LaunchdEntryConfig {
+        LaunchdPlist {
             entry_location,
             entry_type,
             plist_path: path_string,
@@ -211,7 +225,7 @@ fn insert_plists(plists: impl Iterator<Item = DirEntry>) {
 /// Unsure if this is overkill, since the filenames
 /// usually match the label property. Still looking for
 /// a way to do dumpstate, dumpjpcategory without parsing the string
-pub fn init_label_map(runtime_handle: &Handle) {
+pub fn init_plist_map(runtime_handle: &Handle) {
     let dirs = [
         USER_LAUNCH_AGENTS,
         GLOBAL_LAUNCH_AGENTS,
@@ -232,8 +246,59 @@ pub fn init_label_map(runtime_handle: &Handle) {
     runtime_handle.spawn(async { fsnotify_subscriber().await });
 }
 
-/// Get plist + fs meta for an entry by its label
-pub fn for_entry<S: Into<String>>(label: S) -> Option<LaunchdEntryConfig> {
+/// Get plist for a label
+pub fn for_label<S: Into<String>>(label: S) -> Option<LaunchdPlist> {
     let label_map = LABEL_TO_ENTRY_CONFIG.read().ok()?;
     label_map.get(label.into().as_str()).map(|c| c.clone())
+}
+
+/// Given a LaunchdPlist, start editor pointing to temporary file
+/// and replace on exit. Uses plist crate to validate changes and
+/// help show contents for binary encoded files
+pub fn edit_and_replace(plist_meta: &LaunchdPlist) -> Result<(), String> {
+    if plist_meta.readonly {
+        return Err("plist is read-only!".to_string());
+    }
+
+    let mut file =
+        File::open(&plist_meta.plist_path).map_err(|_| "Couldn't read file".to_string())?;
+
+    // We want to write back in the correct format,
+    // can't assume we can safely write XML everywhere?
+    let mut magic_buf: [u8; 8] = [0; 8];
+    file.read_exact(&mut magic_buf)
+        .map_err(|_| "Couldn't read magic".to_string())?;
+    let is_binary = std::str::from_utf8(&magic_buf)
+        .map_err(|_| "Couldn't read magic".to_string())?
+        == PLIST_MAGIC;
+
+    // plist -> validate with crate -> temp file
+    let plist = plist::Value::from_file(&plist_meta.plist_path).map_err(|e| e.to_string())?;
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Must get ts");
+    let temp_path = Path::new(TMP_DIR).join(format!("{}", now.as_secs()));
+    plist.to_file_xml(&temp_path).map_err(|e| e.to_string())?;
+
+    // Start $EDITOR
+    let exit = Command::new(*EDITOR)
+        .arg(&temp_path)
+        .status()
+        .map_err(|e| format!("{} failed: {}", *EDITOR, e.to_string()))?;
+
+    if !exit.success() {
+        return Err(format!("{} did not exit successfully", *EDITOR));
+    }
+
+    // temp file -> validate with crate -> original
+    let plist = plist::Value::from_file(&temp_path).map_err(|e| e.to_string())?;
+    let writer = if is_binary {
+        plist::Value::to_file_binary
+    } else {
+        plist::Value::to_file_xml
+    };
+
+    writer(&plist, &plist_meta.plist_path).map_err(|e| e.to_string())?;
+
+    Ok(())
 }
