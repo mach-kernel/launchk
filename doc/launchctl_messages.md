@@ -315,3 +315,20 @@ As root:
 	}
 ```
 
+Using a `gui/` domain target:
+
+```
+<dictionary: 0x100404080> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0x199d6ee9dd75252d>: 3
+	"handle" => <uint64: 0x199d6ee9dd6a452d>: 501
+	"routine" => <uint64: 0x199d6ee9dd47952d>: 808
+	"name" => <string: 0x1004042c0> { length = 17, contents = "com.docker.vmnetd" }
+	"type" => <uint64: 0x199d6ee9dd75952d>: 8
+	"names" => <array: 0x100404320> { count = 1, capacity = 8, contents =
+		0: <string: 0x1004043e0> { length = 17, contents = "com.docker.vmnetd" }
+	}
+```
+
+1: System
+2: User
+8: Login (GUI)
