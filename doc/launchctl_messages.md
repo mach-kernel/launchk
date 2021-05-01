@@ -281,3 +281,37 @@ As root:
 		0: <string: 0x100404520> { length = 24, contents = "homebrew.mxcl.postgresql" }
 	}
 ```
+
+#### `launchctl disable system/com.apple.FontWorker`
+
+- Must run as root
+- Type `1`
+
+```
+<dictionary: 0x100204480> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xe11a6f0157820409>: 3
+	"handle" => <uint64: 0xe11a6f0157823409>: 0
+	"routine" => <uint64: 0xe11a6f0157b0a409>: 809
+	"name" => <string: 0x100204640> { length = 20, contents = "com.apple.FontWorker" }
+	"type" => <uint64: 0xe11a6f0157822409>: 1
+	"names" => <array: 0x1002046a0> { count = 1, capacity = 8, contents =
+		0: <string: 0x100204760> { length = 20, contents = "com.apple.FontWorker" }
+	}
+```
+
+#### `launchctl enable system/com.apple.FontWorker`
+
+- This has a different `LimitLoadToSessionType` set as background, wanted to see if `type` would change
+
+```
+<dictionary: 0x100404140> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xf489c28b42fa66cd>: 3
+	"handle" => <uint64: 0xf489c28b42fa56cd>: 0
+	"routine" => <uint64: 0xf489c28b42c8d6cd>: 808
+	"name" => <string: 0x100404310> { length = 20, contents = "com.apple.FontWorker" }
+	"type" => <uint64: 0xf489c28b42fa46cd>: 1
+	"names" => <array: 0x100404370> { count = 1, capacity = 8, contents =
+		0: <string: 0x1004045b0> { length = 20, contents = "com.apple.FontWorker" }
+	}
+```
+

@@ -154,18 +154,18 @@ fn build_label_map_entry(plist_path: DirEntry) -> Option<(String, LaunchdPlist)>
         .and_then(|d| d.get("Label"))
         .and_then(|v| v.as_string());
 
-    let entry_type = if path_string.contains(ADMIN_LAUNCH_DAEMONS)
-        || path_string.contains(GLOBAL_LAUNCH_DAEMONS)
+    let entry_type = if path_string.starts_with(ADMIN_LAUNCH_DAEMONS)
+        || path_string.starts_with(GLOBAL_LAUNCH_DAEMONS)
     {
         LaunchdEntryType::Daemon
     } else {
         LaunchdEntryType::Agent
     };
 
-    let entry_location = if path_string.contains(USER_LAUNCH_AGENTS) {
+    let entry_location = if path_string.starts_with(USER_LAUNCH_AGENTS) {
         LaunchdEntryLocation::User
-    } else if path_string.contains(GLOBAL_LAUNCH_AGENTS)
-        || path_string.contains(ADMIN_LAUNCH_DAEMONS)
+    } else if path_string.starts_with(GLOBAL_LAUNCH_AGENTS)
+        || path_string.starts_with(ADMIN_LAUNCH_DAEMONS)
     {
         LaunchdEntryLocation::Global
     } else {
