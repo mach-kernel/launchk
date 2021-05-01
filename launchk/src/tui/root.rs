@@ -228,6 +228,13 @@ impl ViewWrapper for RootLayout {
 impl OmniboxSubscriber for RootLayout {
     fn on_omnibox(&mut self, cmd: OmniboxEvent) -> OmniboxResult {
         match cmd {
+            OmniboxEvent::Command(OmniboxCommand::Chain(cmds)) => {
+                cmds
+                    .iter()
+                    .try_for_each(|c| self.omnibox_tx.send(OmniboxEvent::Command(c.clone())))
+                    .expect("Must send commands");
+                Ok(None)
+            }
             OmniboxEvent::Command(OmniboxCommand::Quit) => {
                 self.cbsink_channel
                     .send(Box::new(|s| {
@@ -237,7 +244,7 @@ impl OmniboxSubscriber for RootLayout {
                 Ok(None)
             }
             // Triggered when toggling to idle
-            OmniboxEvent::FocusServiceList => {
+            OmniboxEvent::Command(OmniboxCommand::FocusServiceList) => {
                 self.layout
                     .set_focus_index(RootLayoutChildren::ServiceList as usize)
                     .expect("Must focus SL");

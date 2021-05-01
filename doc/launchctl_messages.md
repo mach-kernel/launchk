@@ -250,3 +250,34 @@ As root:
 	"domain-port" => <mach send right: 0x100604540> { name = 1799, right = send, urefs = 5 }
 ```
 
+#### `launchctl disable user/501/homebrew.mxcl.postgresql`
+
+- postgresql runs in the `Aqua` domain
+- Interesting that both `name` and `names` are sent!
+
+```
+<dictionary: 0x100404340> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0x2d24e480c52e0073>: 3
+	"handle" => <uint64: 0x2d24e480c5316073>: 501
+	"routine" => <uint64: 0x2d24e480c51ca073>: 809
+	"name" => <string: 0x100404440> { length = 24, contents = "homebrew.mxcl.postgresql" }
+	"type" => <uint64: 0x2d24e480c52e1073>: 2
+	"names" => <array: 0x1004044a0> { count = 1, capacity = 8, contents =
+		0: <string: 0x100404560> { length = 24, contents = "homebrew.mxcl.postgresql" }
+	}
+```
+
+
+#### `launchctl enable user/501/homebrew.mxcl.postgresql`
+
+```
+<dictionary: 0x1004042b0> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xd49d6ee83bb4aaf3>: 3
+	"handle" => <uint64: 0xd49d6ee83babcaf3>: 501
+	"routine" => <uint64: 0xd49d6ee83b861af3>: 808
+	"name" => <string: 0x1004043f0> { length = 24, contents = "homebrew.mxcl.postgresql" }
+	"type" => <uint64: 0xd49d6ee83bb4baf3>: 2
+	"names" => <array: 0x100404450> { count = 1, capacity = 8, contents =
+		0: <string: 0x100404520> { length = 24, contents = "homebrew.mxcl.postgresql" }
+	}
+```

@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::rc::Rc;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Sender};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
@@ -45,6 +45,7 @@ async fn poll_running_jobs(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<C
 }
 
 pub struct ServiceListView {
+    cb_sink: Sender<CbSinkMessage>,
     running_jobs: Arc<RwLock<HashSet<String>>>,
     table_list_view: TableListView<ServiceListItem>,
     label_filter: RefCell<String>,
@@ -55,10 +56,12 @@ impl ServiceListView {
     pub fn new(runtime_handle: &Handle, cb_sink: Sender<CbSinkMessage>) -> Self {
         let arc_svc = Arc::new(RwLock::new(HashSet::new()));
         let ref_clone = arc_svc.clone();
+        let cb_sink_clone = cb_sink.clone();
 
-        runtime_handle.spawn(async move { poll_running_jobs(ref_clone, cb_sink).await });
+        runtime_handle.spawn(async move { poll_running_jobs(ref_clone, cb_sink_clone).await });
 
         Self {
+            cb_sink,
             running_jobs: arc_svc.clone(),
             label_filter: RefCell::new("".into()),
             job_type_filter: RefCell::new(JobTypeFilter::launchk_default()),
@@ -183,9 +186,13 @@ impl ServiceListView {
                     .ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
 
                 edit_and_replace(plist).map_err(OmniboxError::CommandError)?;
+
+                // Clear term / display issues after editor exit
+                self.cb_sink.send(Box::new(Cursive::clear)).expect("Must clear");
+
                 Ok(Some(OmniboxCommand::Prompt(
                     format!("Reload {}?", name),
-                    vec![OmniboxCommand::Unload, OmniboxCommand::Load],
+                    vec![OmniboxCommand::Reload],
                 )))
             }
             OmniboxCommand::Load | OmniboxCommand::Unload => {
@@ -209,7 +216,8 @@ impl ServiceListView {
                 xpc_query(name, &plist.plist_path)
                     .map(|_| None)
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
-            }
+            },
+            OmniboxCommand::Reload => Ok(Some(OmniboxCommand::Chain(vec![OmniboxCommand::Unload, OmniboxCommand::Load]))),
             _ => Ok(None),
         }
     }
@@ -236,7 +244,6 @@ impl OmniboxSubscriber for ServiceListView {
         match event {
             OmniboxEvent::StateUpdate(state) => self.handle_state_update(state),
             OmniboxEvent::Command(cmd) => self.handle_command(cmd),
-            _ => Ok(None),
         }
     }
 }

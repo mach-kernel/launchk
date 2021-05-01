@@ -2,11 +2,14 @@ use std::fmt;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum OmniboxCommand {
+    Chain(Vec<OmniboxCommand>),
     Load,
     Unload,
+    Reload,
     Edit,
     // (message, on ok)
     Prompt(String, Vec<OmniboxCommand>),
+    FocusServiceList,
     Quit,
 }
 
@@ -16,12 +19,13 @@ impl fmt::Display for OmniboxCommand {
     }
 }
 
-pub static OMNIBOX_COMMANDS: [(OmniboxCommand, &str); 4] = [
+pub static OMNIBOX_COMMANDS: [(OmniboxCommand, &str); 5] = [
     (OmniboxCommand::Load, "▶️  Load highlighted job"),
     (OmniboxCommand::Unload, "⏏️  Unload highlighted job"),
     (
         OmniboxCommand::Edit,
         "✍️  Edit plist with $EDITOR, then reload job",
     ),
+    (OmniboxCommand::Reload ,"🔄  Reload highlighted job"),
     (OmniboxCommand::Quit, "🚪 see ya!"),
 ];

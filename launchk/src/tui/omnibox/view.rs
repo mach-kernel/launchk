@@ -15,11 +15,10 @@ use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::state::OmniboxState;
 
-/// Consumers impl OmniboxSubscriber receive these commands
+/// Consumers impl OmniboxSubscriber receive these events
 /// via a channel in a wrapped view
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum OmniboxEvent {
-    FocusServiceList,
     StateUpdate(OmniboxState),
     Command(OmniboxCommand),
 }
@@ -62,7 +61,7 @@ async fn tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>) {
 
         let new = match *mode {
             OmniboxMode::CommandFilter | OmniboxMode::CommandConfirm(_) => {
-                read.with_new(Some(OmniboxMode::Idle), None, Some("".to_string()), None)
+                read.with_new(Some(OmniboxMode::Idle),  None, Some("".to_string()), None)
             }
             _ => read.with_new(Some(OmniboxMode::Idle), None, None, None),
         };
@@ -70,14 +69,12 @@ async fn tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>) {
         drop(read);
         let mut write = state.write().expect("Must write");
 
-        let out = [
-            tx.send(OmniboxEvent::FocusServiceList),
-            tx.send(OmniboxEvent::StateUpdate(new.clone())),
-        ];
-
-        for msg in out.iter() {
-            msg.as_ref().expect("Must send");
-        }
+        [
+            OmniboxEvent::Command(OmniboxCommand::FocusServiceList),
+            OmniboxEvent::StateUpdate(new.clone()),
+        ].iter()
+            .try_for_each(|e| tx.send(e.clone()))
+            .expect("Must send events");
 
         log::debug!("[omnibox/tick]: New state: {:?}", &new);
 
@@ -359,13 +356,13 @@ impl View for OmniboxView {
         let new_state = match (event, mode) {
             (Event::CtrlChar('u'), _) => {
                 self.tx
-                    .send(OmniboxEvent::FocusServiceList)
+                    .send(OmniboxEvent::Command(OmniboxCommand::FocusServiceList))
                     .expect("Must focus");
                 Some(OmniboxState::default())
             }
             (Event::Key(Key::Esc), _) => {
                 self.tx
-                    .send(OmniboxEvent::FocusServiceList)
+                    .send(OmniboxEvent::Command(OmniboxCommand::FocusServiceList))
                     .expect("Must focus");
                 Some(state.with_new(Some(OmniboxMode::Idle), None, Some("".to_string()), None))
             }

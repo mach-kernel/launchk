@@ -32,10 +32,11 @@ pub fn show_prompt(
     let cl = move |siv: &mut Cursive| {
         let ask = Dialog::around(TextView::new(prompt.clone()))
             .button("Yes", move |s| {
-                for cmd in &commands {
-                    tx.send(OmniboxEvent::Command(cmd.clone()))
-                        .expect("Must send command");
-                }
+                commands
+                    .iter()
+                    .try_for_each(|c| tx.send(OmniboxEvent::Command(c.clone())))
+                    .expect("Must sent commands");
+
                 s.pop_layer();
             })
             .button("No", |s| {
