@@ -4,18 +4,17 @@ use crate::launchd::query::{DomainType, LimitLoadToSessionType};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum OmniboxCommand {
-    Chain(Vec<OmniboxCommand>),
-    // Load(DomainType, Option<u64>, LimitLoadToSessionType),
-    // Unload(DomainType, Option<u64>),
-    Load,
-    Unload,
+    // Chain(Vec<OmniboxCommand>),
+    Load(LimitLoadToSessionType, DomainType, Option<u64>),
+    Unload(DomainType, Option<u64>),
     // Reuses domain, handle, limit load to session type from existing
     Reload,
     Enable,
     Disable,
     Edit,
     // (message, on ok)
-    Prompt(String, Vec<OmniboxCommand>),
+    Confirm(String, Vec<OmniboxCommand>),
+    DomainSessionPrompt(fn(DomainType, LimitLoadToSessionType) -> Vec<OmniboxCommand>),
     FocusServiceList,
     Quit,
 }
@@ -26,15 +25,20 @@ impl fmt::Display for OmniboxCommand {
     }
 }
 
-pub static OMNIBOX_COMMANDS: [(OmniboxCommand, &str); 7] = [
-    (OmniboxCommand::Load, "▶️  Load highlighted job"),
-    (OmniboxCommand::Unload, "⏏️  Unload highlighted job"),
-    (OmniboxCommand::Enable, "▶️  Enable highlighted job (enables load)"),
-    (OmniboxCommand::Disable, "⏏️  Disable highlighted job (prevents load)"),
+pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 7] = [
+    ("load", "▶️  Load highlighted job", OmniboxCommand::DomainSessionPrompt(|dt, lltst| vec![
+        OmniboxCommand::Load(lltst, dt, None)
+    ])),
+    ("unload", "⏏️  Unload highlighted job", OmniboxCommand::DomainSessionPrompt(|dt, _| vec![
+        OmniboxCommand::Unload(dt, None)
+    ])),
+    ("enable", "▶️  Enable highlighted job (enables load)", OmniboxCommand::Enable),
+    ("disable", "⏏️  Disable highlighted job (prevents load)", OmniboxCommand::Disable),
     (
-        OmniboxCommand::Edit,
+        "edit",
         "✍️  Edit plist with $EDITOR, then reload job",
+        OmniboxCommand::Edit,
     ),
-    (OmniboxCommand::Reload ,"🔄  Reload highlighted job"),
-    (OmniboxCommand::Quit, "🚪 see ya!"),
+    ("thing" ,"🔄  Reload highlighted job", OmniboxCommand::Reload),
+    ("thing", "🚪 see ya!", OmniboxCommand::Quit),
 ];

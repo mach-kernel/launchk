@@ -92,8 +92,8 @@ impl From<u64> for DomainType {
             3 => DomainType::UserLogin,
             4 => DomainType::Session,
             5 => DomainType::PID,
-            6 => DomainType::RequestorDomain,
-            7 => DomainType::RequestorUserDomain,
+            6 => DomainType::RequestorUserDomain,
+            7 => DomainType::RequestorDomain,
             _ => DomainType::Unknown,
         }
     }
@@ -184,7 +184,6 @@ pub fn unload<S: Into<String>>(
     label: S,
     plist_path: S,
     domain_type: Option<DomainType>,
-    limit_load_to_session_type: Option<LimitLoadToSessionType>,
     handle: Option<u64>
 ) -> XPCPipeResult {
     let mut message: HashMap<&str, XPCObject> = from_msg(&UNLOAD_PATHS);
@@ -192,7 +191,6 @@ pub fn unload<S: Into<String>>(
 
     message.insert("type", XPCObject::from(domain_type.unwrap_or(DomainType::RequestorDomain) as u64));
     message.insert("handle", XPCObject::from(handle.unwrap_or(0)));
-    message.insert("session", XPCObject::from(limit_load_to_session_type.map(|lltst| lltst.to_string()).unwrap_or("Aqua".to_string())));
     let paths = vec![XPCObject::from(plist_path.into())];
     message.insert("paths", XPCObject::from(paths));
 

@@ -190,38 +190,24 @@ impl ServiceListView {
                 // Clear term
                 self.cb_sink.send(Box::new(Cursive::clear)).expect("Must clear");
 
-                Ok(Some(OmniboxCommand::Prompt(
+                Ok(Some(OmniboxCommand::Confirm(
                     format!("Reload {}?", name),
                     vec![OmniboxCommand::Reload],
                 )))
             },
-            OmniboxCommand::Load | OmniboxCommand::Unload => {
+            OmniboxCommand::Load(lltst, dt, _handle) => {
                 let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
-                let xpc_query = if cmd == OmniboxCommand::Load {
-                    load
-                } else {
-                    unload
-                };
-
-                xpc_query(name, plist.plist_path, None, None, None)
+                load(name, plist.plist_path, Some(dt), Some(lltst), None)
                     .map(|_| None)
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
             },
-            OmniboxCommand::Enable | OmniboxCommand::Disable => {
+            OmniboxCommand::Unload(dt, _handle) => {
                 let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
-                //     let xpc_query = if cmd == OmniboxCommand::Enable {
-                //         enable
-                //     } else {
-                //         disable
-                //     };
-
-                //     xpc_query(name, &plist.plist_path)
-                //         .map(|_| None)
-                //         .map_err(|e| OmniboxError::CommandError(e.to_string()))
-
-                Ok(None)
+                unload(name, plist.plist_path, Some(dt), None)
+                    .map(|_| None)
+                    .map_err(|e| OmniboxError::CommandError(e.to_string()))
             },
-            OmniboxCommand::Reload => Ok(Some(OmniboxCommand::Chain(vec![OmniboxCommand::Unload, OmniboxCommand::Load]))),
+            // OmniboxCommand::Reload => Ok(Some(OmniboxCommand::Chain(vec![OmniboxCommand::Unload, OmniboxCommand::Load]))),
             _ => Ok(None),
         }
     }

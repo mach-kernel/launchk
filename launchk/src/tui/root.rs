@@ -250,9 +250,15 @@ impl OmniboxSubscriber for RootLayout {
                     .expect("Must focus SL");
                 Ok(None)
             }
-            OmniboxEvent::Command(OmniboxCommand::Prompt(p, c)) => {
+            OmniboxEvent::Command(OmniboxCommand::Confirm(p, c)) => {
                 self.cbsink_channel
                     .send(dialog::show_prompt(self.omnibox_tx.clone(), p, c))
+                    .expect("Must show prompt");
+                Ok(None)
+            }
+            OmniboxEvent::Command(OmniboxCommand::DomainSessionPrompt(f)) => {
+                self.cbsink_channel
+                    .send(dialog::domain_session_prompt(self.omnibox_tx.clone(), f))
                     .expect("Must show prompt");
                 Ok(None)
             }

@@ -124,8 +124,8 @@ impl OmniboxView {
 
         let matched_command = suggested_command
             .as_ref()
-            .filter(|(cmd, _)| cmd.to_string() == *command_filter)
-            .map(|(cmd, _)| cmd.clone());
+            .filter(|(cmd, _, _)| *cmd == *command_filter)
+            .map(|(_, _, oc)| oc.clone());
 
         let (lf_char, cf_char) = match (event, mode) {
             (Event::Char(c), OmniboxMode::LabelFilter) => {
@@ -164,7 +164,7 @@ impl OmniboxView {
             }
             // Complete suggestion
             (Event::Key(Key::Tab), OmniboxMode::CommandFilter) if suggested_command.is_some() => {
-                let (cmd, _) = suggested_command.unwrap();
+                let (cmd, _, _) = suggested_command.unwrap();
 
                 // Can submit from here, but catching a glimpse of the whole command
                 // highlighting before flushing back out is confirmation that it did something
@@ -269,7 +269,7 @@ impl OmniboxView {
         if suggestion.is_none() {
             return;
         }
-        let (cmd, desc) = suggestion.unwrap();
+        let (cmd, desc, ..) = suggestion.unwrap();
         let cmd_string = cmd.to_string().replace(&state.command_filter, "");
 
         printer.with_style(Style::from(Color::Light(BaseColor::Black)), |p| {
