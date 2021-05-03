@@ -1,11 +1,18 @@
 use std::fmt;
 
+use crate::launchd::query::{DomainType, LimitLoadToSessionType};
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum OmniboxCommand {
     Chain(Vec<OmniboxCommand>),
+    // Load(DomainType, Option<u64>, LimitLoadToSessionType),
+    // Unload(DomainType, Option<u64>),
     Load,
     Unload,
+    // Reuses domain, handle, limit load to session type from existing
     Reload,
+    Enable,
+    Disable,
     Edit,
     // (message, on ok)
     Prompt(String, Vec<OmniboxCommand>),
@@ -19,9 +26,11 @@ impl fmt::Display for OmniboxCommand {
     }
 }
 
-pub static OMNIBOX_COMMANDS: [(OmniboxCommand, &str); 5] = [
+pub static OMNIBOX_COMMANDS: [(OmniboxCommand, &str); 7] = [
     (OmniboxCommand::Load, "▶️  Load highlighted job"),
     (OmniboxCommand::Unload, "⏏️  Unload highlighted job"),
+    (OmniboxCommand::Enable, "▶️  Enable highlighted job (enables load)"),
+    (OmniboxCommand::Disable, "⏏️  Disable highlighted job (prevents load)"),
     (
         OmniboxCommand::Edit,
         "✍️  Edit plist with $EDITOR, then reload job",

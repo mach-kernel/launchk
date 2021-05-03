@@ -317,7 +317,7 @@ As root:
 
 Using a `gui/` domain target:
 
-```
+```	
 <dictionary: 0x100404080> { count = 6, transaction: 0, voucher = 0x0, contents =
 	"subsystem" => <uint64: 0x199d6ee9dd75252d>: 3
 	"handle" => <uint64: 0x199d6ee9dd6a452d>: 501

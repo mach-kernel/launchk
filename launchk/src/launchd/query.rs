@@ -14,14 +14,14 @@ use xpc_sys::objects::xpc_dictionary::XPCDictionary;
 use xpc_sys::objects::xpc_error::XPCError;
 use xpc_sys::objects::xpc_type::check_xpc_type;
 
-#[link(name = "c")]
-extern "C" {
-    fn geteuid() -> u32;
-}
+// #[link(name = "c")]
+// extern "C" {
+//     fn geteuid() -> u32;
+// }
 
-lazy_static! {
-    static ref IS_ROOT: bool = unsafe { geteuid() } == 0;
-}
+// lazy_static! {
+//     static ref IS_ROOT: bool = unsafe { geteuid() } == 0;
+// }
 
 /// LimitLoadToSessionType key in XPC response
 /// https://developer.apple.com/library/archive/technotes/tn2083/_index.html
@@ -71,11 +71,46 @@ impl TryFrom<XPCObject> for LimitLoadToSessionType {
     }
 }
 
+// Huge thanks to: https://saelo.github.io/presentations/bits_of_launchd.pdf
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum DomainType {
+    System = 1,
+    User = 2,
+    UserLogin = 3,
+    Session = 4,
+    PID = 5,
+    RequestorUserDomain = 6,
+    RequestorDomain = 7,
+    Unknown,
+}
+
+impl From<u64> for DomainType {
+    fn from(value: u64) -> Self {
+        match value {
+            1 => DomainType::System,
+            2 => DomainType::User,
+            3 => DomainType::UserLogin,
+            4 => DomainType::Session,
+            5 => DomainType::PID,
+            6 => DomainType::RequestorDomain,
+            7 => DomainType::RequestorUserDomain,
+            _ => DomainType::Unknown,
+        }
+    }
+}
+
+impl fmt::Display for DomainType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+// TODO: reuse list_all()
 pub fn find_in_all<S: Into<String>>(label: S) -> Result<XPCDictionary, XPCError> {
     let label_string = label.into();
 
-    for domain_type in 0..8 {
-        let response = list(domain_type, Some(label_string.clone()));
+    for domain_type in DomainType::System as u64..DomainType::RequestorDomain as u64 {
+        let response = list(domain_type.into(), Some(label_string.clone()));
         if response.is_ok() {
             return response;
         }
@@ -84,9 +119,10 @@ pub fn find_in_all<S: Into<String>>(label: S) -> Result<XPCDictionary, XPCError>
     Err(XPCError::NotFound)
 }
 
-pub fn list(domain_type: u64, name: Option<String>) -> Result<XPCDictionary, XPCError> {
+/// Query for jobs in a domain
+pub fn list(domain_type: DomainType, name: Option<String>) -> Result<XPCDictionary, XPCError> {
     let mut msg = from_msg(&LIST_SERVICES);
-    msg.insert("type", domain_type.into());
+    msg.insert("type", XPCObject::from(domain_type as u64));
 
     if name.is_some() {
         msg.insert("name", name.unwrap().into());
@@ -103,10 +139,11 @@ pub fn list(domain_type: u64, name: Option<String>) -> Result<XPCDictionary, XPC
         })
 }
 
+/// Query for jobs across all domain types
 pub fn list_all() -> HashSet<String> {
-    let everything = (0..8)
+    let everything = (DomainType::System as u64..DomainType::RequestorDomain as u64)
         .filter_map(|t| {
-            let svc_for_type = list(t as u64, None)
+            let svc_for_type = list(t.into(), None)
                 .and_then(|d| d.get_as_dictionary(&["services"]))
                 .map(|XPCDictionary(ref hm)| hm.keys().map(|k| k.clone()).collect());
 
@@ -117,22 +154,21 @@ pub fn list_all() -> HashSet<String> {
     HashSet::from_iter(everything)
 }
 
-pub fn load<S: Into<String>>(label: S, plist_path: S) -> XPCPipeResult {
+pub fn load<S: Into<String>>(
+    label: S,
+    plist_path: S,
+    domain_type: Option<DomainType>,
+    limit_load_to_session_type: Option<LimitLoadToSessionType>,
+    handle: Option<u64>
+) -> XPCPipeResult {
     let mut message: HashMap<&str, XPCObject> = from_msg(&LOAD_PATHS);
     let label_string = label.into();
 
-    message.insert(
-        "type",
-        if *IS_ROOT {
-            XPCObject::from(1 as u64)
-        } else {
-            XPCObject::from(7 as u64)
-        },
-    );
-
+    message.insert("type", XPCObject::from(domain_type.unwrap_or(DomainType::RequestorDomain) as u64));
+    message.insert("handle", XPCObject::from(handle.unwrap_or(0)));
+    message.insert("session", XPCObject::from(limit_load_to_session_type.map(|lltst| lltst.to_string()).unwrap_or("Aqua".to_string())));
     let paths = vec![XPCObject::from(plist_path.into())];
     message.insert("paths", XPCObject::from(paths));
-    message.insert("session", XPCObject::from("Aqua"));
 
     let message: XPCObject = message.into();
 
@@ -144,22 +180,21 @@ pub fn load<S: Into<String>>(label: S, plist_path: S) -> XPCPipeResult {
     handle_load_unload_errors(label_string, message.pipe_routine()?)
 }
 
-pub fn unload<S: Into<String>>(label: S, plist_path: S) -> XPCPipeResult {
+pub fn unload<S: Into<String>>(
+    label: S,
+    plist_path: S,
+    domain_type: Option<DomainType>,
+    limit_load_to_session_type: Option<LimitLoadToSessionType>,
+    handle: Option<u64>
+) -> XPCPipeResult {
     let mut message: HashMap<&str, XPCObject> = from_msg(&UNLOAD_PATHS);
     let label_string = label.into();
 
-    message.insert(
-        "type",
-        if *IS_ROOT {
-            XPCObject::from(1 as u64)
-        } else {
-            XPCObject::from(7 as u64)
-        },
-    );
-
+    message.insert("type", XPCObject::from(domain_type.unwrap_or(DomainType::RequestorDomain) as u64));
+    message.insert("handle", XPCObject::from(handle.unwrap_or(0)));
+    message.insert("session", XPCObject::from(limit_load_to_session_type.map(|lltst| lltst.to_string()).unwrap_or("Aqua".to_string())));
     let paths = vec![XPCObject::from(plist_path.into())];
     message.insert("paths", XPCObject::from(paths));
-    message.insert("session", XPCObject::from("Aqua"));
 
     let message: XPCObject = message.into();
 

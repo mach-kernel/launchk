@@ -55,6 +55,26 @@ lazy_static! {
 
         msg
     };
+
+    pub static ref ENABLE_NAMES: HashMap<&'static str, XPCObject> = {
+        let mut msg = HashMap::new();
+        msg.insert("routine", XPCObject::from(808 as u64));
+        msg.insert("subsystem", XPCObject::from(3 as u64));
+        // UID or ASID
+        msg.insert("handle", XPCObject::from(0 as u64));
+
+        msg
+    };
+
+    pub static ref DISABLE_NAMES: HashMap<&'static str, XPCObject> = {
+        let mut msg = HashMap::new();
+        msg.insert("routine", XPCObject::from(809 as u64));
+        msg.insert("subsystem", XPCObject::from(3 as u64));
+        // UID or ASID
+        msg.insert("handle", XPCObject::from(0 as u64));
+
+        msg
+    };
 }
 
 pub fn from_msg<'a>(proto: &HashMap<&'a str, XPCObject>) -> HashMap<&'a str, XPCObject> {

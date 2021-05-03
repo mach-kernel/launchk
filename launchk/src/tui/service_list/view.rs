@@ -13,7 +13,7 @@ use cursive::{Cursive, View, XY};
 use tokio::runtime::Handle;
 use tokio::time::interval;
 
-use crate::launchd::entry_status::get_entry_status;
+use crate::launchd::{entry_status::get_entry_status, plist::LaunchdPlist};
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};
 use crate::launchd::query::{list_all, load, unload};
@@ -171,51 +171,55 @@ impl ServiceListView {
             .ok_or_else(|| OmniboxError::CommandError("Cannot get highlighted row".to_string()))
     }
 
-    fn handle_command(&mut self, cmd: OmniboxCommand) -> OmniboxResult {
+    fn with_active_item_plist(&self) -> Result<(ServiceListItem, LaunchdPlist), OmniboxError> {
+        let item = &*self.get_active_list_item()?;
+        let plist = item.status
+            .plist
+            .as_ref()
+            .ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
+
+        Ok((item.clone(), plist.clone()))
+    }
+
+    fn handle_command(&self, cmd: OmniboxCommand) -> OmniboxResult {
         match cmd {
-            OmniboxCommand::Edit => {
-                let ServiceListItem {
-                    name,
-                    status: entry_info,
-                    ..
-                } = &*self.get_active_list_item()?;
+            OmniboxCommand::Edit => {                
+                let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
+                edit_and_replace(&plist).map_err(OmniboxError::CommandError)?;
 
-                let plist = entry_info
-                    .plist
-                    .as_ref()
-                    .ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
-
-                edit_and_replace(plist).map_err(OmniboxError::CommandError)?;
-
-                // Clear term / display issues after editor exit
+                // Clear term
                 self.cb_sink.send(Box::new(Cursive::clear)).expect("Must clear");
 
                 Ok(Some(OmniboxCommand::Prompt(
                     format!("Reload {}?", name),
                     vec![OmniboxCommand::Reload],
                 )))
-            }
+            },
             OmniboxCommand::Load | OmniboxCommand::Unload => {
-                let ServiceListItem {
-                    name,
-                    status: entry_info,
-                    ..
-                } = &*self.get_active_list_item()?;
-
-                let plist = entry_info
-                    .plist
-                    .as_ref()
-                    .ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
-
+                let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
                 let xpc_query = if cmd == OmniboxCommand::Load {
                     load
                 } else {
                     unload
                 };
 
-                xpc_query(name, &plist.plist_path)
+                xpc_query(name, plist.plist_path, None, None, None)
                     .map(|_| None)
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
+            },
+            OmniboxCommand::Enable | OmniboxCommand::Disable => {
+                let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
+                //     let xpc_query = if cmd == OmniboxCommand::Enable {
+                //         enable
+                //     } else {
+                //         disable
+                //     };
+
+                //     xpc_query(name, &plist.plist_path)
+                //         .map(|_| None)
+                //         .map_err(|e| OmniboxError::CommandError(e.to_string()))
+
+                Ok(None)
             },
             OmniboxCommand::Reload => Ok(Some(OmniboxCommand::Chain(vec![OmniboxCommand::Unload, OmniboxCommand::Load]))),
             _ => Ok(None),
