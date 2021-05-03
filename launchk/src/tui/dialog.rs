@@ -1,6 +1,6 @@
 use std::sync::mpsc::Sender;
 
-use cursive::{CbSink, views::{Dialog, DummyView, LinearLayout, RadioGroup, TextView}};
+use cursive::{CbSink, theme::Effect, view::Margins, views::{Dialog, DummyView, LinearLayout, RadioGroup, TextView}};
 use cursive::Cursive;
 
 use crate::{launchd::query::{DomainType, LimitLoadToSessionType}, tui::omnibox::command::OmniboxCommand};
@@ -59,26 +59,30 @@ pub fn domain_session_prompt(
         let mut lltst_group: RadioGroup<LimitLoadToSessionType> = RadioGroup::new();
 
         let ask = Dialog::new()
-            .title("Choose domain and LimitLoadToSessionType")
+            .title("Please choose")
             .content(
             LinearLayout::horizontal()
                     .child(
                     LinearLayout::vertical()
-                            .child(TextView::new("Domain Type"))
-                            .child(domain_group.button(DomainType::System, "System (1)"))
-                            .child(domain_group.button(DomainType::User, "User (2)"))
-                            .child(domain_group.button(DomainType::UserLogin, "UserLogin (3)"))
-                            .child(domain_group.button(DomainType::Session, "Session (4)"))
+                            .child(TextView::new("Domain Type")
+                            .effect(Effect::Bold))
+                            .child(DummyView)
+                            .child(domain_group.button(DomainType::System, "1: System"))
+                            .child(domain_group.button(DomainType::User, "2: User"))
+                            .child(domain_group.button(DomainType::UserLogin, "3: UserLogin"))
+                            .child(domain_group.button(DomainType::Session, "4: Session"))
                             // TODO: Ask for handle
-                            .child(domain_group.button(DomainType::PID, "PID (5)").disabled())
-                            .child(domain_group.button(DomainType::RequestorUserDomain, "Requestor User Domain (6)"))
+                            .child(domain_group.button(DomainType::PID, "5: PID").disabled())
+                            .child(domain_group.button(DomainType::RequestorUserDomain, "6: Requestor User Domain"))
                             // TODO: Is this a sane default?
-                            .child(domain_group.button(DomainType::RequestorDomain, "Requestor Domain (7)").selected())
+                            .child(domain_group.button(DomainType::RequestorDomain, "7: Requestor Domain").selected())
                     )
                     .child(DummyView)
                     .child(
                     LinearLayout::vertical()
-                            .child(TextView::new("Domain Type"))
+                            .child(TextView::new("Limit Load To Session Type")
+                            .effect(Effect::Bold))
+                            .child(DummyView)
                             .child(lltst_group.button(LimitLoadToSessionType::Aqua, LimitLoadToSessionType::Aqua.to_string()))
                             .child(lltst_group.button(LimitLoadToSessionType::StandardIO, LimitLoadToSessionType::StandardIO.to_string()))
                             .child(lltst_group.button(LimitLoadToSessionType::Background, LimitLoadToSessionType::Background.to_string()))
@@ -93,13 +97,14 @@ pub fn domain_session_prompt(
                 f(dt, lltst)
                     .iter()
                     .try_for_each(|c| tx.send(OmniboxEvent::Command(c.clone())))
-                    .expect("Must sent commands");
+                    .expect("Must send commands");
 
                 s.pop_layer();
             })
             .button("Cancel", |s| {
                 s.pop_layer();
-            });
+            })
+            .padding(Margins::trbl(5, 5, 5, 5));
 
         siv.add_layer(ask);
     };

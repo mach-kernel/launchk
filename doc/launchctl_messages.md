@@ -1,6 +1,6 @@
 # launchctl messages
 
-This is a handy reference of XPC messages sent by `launchctl` for some basic commands, as presented by `xpc_copy_description`.
+XPC messages sent by `launchctl` for some basic commands as presented by `xpc_copy_description`.
 
 #### `launchctl print system`
 
@@ -196,8 +196,6 @@ strerr Domain does not support specified action
 	"domain-port" => <mach send right: 0x100304fa0> { name = 1799, right = send, urefs = 5 }
 ```
 
-Type seems same even if trying from `/Library`:
-
 ```
 <dictionary: 0x100604420> { count = 11, transaction: 0, voucher = 0x0, contents =
 	"subsystem" => <uint64: 0x45e43765185d939b>: 3
@@ -331,4 +329,4 @@ Using a `gui/` domain target:
 
 1: System
 2: User
-8: Login (GUI)
+8: Login (GUI)?
