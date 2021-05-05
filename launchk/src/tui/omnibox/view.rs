@@ -61,7 +61,7 @@ async fn tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>) {
 
         let new = match *mode {
             OmniboxMode::CommandFilter | OmniboxMode::CommandConfirm(_) => {
-                read.with_new(Some(OmniboxMode::Idle),  None, Some("".to_string()), None)
+                read.with_new(Some(OmniboxMode::Idle), None, Some("".to_string()), None)
             }
             _ => read.with_new(Some(OmniboxMode::Idle), None, None, None),
         };
@@ -72,9 +72,10 @@ async fn tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>) {
         [
             OmniboxEvent::Command(OmniboxCommand::FocusServiceList),
             OmniboxEvent::StateUpdate(new.clone()),
-        ].iter()
-            .try_for_each(|e| tx.send(e.clone()))
-            .expect("Must send events");
+        ]
+        .iter()
+        .try_for_each(|e| tx.send(e.clone()))
+        .expect("Must send events");
 
         log::debug!("[omnibox/tick]: New state: {:?}", &new);
 

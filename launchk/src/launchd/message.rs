@@ -1,7 +1,4 @@
-use std::collections::HashMap;
-use xpc_sys::objects::xpc_object::XPCObject;
 use xpc_sys::objects::xpc_dictionary::XPCDictionary;
-use xpc_sys::{get_bootstrap_port, mach_port_t};
 
 lazy_static! {
     /// launchctl list [name]

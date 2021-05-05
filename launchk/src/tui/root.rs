@@ -229,8 +229,7 @@ impl OmniboxSubscriber for RootLayout {
     fn on_omnibox(&mut self, cmd: OmniboxEvent) -> OmniboxResult {
         match cmd {
             OmniboxEvent::Command(OmniboxCommand::Chain(cmds)) => {
-                cmds
-                    .iter()
+                cmds.iter()
                     .try_for_each(|c| self.omnibox_tx.send(OmniboxEvent::Command(c.clone())))
                     .expect("Must send commands");
                 Ok(None)

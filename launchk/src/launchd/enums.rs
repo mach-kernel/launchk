@@ -1,10 +1,10 @@
+use std::convert::TryFrom;
 use std::fmt;
+use xpc_sys::objects::xpc_error::XPCError;
 use xpc_sys::objects::xpc_object::XPCObject;
 use xpc_sys::objects::xpc_type;
 use xpc_sys::objects::xpc_type::check_xpc_type;
 use xpc_sys::traits::xpc_value::TryXPCValue;
-use xpc_sys::objects::xpc_error::XPCError;
-use std::convert::TryFrom;
 
 /// LimitLoadToSessionType key in XPC response
 /// https://developer.apple.com/library/archive/technotes/tn2083/_index.html

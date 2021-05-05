@@ -9,7 +9,7 @@ use std::rc::Rc;
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::DictionaryError;
 use crate::objects::xpc_object::XPCObject;
-use crate::{objects, xpc_retain, get_bootstrap_port, mach_port_t};
+use crate::{get_bootstrap_port, mach_port_t, objects, xpc_retain};
 use crate::{xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t};
 
 use block::ConcreteBlock;
@@ -18,7 +18,7 @@ use block::ConcreteBlock;
 pub struct XPCDictionary(pub HashMap<String, XPCObject>);
 
 impl XPCDictionary {
-    pub fn new() -> Self{
+    pub fn new() -> Self {
         XPCDictionary(HashMap::new())
     }
 
@@ -63,11 +63,7 @@ impl XPCDictionary {
         self.get(items).and_then(|r| XPCDictionary::try_from(r))
     }
 
-    pub fn entry<S: Into<String>, O: Into<XPCObject>>(
-        mut self,
-        key: S,
-        value: O
-    ) -> XPCDictionary {
+    pub fn entry<S: Into<String>, O: Into<XPCObject>>(mut self, key: S, value: O) -> XPCDictionary {
         let Self(hm) = &mut self;
         hm.insert(key.into(), value.into());
         self
@@ -76,10 +72,11 @@ impl XPCDictionary {
     pub fn entry_if_present<S: Into<String>, O: Into<XPCObject>>(
         self,
         key: S,
-        value: Option<O>
+        value: Option<O>,
     ) -> XPCDictionary {
-        if value.is_none() { self }
-        else {
+        if value.is_none() {
+            self
+        } else {
             self.entry(key, value.unwrap())
         }
     }
@@ -91,7 +88,7 @@ impl XPCDictionary {
         self
     }
 
-    pub fn with_domain_port(mut self) -> XPCDictionary {
+    pub fn with_domain_port(self) -> XPCDictionary {
         self.entry("domain-port", get_bootstrap_port() as mach_port_t)
     }
 }

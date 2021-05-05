@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::rc::Rc;
-use std::sync::mpsc::{Sender};
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
@@ -13,10 +13,12 @@ use cursive::{Cursive, View, XY};
 use tokio::runtime::Handle;
 use tokio::time::interval;
 
-use crate::launchd::{entry_status::get_entry_status, plist::LaunchdPlist, entry_status::LaunchdEntryStatus};
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};
 use crate::launchd::query::{list_all, load, unload};
+use crate::launchd::{
+    entry_status::get_entry_status, entry_status::LaunchdEntryStatus, plist::LaunchdPlist,
+};
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::state::OmniboxState;
 use crate::tui::omnibox::subscribed_view::{OmniboxResult, OmniboxSubscriber};
@@ -173,7 +175,8 @@ impl ServiceListView {
 
     fn with_active_item_plist(&self) -> Result<(ServiceListItem, LaunchdPlist), OmniboxError> {
         let item = &*self.get_active_list_item()?;
-        let plist = item.status
+        let plist = item
+            .status
             .plist
             .as_ref()
             .ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
@@ -183,38 +186,49 @@ impl ServiceListView {
 
     fn handle_command(&self, cmd: OmniboxCommand) -> OmniboxResult {
         match cmd {
-            OmniboxCommand::Edit => {                
+            OmniboxCommand::Edit => {
                 let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
                 edit_and_replace(&plist).map_err(OmniboxError::CommandError)?;
 
                 // Clear term
-                self.cb_sink.send(Box::new(Cursive::clear)).expect("Must clear");
+                self.cb_sink
+                    .send(Box::new(Cursive::clear))
+                    .expect("Must clear");
 
                 Ok(Some(OmniboxCommand::Confirm(
                     format!("Reload {}?", name),
                     vec![OmniboxCommand::Reload],
                 )))
-            },
+            }
             OmniboxCommand::Load(st, dt, _handle) => {
                 let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
                 load(name, plist.plist_path, Some(dt), Some(st), None)
                     .map(|_| None)
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
-            },
+            }
             OmniboxCommand::Unload(dt, _handle) => {
                 let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
-                let LaunchdEntryStatus { limit_load_to_session_type, .. } = get_entry_status(&name);
+                let LaunchdEntryStatus {
+                    limit_load_to_session_type,
+                    ..
+                } = get_entry_status(&name);
 
-                unload(name, plist.plist_path, Some(dt), Some(limit_load_to_session_type), None)
-                    .map(|_| None)
-                    .map_err(|e| OmniboxError::CommandError(e.to_string()))
-            },
-            OmniboxCommand::Reload => {
-                Ok(Some(OmniboxCommand::DomainSessionPrompt(|dt, st| vec![
+                unload(
+                    name,
+                    plist.plist_path,
+                    Some(dt),
+                    Some(limit_load_to_session_type),
+                    None,
+                )
+                .map(|_| None)
+                .map_err(|e| OmniboxError::CommandError(e.to_string()))
+            }
+            OmniboxCommand::Reload => Ok(Some(OmniboxCommand::DomainSessionPrompt(|dt, st| {
+                vec![
                     OmniboxCommand::Unload(dt.clone(), None),
-                    OmniboxCommand::Load(st, dt, None)
-                ])))
-            },
+                    OmniboxCommand::Load(st, dt, None),
+                ]
+            }))),
             _ => Ok(None),
         }
     }

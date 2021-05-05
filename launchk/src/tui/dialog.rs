@@ -1,11 +1,18 @@
 use std::sync::mpsc::Sender;
 
-use cursive::{CbSink, theme::Effect, view::Margins, views::{Dialog, DummyView, LinearLayout, RadioGroup, TextView}};
 use cursive::Cursive;
+use cursive::{
+    theme::Effect,
+    view::Margins,
+    views::{Dialog, DummyView, LinearLayout, RadioGroup, TextView},
+};
 
-use crate::{launchd::enums::{DomainType, SessionType}, tui::omnibox::command::OmniboxCommand};
 use crate::tui::omnibox::view::OmniboxEvent;
 use crate::tui::root::CbSinkMessage;
+use crate::{
+    launchd::enums::{DomainType, SessionType},
+    tui::omnibox::command::OmniboxCommand,
+};
 
 /// The XPC error key sometimes contains information that is not necessarily a failure,
 /// so let's just call it "Notice" until we figure out what to do next?
@@ -59,11 +66,10 @@ pub fn domain_session_prompt(
         let ask = Dialog::new()
             .title("Please choose")
             .content(
-            LinearLayout::horizontal()
+                LinearLayout::horizontal()
                     .child(
-                    LinearLayout::vertical()
-                            .child(TextView::new("Domain Type")
-                            .effect(Effect::Bold))
+                        LinearLayout::vertical()
+                            .child(TextView::new("Domain Type").effect(Effect::Bold))
                             .child(DummyView)
                             .child(domain_group.button(DomainType::System, "1: System"))
                             .child(domain_group.button(DomainType::User, "2: User"))
@@ -71,21 +77,41 @@ pub fn domain_session_prompt(
                             .child(domain_group.button(DomainType::Session, "4: Session"))
                             // TODO: Ask for handle
                             .child(domain_group.button(DomainType::PID, "5: PID").disabled())
-                            .child(domain_group.button(DomainType::RequestorUserDomain, "6: Requester User Domain"))
+                            .child(domain_group.button(
+                                DomainType::RequestorUserDomain,
+                                "6: Requester User Domain",
+                            ))
                             // TODO: Is this a sane default?
-                            .child(domain_group.button(DomainType::RequestorDomain, "7: Requester Domain").selected())
+                            .child(
+                                domain_group
+                                    .button(DomainType::RequestorDomain, "7: Requester Domain")
+                                    .selected(),
+                            ),
                     )
                     .child(DummyView)
                     .child(
-                    LinearLayout::vertical()
-                            .child(TextView::new("Session Type")
-                            .effect(Effect::Bold))
+                        LinearLayout::vertical()
+                            .child(TextView::new("Session Type").effect(Effect::Bold))
                             .child(DummyView)
-                            .child(st_group.button(SessionType::Aqua, SessionType::Aqua.to_string()))
-                            .child(st_group.button(SessionType::StandardIO, SessionType::StandardIO.to_string()))
-                            .child(st_group.button(SessionType::Background, SessionType::Background.to_string()))
-                            .child(st_group.button(SessionType::LoginWindow, SessionType::LoginWindow.to_string()))
-                            .child(st_group.button(SessionType::System, SessionType::System.to_string()))
+                            .child(
+                                st_group.button(SessionType::Aqua, SessionType::Aqua.to_string()),
+                            )
+                            .child(st_group.button(
+                                SessionType::StandardIO,
+                                SessionType::StandardIO.to_string(),
+                            ))
+                            .child(st_group.button(
+                                SessionType::Background,
+                                SessionType::Background.to_string(),
+                            ))
+                            .child(st_group.button(
+                                SessionType::LoginWindow,
+                                SessionType::LoginWindow.to_string(),
+                            ))
+                            .child(
+                                st_group
+                                    .button(SessionType::System, SessionType::System.to_string()),
+                            ),
                     ),
             )
             .button("OK", move |s| {

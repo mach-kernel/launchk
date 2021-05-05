@@ -1,20 +1,16 @@
 use crate::launchd::message::{LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS};
-use std::collections::{HashMap, HashSet};
-use std::convert::{TryFrom, TryInto};
-use std::fmt;
+use std::collections::HashSet;
 
 use xpc_sys::objects::xpc_object::XPCObject;
-use xpc_sys::objects::xpc_type;
-use xpc_sys::traits::xpc_pipeable::{XPCPipeResult, XPCPipeable};
-use xpc_sys::traits::xpc_value::TryXPCValue;
+
+use xpc_sys::traits::xpc_pipeable::XPCPipeable;
 
 use crate::launchd::entry_status::ENTRY_STATUS_CACHE;
 use std::iter::FromIterator;
 use xpc_sys::objects::xpc_dictionary::XPCDictionary;
 use xpc_sys::objects::xpc_error::XPCError;
-use xpc_sys::objects::xpc_type::check_xpc_type;
-use crate::launchd::enums::{DomainType, SessionType};
 
+use crate::launchd::enums::{DomainType, SessionType};
 
 // TODO: reuse list_all()
 pub fn find_in_all<S: Into<String>>(label: S) -> Result<XPCDictionary, XPCError> {
@@ -64,7 +60,7 @@ pub fn load<S: Into<String>>(
     plist_path: S,
     domain_type: Option<DomainType>,
     session: Option<SessionType>,
-    handle: Option<u64>
+    handle: Option<u64>,
 ) -> Result<XPCDictionary, XPCError> {
     ENTRY_STATUS_CACHE
         .lock()
@@ -73,9 +69,15 @@ pub fn load<S: Into<String>>(
 
     XPCDictionary::new()
         .extend(&LOAD_PATHS)
-        .entry("type", domain_type.unwrap_or(DomainType::RequestorDomain) as u64)
+        .entry(
+            "type",
+            domain_type.unwrap_or(DomainType::RequestorDomain) as u64,
+        )
         .entry("handle", handle.unwrap_or(0))
-        .entry("session", session.map(|s| s.to_string()).unwrap_or("Aqua".to_string()))
+        .entry(
+            "session",
+            session.map(|s| s.to_string()).unwrap_or("Aqua".to_string()),
+        )
         .entry("paths", vec![XPCObject::from(plist_path.into())])
         .pipe_routine_with_error_handling()
 }
@@ -85,7 +87,7 @@ pub fn unload<S: Into<String>>(
     plist_path: S,
     domain_type: Option<DomainType>,
     session: Option<SessionType>,
-    handle: Option<u64>
+    handle: Option<u64>,
 ) -> Result<XPCDictionary, XPCError> {
     ENTRY_STATUS_CACHE
         .lock()
@@ -94,10 +96,15 @@ pub fn unload<S: Into<String>>(
 
     XPCDictionary::new()
         .extend(&UNLOAD_PATHS)
-        .entry("type", domain_type.unwrap_or(DomainType::RequestorDomain) as u64)
+        .entry(
+            "type",
+            domain_type.unwrap_or(DomainType::RequestorDomain) as u64,
+        )
         .entry("handle", handle.unwrap_or(0))
-        .entry("session", session.map(|s| s.to_string()).unwrap_or("Aqua".to_string()))
+        .entry(
+            "session",
+            session.map(|s| s.to_string()).unwrap_or("Aqua".to_string()),
+        )
         .entry("paths", vec![XPCObject::from(plist_path.into())])
         .pipe_routine_with_error_handling()
 }
-

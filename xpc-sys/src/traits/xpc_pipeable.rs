@@ -2,11 +2,14 @@ use crate::objects::xpc_dictionary::XPCDictionary;
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::PipeError;
 use crate::objects::xpc_object::XPCObject;
-use crate::{get_xpc_bootstrap_pipe, rs_strerror, xpc_object_t, xpc_pipe_routine, xpc_pipe_routine_with_flags, rs_xpc_strerror};
+use crate::{
+    get_xpc_bootstrap_pipe, rs_strerror, rs_xpc_strerror, xpc_object_t, xpc_pipe_routine,
+    xpc_pipe_routine_with_flags,
+};
 
-use std::ptr::null_mut;
-use std::convert::TryInto;
 use crate::traits::xpc_value::TryXPCValue;
+use std::convert::TryInto;
+use std::ptr::null_mut;
 
 pub type XPCPipeResult = Result<XPCObject, XPCError>;
 
@@ -21,15 +24,24 @@ pub trait XPCPipeable {
 
         if hm.contains_key("error") {
             let errcode: i64 = response.get(&["error"])?.xpc_value()?;
-            Err(XPCError::QueryError(format!("{}: {}", errcode, rs_xpc_strerror(errcode as i32))))
+            Err(XPCError::QueryError(format!(
+                "{}: {}",
+                errcode,
+                rs_xpc_strerror(errcode as i32)
+            )))
         } else if hm.contains_key("errors") {
             let XPCDictionary(errors_hm) = response.get_as_dictionary(&["errors"])?;
-            if errors_hm.is_empty() { return Ok(response); }
+            if errors_hm.is_empty() {
+                return Ok(response);
+            }
 
-            let errors: Vec<String> = errors_hm.iter().flat_map(|(_, e)| {
-                let e: Result<i64, XPCError> = e.xpc_value();
-                e.map(|e_i64| format!("{}: {}", e_i64, rs_xpc_strerror(e_i64 as i32)))
-            }).collect();
+            let errors: Vec<String> = errors_hm
+                .iter()
+                .flat_map(|(_, e)| {
+                    let e: Result<i64, XPCError> = e.xpc_value();
+                    e.map(|e_i64| format!("{}: {}", e_i64, rs_xpc_strerror(e_i64 as i32)))
+                })
+                .collect();
 
             Err(XPCError::QueryError(errors.join("\n")))
         } else {

@@ -3,9 +3,9 @@ use std::convert::TryInto;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
+use crate::launchd::enums::SessionType;
 use crate::launchd::plist::LaunchdPlist;
 use crate::launchd::query::find_in_all;
-use crate::launchd::enums::SessionType;
 use xpc_sys::traits::xpc_value::TryXPCValue;
 
 const ENTRY_INFO_QUERY_TTL: Duration = Duration::from_secs(15);
