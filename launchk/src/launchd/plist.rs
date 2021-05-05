@@ -291,7 +291,7 @@ pub fn edit_and_replace(plist_meta: &LaunchdPlist) -> Result<(), String> {
     }
 
     // temp file -> validate with crate -> original
-    let plist = plist::Value::from_file(&temp_path).map_err(|e| e.to_string())?;
+    let plist = plist::Value::from_file(&temp_path).map_err(|e| format!("Changes not saved: {}", e))?;
     let writer = if is_binary {
         plist::Value::to_file_binary
     } else {

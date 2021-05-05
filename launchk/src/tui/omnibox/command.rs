@@ -25,8 +25,8 @@ impl fmt::Display for OmniboxCommand {
 }
 
 pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 7] = [
-    ("load", "▶️  Load highlighted job", OmniboxCommand::DomainSessionPrompt(|dt, lltst| vec![
-        OmniboxCommand::Load(lltst, dt, None)
+    ("load", "▶️  Load highlighted job", OmniboxCommand::DomainSessionPrompt(|dt, st| vec![
+        OmniboxCommand::Load(st, dt, None)
     ])),
     ("unload", "⏏️  Unload highlighted job", OmniboxCommand::DomainSessionPrompt(|dt, _| vec![
         OmniboxCommand::Unload(dt, None)
@@ -38,6 +38,6 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 7] = [
         "✍️  Edit plist with $EDITOR, then reload job",
         OmniboxCommand::Edit,
     ),
-    ("thing" ,"🔄  Reload highlighted job", OmniboxCommand::Reload),
-    ("thing", "🚪 see ya!", OmniboxCommand::Quit),
+    ("reload" ,"🔄  Reload highlighted job", OmniboxCommand::Reload),
+    ("exit", "🚪 see ya!", OmniboxCommand::Quit),
 ];

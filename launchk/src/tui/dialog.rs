@@ -39,9 +39,7 @@ pub fn show_prompt(
 
                 s.pop_layer();
             })
-            .button("No", |s| {
-                s.pop_layer();
-            })
+            .dismiss_button("No")
             .title("Notice");
 
         siv.add_layer(ask);
@@ -56,7 +54,7 @@ pub fn domain_session_prompt(
 ) -> CbSinkMessage {
     let cl = move |siv: &mut Cursive| {
         let mut domain_group: RadioGroup<DomainType> = RadioGroup::new();
-        let mut lltst_group: RadioGroup<SessionType> = RadioGroup::new();
+        let mut st_group: RadioGroup<SessionType> = RadioGroup::new();
 
         let ask = Dialog::new()
             .title("Please choose")
@@ -73,37 +71,35 @@ pub fn domain_session_prompt(
                             .child(domain_group.button(DomainType::Session, "4: Session"))
                             // TODO: Ask for handle
                             .child(domain_group.button(DomainType::PID, "5: PID").disabled())
-                            .child(domain_group.button(DomainType::RequestorUserDomain, "6: Requestor User Domain"))
+                            .child(domain_group.button(DomainType::RequestorUserDomain, "6: Requester User Domain"))
                             // TODO: Is this a sane default?
-                            .child(domain_group.button(DomainType::RequestorDomain, "7: Requestor Domain").selected())
+                            .child(domain_group.button(DomainType::RequestorDomain, "7: Requester Domain").selected())
                     )
                     .child(DummyView)
                     .child(
                     LinearLayout::vertical()
-                            .child(TextView::new("Limit Load To Session Type")
+                            .child(TextView::new("Session Type")
                             .effect(Effect::Bold))
                             .child(DummyView)
-                            .child(lltst_group.button(SessionType::Aqua, SessionType::Aqua.to_string()))
-                            .child(lltst_group.button(SessionType::StandardIO, SessionType::StandardIO.to_string()))
-                            .child(lltst_group.button(SessionType::Background, SessionType::Background.to_string()))
-                            .child(lltst_group.button(SessionType::LoginWindow, SessionType::LoginWindow.to_string()))
-                            .child(lltst_group.button(SessionType::System, SessionType::System.to_string()))
+                            .child(st_group.button(SessionType::Aqua, SessionType::Aqua.to_string()))
+                            .child(st_group.button(SessionType::StandardIO, SessionType::StandardIO.to_string()))
+                            .child(st_group.button(SessionType::Background, SessionType::Background.to_string()))
+                            .child(st_group.button(SessionType::LoginWindow, SessionType::LoginWindow.to_string()))
+                            .child(st_group.button(SessionType::System, SessionType::System.to_string()))
                     ),
             )
             .button("OK", move |s| {
                 let dt = domain_group.selection().as_ref().clone();
-                let lltst = lltst_group.selection().as_ref().clone();
+                let st = st_group.selection().as_ref().clone();
 
-                f(dt, lltst)
+                f(dt, st)
                     .iter()
                     .try_for_each(|c| tx.send(OmniboxEvent::Command(c.clone())))
                     .expect("Must send commands");
 
                 s.pop_layer();
             })
-            .button("Cancel", |s| {
-                s.pop_layer();
-            })
+            .dismiss_button("Cancel")
             .padding(Margins::trbl(5, 5, 5, 5));
 
         siv.add_layer(ask);

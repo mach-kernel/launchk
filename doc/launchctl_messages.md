@@ -177,6 +177,28 @@ type 8
 strerr Domain does not support specified action
 ```
 
+Response:
+
+```
+    	"EnableTransactions" => <bool: 0x7fff9464d490>: true
+    	"Sockets" => <dictionary: 0x7fcc6462dc80> { count = 1, transaction: 0, voucher = 0x0, contents =
+    		"Listeners" => <array: 0x7fcc64630370> { count = 1, capacity = 1, contents =
+    			0: <fd: 0x7fcc6462e3c0> { type = (invalid descriptor), path = (invalid path) }
+    		}
+    	}
+    	"LimitLoadToSessionType" => <string: 0x7fcc6462dd90> { length = 6, contents = "System" }
+    	"Label" => <string: 0x7fcc6462de00> { length = 17, contents = "com.apple.usbmuxd" }
+    	"OnDemand" => <bool: 0x7fff9464d4b0>: false
+    	"LastExitStatus" => <int64: 0x97301c3994c391b1>: 0
+    	"PID" => <int64: 0x97301c3994c9c1b1>: 165
+    	"Program" => <string: 0x7fcc64631050> { length = 85, contents = "/System/Library/PrivateFrameworks/MobileDevice.framework/Versions/A/Resources/usbmuxd" }
+    	"ProgramArguments" => <array: 0x7fcc6462dea0> { count = 2, capacity = 2, contents =
+    		0: <string: 0x7fcc6462df30> { length = 85, contents = "/System/Library/PrivateFrameworks/MobileDevice.framework/Versions/A/Resources/usbmuxd" }
+    		1: <string: 0x7fcc64630f80> { length = 8, contents = "-launchd" }
+    	}
+    }
+```
+
 #### `launchctl unload ~/Library/LaunchAgents/homebrew.mxcl.elasticsearch.plist`
 
 ```

@@ -13,7 +13,7 @@ use cursive::{Cursive, View, XY};
 use tokio::runtime::Handle;
 use tokio::time::interval;
 
-use crate::launchd::{entry_status::get_entry_status, plist::LaunchdPlist};
+use crate::launchd::{entry_status::get_entry_status, plist::LaunchdPlist, entry_status::LaunchdEntryStatus};
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};
 use crate::launchd::query::{list_all, load, unload};
@@ -195,19 +195,26 @@ impl ServiceListView {
                     vec![OmniboxCommand::Reload],
                 )))
             },
-            OmniboxCommand::Load(lltst, dt, _handle) => {
+            OmniboxCommand::Load(st, dt, _handle) => {
                 let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
-                load(name, plist.plist_path, Some(dt), Some(lltst), None)
+                load(name, plist.plist_path, Some(dt), Some(st), None)
                     .map(|_| None)
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
             },
             OmniboxCommand::Unload(dt, _handle) => {
                 let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
-                unload(name, plist.plist_path, Some(dt), None, None)
+                let LaunchdEntryStatus { limit_load_to_session_type, .. } = get_entry_status(&name);
+
+                unload(name, plist.plist_path, Some(dt), Some(limit_load_to_session_type), None)
                     .map(|_| None)
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
             },
-            // OmniboxCommand::Reload => Ok(Some(OmniboxCommand::Chain(vec![OmniboxCommand::Unload, OmniboxCommand::Load]))),
+            OmniboxCommand::Reload => {
+                Ok(Some(OmniboxCommand::DomainSessionPrompt(|dt, st| vec![
+                    OmniboxCommand::Unload(dt.clone(), None),
+                    OmniboxCommand::Load(st, dt, None)
+                ])))
+            },
             _ => Ok(None),
         }
     }
