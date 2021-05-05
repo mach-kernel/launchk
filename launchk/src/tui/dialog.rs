@@ -3,7 +3,7 @@ use std::sync::mpsc::Sender;
 use cursive::{CbSink, theme::Effect, view::Margins, views::{Dialog, DummyView, LinearLayout, RadioGroup, TextView}};
 use cursive::Cursive;
 
-use crate::{launchd::query::{DomainType, LimitLoadToSessionType}, tui::omnibox::command::OmniboxCommand};
+use crate::{launchd::enums::{DomainType, SessionType}, tui::omnibox::command::OmniboxCommand};
 use crate::tui::omnibox::view::OmniboxEvent;
 use crate::tui::root::CbSinkMessage;
 
@@ -52,11 +52,11 @@ pub fn show_prompt(
 
 pub fn domain_session_prompt(
     tx: Sender<OmniboxEvent>,
-    f: fn(DomainType, LimitLoadToSessionType) -> Vec<OmniboxCommand>,
+    f: fn(DomainType, SessionType) -> Vec<OmniboxCommand>,
 ) -> CbSinkMessage {
     let cl = move |siv: &mut Cursive| {
         let mut domain_group: RadioGroup<DomainType> = RadioGroup::new();
-        let mut lltst_group: RadioGroup<LimitLoadToSessionType> = RadioGroup::new();
+        let mut lltst_group: RadioGroup<SessionType> = RadioGroup::new();
 
         let ask = Dialog::new()
             .title("Please choose")
@@ -83,11 +83,11 @@ pub fn domain_session_prompt(
                             .child(TextView::new("Limit Load To Session Type")
                             .effect(Effect::Bold))
                             .child(DummyView)
-                            .child(lltst_group.button(LimitLoadToSessionType::Aqua, LimitLoadToSessionType::Aqua.to_string()))
-                            .child(lltst_group.button(LimitLoadToSessionType::StandardIO, LimitLoadToSessionType::StandardIO.to_string()))
-                            .child(lltst_group.button(LimitLoadToSessionType::Background, LimitLoadToSessionType::Background.to_string()))
-                            .child(lltst_group.button(LimitLoadToSessionType::LoginWindow, LimitLoadToSessionType::LoginWindow.to_string()))
-                            .child(lltst_group.button(LimitLoadToSessionType::System, LimitLoadToSessionType::System.to_string()))
+                            .child(lltst_group.button(SessionType::Aqua, SessionType::Aqua.to_string()))
+                            .child(lltst_group.button(SessionType::StandardIO, SessionType::StandardIO.to_string()))
+                            .child(lltst_group.button(SessionType::Background, SessionType::Background.to_string()))
+                            .child(lltst_group.button(SessionType::LoginWindow, SessionType::LoginWindow.to_string()))
+                            .child(lltst_group.button(SessionType::System, SessionType::System.to_string()))
                     ),
             )
             .button("OK", move |s| {

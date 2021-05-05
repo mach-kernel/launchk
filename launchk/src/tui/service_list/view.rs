@@ -203,7 +203,7 @@ impl ServiceListView {
             },
             OmniboxCommand::Unload(dt, _handle) => {
                 let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
-                unload(name, plist.plist_path, Some(dt), None)
+                unload(name, plist.plist_path, Some(dt), None, None)
                     .map(|_| None)
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
             },

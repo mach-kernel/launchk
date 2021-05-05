@@ -4,7 +4,8 @@ use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
 use crate::launchd::plist::LaunchdPlist;
-use crate::launchd::query::{find_in_all, LimitLoadToSessionType};
+use crate::launchd::query::find_in_all;
+use crate::launchd::enums::SessionType;
 use xpc_sys::traits::xpc_value::TryXPCValue;
 
 const ENTRY_INFO_QUERY_TTL: Duration = Duration::from_secs(15);
@@ -17,7 +18,7 @@ lazy_static! {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LaunchdEntryStatus {
     pub plist: Option<LaunchdPlist>,
-    pub limit_load_to_session_type: LimitLoadToSessionType,
+    pub limit_load_to_session_type: SessionType,
     // So, there is a pid_t, but it's i32, and the XPC response has an i64?
     pub pid: i64,
     tick: SystemTime,
@@ -26,7 +27,7 @@ pub struct LaunchdEntryStatus {
 impl Default for LaunchdEntryStatus {
     fn default() -> Self {
         LaunchdEntryStatus {
-            limit_load_to_session_type: LimitLoadToSessionType::Unknown,
+            limit_load_to_session_type: SessionType::Unknown,
             plist: None,
             pid: 0,
             tick: SystemTime::now(),
@@ -72,7 +73,7 @@ fn build_entry_status<S: Into<String>>(label: S) -> LaunchdEntryStatus {
         .map_err(|e| e.clone())
         .and_then(|r| r.get(&["service", "LimitLoadToSessionType"]))
         .and_then(|o| o.try_into())
-        .unwrap_or(LimitLoadToSessionType::Unknown);
+        .unwrap_or(SessionType::Unknown);
 
     let entry_config = crate::launchd::plist::for_label(label_string.clone());
 

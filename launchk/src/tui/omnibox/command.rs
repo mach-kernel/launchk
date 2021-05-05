@@ -1,11 +1,10 @@
 use std::fmt;
-
-use crate::launchd::query::{DomainType, LimitLoadToSessionType};
+use crate::launchd::enums::{DomainType, SessionType};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum OmniboxCommand {
     Chain(Vec<OmniboxCommand>),
-    Load(LimitLoadToSessionType, DomainType, Option<u64>),
+    Load(SessionType, DomainType, Option<u64>),
     Unload(DomainType, Option<u64>),
     // Reuses domain, handle, limit load to session type from existing
     Reload,
@@ -14,7 +13,7 @@ pub enum OmniboxCommand {
     Edit,
     // (message, on ok)
     Confirm(String, Vec<OmniboxCommand>),
-    DomainSessionPrompt(fn(DomainType, LimitLoadToSessionType) -> Vec<OmniboxCommand>),
+    DomainSessionPrompt(fn(DomainType, SessionType) -> Vec<OmniboxCommand>),
     FocusServiceList,
     Quit,
 }
