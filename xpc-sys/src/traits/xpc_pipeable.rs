@@ -16,17 +16,19 @@ pub trait XPCPipeable {
 
     /// Pipe routine expecting XPC dictionary reply, with checking of "error" and "errors" keys
     fn pipe_routine_with_error_handling(&self) -> Result<XPCDictionary, XPCError> {
-        let response: XPCDictionary = self.pipe_routine()?.try_into()?;
+        let response = self.pipe_routine()?.try_into()?;
         let XPCDictionary(hm) = &response;
 
         if hm.contains_key("error") {
             let errcode: i64 = response.get(&["error"])?.xpc_value()?;
-            Err(XPCError::QueryError(rs_xpc_strerror(errcode as i32)))
+            Err(XPCError::QueryError(format!("{}: {}", errcode, rs_xpc_strerror(errcode as i32))))
         } else if hm.contains_key("errors") {
             let XPCDictionary(errors_hm) = response.get_as_dictionary(&["errors"])?;
+            if errors_hm.is_empty() { return Ok(response); }
+
             let errors: Vec<String> = errors_hm.iter().flat_map(|(_, e)| {
                 let e: Result<i64, XPCError> = e.xpc_value();
-                e.map(|e_i64| rs_xpc_strerror(e_i64 as i32))
+                e.map(|e_i64| format!("{}: {}", e_i64, rs_xpc_strerror(e_i64 as i32)))
             }).collect();
 
             Err(XPCError::QueryError(errors.join("\n")))
