@@ -1,4 +1,5 @@
 use xpc_sys::objects::xpc_dictionary::XPCDictionary;
+use crate::launchd::query_builder::QueryBuilder;
 
 lazy_static! {
     /// launchctl list [name]
@@ -8,7 +9,6 @@ lazy_static! {
         .entry("subsystem", 3 as u64)
         .entry("handle", 0 as u64)
         .entry("routine", 815 as u64)
-        .entry("type", 1 as u64)
         .entry("legacy", true);
 
     /// launchctl load [path]

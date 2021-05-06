@@ -11,6 +11,7 @@ use xpc_sys::objects::xpc_dictionary::XPCDictionary;
 use xpc_sys::objects::xpc_error::XPCError;
 
 use crate::launchd::enums::{DomainType, SessionType};
+use crate::launchd::query_builder::QueryBuilder;
 
 // TODO: reuse list_all()
 pub fn find_in_all<S: Into<String>>(label: S) -> Result<XPCDictionary, XPCError> {
@@ -35,7 +36,7 @@ pub fn find_in_all<S: Into<String>>(label: S) -> Result<XPCDictionary, XPCError>
 pub fn list(domain_type: DomainType, name: Option<String>) -> Result<XPCDictionary, XPCError> {
     XPCDictionary::new()
         .extend(&LIST_SERVICES)
-        .entry("type", domain_type as u64)
+        .with_domain_type_or_default(Some(domain_type))
         .entry_if_present("name", name)
         .pipe_routine_with_error_handling()
 }
@@ -69,16 +70,10 @@ pub fn load<S: Into<String>>(
 
     XPCDictionary::new()
         .extend(&LOAD_PATHS)
-        .entry(
-            "type",
-            domain_type.unwrap_or(DomainType::RequestorDomain) as u64,
-        )
-        .entry("handle", handle.unwrap_or(0))
-        .entry(
-            "session",
-            session.map(|s| s.to_string()).unwrap_or("Aqua".to_string()),
-        )
-        .entry("paths", vec![XPCObject::from(plist_path.into())])
+        .with_domain_type_or_default(domain_type)
+        .with_session_type_or_default(session)
+        .with_handle_or_default(handle)
+        .entry("paths", vec![plist_path.into()])
         .pipe_routine_with_error_handling()
 }
 
@@ -96,15 +91,9 @@ pub fn unload<S: Into<String>>(
 
     XPCDictionary::new()
         .extend(&UNLOAD_PATHS)
-        .entry(
-            "type",
-            domain_type.unwrap_or(DomainType::RequestorDomain) as u64,
-        )
-        .entry("handle", handle.unwrap_or(0))
-        .entry(
-            "session",
-            session.map(|s| s.to_string()).unwrap_or("Aqua".to_string()),
-        )
-        .entry("paths", vec![XPCObject::from(plist_path.into())])
+        .with_domain_type_or_default(domain_type)
+        .with_session_type_or_default(session)
+        .with_handle_or_default(handle)
+        .entry("paths", vec![plist_path.into()])
         .pipe_routine_with_error_handling()
 }

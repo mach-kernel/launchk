@@ -62,35 +62,6 @@ impl XPCDictionary {
     {
         self.get(items).and_then(|r| XPCDictionary::try_from(r))
     }
-
-    pub fn entry<S: Into<String>, O: Into<XPCObject>>(mut self, key: S, value: O) -> XPCDictionary {
-        let Self(hm) = &mut self;
-        hm.insert(key.into(), value.into());
-        self
-    }
-
-    pub fn entry_if_present<S: Into<String>, O: Into<XPCObject>>(
-        self,
-        key: S,
-        value: Option<O>,
-    ) -> XPCDictionary {
-        if value.is_none() {
-            self
-        } else {
-            self.entry(key, value.unwrap())
-        }
-    }
-
-    pub fn extend(mut self, other: &XPCDictionary) -> XPCDictionary {
-        let Self(self_hm) = &mut self;
-        let Self(other_hm) = other;
-        self_hm.extend(other_hm.iter().map(|(s, o)| (s.clone(), o.clone())));
-        self
-    }
-
-    pub fn with_domain_port(self) -> XPCDictionary {
-        self.entry("domain-port", get_bootstrap_port() as mach_port_t)
-    }
 }
 
 impl From<HashMap<String, XPCObject>> for XPCDictionary {

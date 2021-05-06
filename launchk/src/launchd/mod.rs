@@ -8,3 +8,4 @@ pub mod enums;
 pub mod job_type_filter;
 /// plist management
 pub mod plist;
+pub mod query_builder;

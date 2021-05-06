@@ -20,11 +20,78 @@ Should work on macOS 10.10+ according to the availability sec. [in the docs](htt
 
 There is some "convenience glue" for dealing with XPC objects. Eventually, this will be broken out into its own crate. Most of the tests (for now) are written around not breaking data going across the FFI barrier.
 
+##### Object lifecycle
+
 XPCObject wraps `xpc_object_t` in an `Arc`. `Drop` will invoke `xpc_release()` on objects being dropped with no other [strong refs](https://doc.rust-lang.org/std/sync/struct.Arc.html#method.strong_count).
 
-#### xpc_pipe_routine
+**NOTE**: When using Objective-C blocks with the [block crate](https://crates.io/crates/block) (e.g. looping over an array), make sure to invoke `xpc_retain()` on any object you wish to keep after the closure is dropped, or else the XPC objects in the closure will be dropped as well! See the `XPCDictionary` implementation for more details. xpc-sys handles this for you for its conversions.
 
-Form your messages as a HashMap:
+#### XPCDictionary and QueryBuilder
+
+While we can go from `HashMap<&str, XPCObject>` to `XPCObject`, it can be a little verbose. A `QueryBuilder` trait exposes some builder methods to make building an XPC dictionary a little easier (without all of the `into()`s, and some additional error checking).
+
+To write the query for `launchctl list`:
+
+```rust
+    let LIST_SERVICES: XPCDictionary = XPCDictionary::new()
+        // "list com.apple.Spotlight" (if specified)
+        // .entry("name", "com.apple.Spotlight");
+        .entry("subsystem", 3 as u64)
+        .entry("handle", 0 as u64)
+        .entry("routine", 815 as u64)
+        .entry("legacy", true);
+
+    let reply: Result<XPCDictionary, XPCError> = XPCDictionary::new()
+        // LIST_SERVICES is a proto 
+        .extend(&LIST_SERVICES)
+        // Specify the domain type, or fall back on requester domain
+        .with_domain_type_or_default(Some(domain_type))
+        .entry_if_present("name", name)
+        .pipe_routine_with_error_handling();
+```
+
+In addition to checking `errno` is 0, `pipe_routine_with_error_handling` also looks for possible `error`  and `errors` keys in the response dictionary and provides an `Err()` with `xpc_strerror` contents.
+
+#### FFI Type Conversions
+
+Conversions to/from Rust/XPC objects uses the [xpc.h functions documented on Apple Developer](https://developer.apple.com/documentation/xpc/xpc_services_xpc_h?language=objc) using the `From` trait.
+
+| Rust                                   | XPC                   |
+|----------------------------------------|-----------------------|
+| i64                                    | _xpc_type_int64       |
+| u64                                    | _xpc_type_uint64      |
+| f64                                    | _xpc_type_double      |
+| bool                                   | _xpc_bool_true/false  |
+| Into<String>                           | _xpc_type_string      |
+| HashMap<Into<String>, Into<XPCObject>> | _xpc_type_dictionary  |
+| Vec<Into<XPCObject>>                   | _xpc_type_array       |
+
+Make XPC objects for anything with `From<T>`. From earlier example, even Mach ports:
+```rust
+let mut message: HashMap<&str, XPCObject> = HashMap::new();
+
+message.insert(
+    "domain-port",
+    XPCObject::from(get_bootstrap_port() as mach_port_t),
+);
+```
+
+Go from an XPC object to value via the `TryXPCValue` trait. It checks your object's type via `xpc_get_type()` and yields a clear error if you're using the wrong type:
+```rust
+#[test]
+fn deserialize_as_wrong_type() {
+    let an_i64: XPCObject = XPCObject::from(42 as i64);
+    let as_u64: Result<u64, XPCError> = an_i64.xpc_value();
+    assert_eq!(
+        as_u64.err().unwrap(),
+        XPCValueError("Cannot get int64 as uint64".to_string())
+    );
+}
+```
+
+##### XPC Dictionaries
+
+Go from a `HashMap` to `xpc_object_t` with the `XPCObject` type:
 
 ```rust
 let mut message: HashMap<&str, XPCObject> = HashMap::new();
@@ -88,27 +155,18 @@ let XPCDictionary(hm) = response.unwrap();
 let whatever = hm.get("...");
 ```
 
-#### Making XPC Objects
+##### XPC Arrays
 
-Make XPC objects for anything with `From<T>`. From earlier example, even Mach ports:
+An XPC array can be made from either `Vec<XPCObject>` or `Vec<Into<XPCObject>>`:
+
 ```rust
-let mut message: HashMap<&str, XPCObject> = HashMap::new();
+let xpc_array = XPCObject::from(vec![XPCObject::from("eins"), XPCObject::from("zwei"), XPCObject::from("polizei")]);
 
-message.insert(
-    "domain-port",
-    XPCObject::from(get_bootstrap_port() as mach_port_t),
-);
+let xpc_array = XPCObject::from(vec!["eins", "zwei", "polizei"])
 ```
 
-Go from an XPC object to value via `TryXPCValue`. It checks your object's type via `xpc_get_type()` and yields a clear error if you're using the wrong type:
+Go back to `Vec` using `xpc_value`:
+
 ```rust
-#[test]
-fn deserialize_as_wrong_type() {
-    let an_i64: XPCObject = XPCObject::from(42 as i64);
-    let as_u64: Result<u64, XPCError> = an_i64.xpc_value();
-    assert_eq!(
-        as_u64.err().unwrap(),
-        XPCValueError("Cannot get int64 as uint64".to_string())
-    );
-}
+let rs_vec: Vec<XPCObject> = xpc_array.xpc_value().unwrap();
 ```

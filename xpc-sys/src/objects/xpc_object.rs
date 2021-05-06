@@ -102,11 +102,11 @@ impl From<&str> for XPCObject {
     }
 }
 
-impl From<Vec<XPCObject>> for XPCObject {
-    fn from(slice: Vec<XPCObject>) -> Self {
+impl<O: Into<XPCObject>> From<Vec<O>> for XPCObject {
+    fn from(value: Vec<O>) -> Self {
         let xpc_array = unsafe { xpc_array_create(null_mut(), 0) };
-        for object in slice {
-            unsafe { xpc_array_append_value(xpc_array, object.as_ptr()) }
+        for object in value {
+            unsafe { xpc_array_append_value(xpc_array, object.into().as_ptr()) }
         }
 
         XPCObject::new(xpc_array)
