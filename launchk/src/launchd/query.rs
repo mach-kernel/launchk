@@ -1,4 +1,4 @@
-use crate::launchd::message::{LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS};
+use crate::launchd::message::{LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS, ENABLE_NAMES, DISABLE_NAMES};
 use std::collections::HashSet;
 
 use xpc_sys::objects::xpc_object::XPCObject;
@@ -95,5 +95,27 @@ pub fn unload<S: Into<String>>(
         .with_session_type_or_default(session)
         .with_handle_or_default(handle)
         .entry("paths", vec![plist_path.into()])
+        .pipe_routine_with_error_handling()
+}
+
+pub fn enable<S: Into<String>>(label: S, domain_type: DomainType) -> Result<XPCDictionary, XPCError> {
+    let label_string = label.into();
+
+    XPCDictionary::new()
+        .extend(&ENABLE_NAMES)
+        .with_domain_type_or_default(Some(domain_type))
+        .entry("name", label_string.clone())
+        .entry("names", vec![label_string])
+        .pipe_routine_with_error_handling()
+}
+
+pub fn disable<S: Into<String>>(label: S, domain_type: DomainType) -> Result<XPCDictionary, XPCError> {
+    let label_string = label.into();
+
+    XPCDictionary::new()
+        .extend(&DISABLE_NAMES)
+        .with_domain_type_or_default(Some(domain_type))
+        .entry("name", label_string.clone())
+        .entry("names", vec![label_string])
         .pipe_routine_with_error_handling()
 }

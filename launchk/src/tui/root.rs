@@ -255,9 +255,9 @@ impl OmniboxSubscriber for RootLayout {
                     .expect("Must show prompt");
                 Ok(None)
             }
-            OmniboxEvent::Command(OmniboxCommand::DomainSessionPrompt(f)) => {
+            OmniboxEvent::Command(OmniboxCommand::DomainSessionPrompt(domain_only, f)) => {
                 self.cbsink_channel
-                    .send(dialog::domain_session_prompt(self.omnibox_tx.clone(), f))
+                    .send(dialog::domain_session_prompt(domain_only, self.omnibox_tx.clone(), f))
                     .expect("Must show prompt");
                 Ok(None)
             }

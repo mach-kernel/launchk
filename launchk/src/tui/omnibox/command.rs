@@ -8,12 +8,13 @@ pub enum OmniboxCommand {
     Unload(DomainType, Option<u64>),
     // Reuses domain, handle, limit load to session type from existing
     Reload,
-    Enable,
-    Disable,
+    Enable(DomainType),
+    Disable(DomainType),
     Edit,
     // (message, on ok)
     Confirm(String, Vec<OmniboxCommand>),
-    DomainSessionPrompt(fn(DomainType, SessionType) -> Vec<OmniboxCommand>),
+    // (prompt for domain only?, action gen fn)
+    DomainSessionPrompt(bool, fn(DomainType, Option<SessionType>) -> Vec<OmniboxCommand>),
     FocusServiceList,
     Quit,
 }
@@ -28,22 +29,22 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 7] = [
     (
         "load",
         "▶️  Load highlighted job",
-        OmniboxCommand::DomainSessionPrompt(|dt, st| vec![OmniboxCommand::Load(st, dt, None)]),
+        OmniboxCommand::DomainSessionPrompt(false, |dt, st| vec![OmniboxCommand::Load(st.expect("Must be provided"), dt, None)]),
     ),
     (
         "unload",
         "⏏️  Unload highlighted job",
-        OmniboxCommand::DomainSessionPrompt(|dt, _| vec![OmniboxCommand::Unload(dt, None)]),
+        OmniboxCommand::DomainSessionPrompt(false, |dt, _| vec![OmniboxCommand::Unload(dt, None)]),
     ),
     (
         "enable",
         "▶️  Enable highlighted job (enables load)",
-        OmniboxCommand::Enable,
+        OmniboxCommand::DomainSessionPrompt(true, |dt, _| vec![OmniboxCommand::Enable(dt)]),
     ),
     (
         "disable",
         "⏏️  Disable highlighted job (prevents load)",
-        OmniboxCommand::Disable,
+        OmniboxCommand::DomainSessionPrompt(true, |dt, _| vec![OmniboxCommand::Disable(dt)]),
     ),
     (
         "edit",
