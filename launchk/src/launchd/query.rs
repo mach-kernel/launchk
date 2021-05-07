@@ -106,6 +106,7 @@ pub fn enable<S: Into<String>>(label: S, domain_type: DomainType) -> Result<XPCD
         .with_domain_type_or_default(Some(domain_type))
         .entry("name", label_string.clone())
         .entry("names", vec![label_string])
+        .with_handle_or_default(None)
         .pipe_routine_with_error_handling()
 }
 
@@ -117,5 +118,6 @@ pub fn disable<S: Into<String>>(label: S, domain_type: DomainType) -> Result<XPC
         .with_domain_type_or_default(Some(domain_type))
         .entry("name", label_string.clone())
         .entry("names", vec![label_string])
+        .with_handle_or_default(None)
         .pipe_routine_with_error_handling()
 }

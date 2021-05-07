@@ -9,6 +9,7 @@ use std::ptr::null_mut;
 use std::sync::Arc;
 
 use std::fmt;
+use crate::objects::xpc_dictionary::XPCDictionary;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XPCObject(pub Arc<xpc_object_t>, pub XPCType);
@@ -118,6 +119,14 @@ impl From<String> for XPCObject {
     fn from(value: String) -> Self {
         let cstr = CString::new(value).unwrap();
         unsafe { XPCObject::new(xpc_string_create(cstr.as_ptr())) }
+    }
+}
+
+impl From<XPCDictionary> for XPCObject {
+    /// Use From<HashMap<Into<String>, XPCObject>>
+    fn from(xpcd: XPCDictionary) -> Self {
+        let XPCDictionary(hm) = xpcd;
+        hm.into()
     }
 }
 

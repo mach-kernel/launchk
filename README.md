@@ -21,7 +21,7 @@ Should work on macOS 10.10+ according to the availability sec. [in the docs](htt
 
 ### xpc-sys crate
 
-There is some "convenience glue" for dealing with XPC objects. Eventually, this will be broken out into its own crate. Most of the tests (for now) are written around not breaking data going across the FFI barrier.
+There is some "convenience glue" for dealing with XPC objects. Eventually, this will be broken out into its own crate. Some tests exist for not breaking data to/from FFI.
 
 ##### Object lifecycle
 
