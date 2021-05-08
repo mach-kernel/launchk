@@ -14,7 +14,7 @@ use crate::launchd::enums::{DomainType, SessionType};
 use crate::launchd::query_builder::QueryBuilder;
 
 // TODO: reuse list_all()
-pub fn find_in_all<S: Into<String>>(label: S) -> Result<XPCDictionary, XPCError> {
+pub fn find_in_all<S: Into<String>>(label: S) -> Result<(DomainType, XPCDictionary), XPCError> {
     let label_string = label.into();
 
     for domain_type in DomainType::System as u64..DomainType::RequestorDomain as u64 {
@@ -25,7 +25,7 @@ pub fn find_in_all<S: Into<String>>(label: S) -> Result<XPCDictionary, XPCError>
             .pipe_routine_with_error_handling();
 
         if response.is_ok() {
-            return response;
+            return response.map(|r| (domain_type.into(), r));
         }
     }
 
