@@ -197,7 +197,8 @@ impl ViewWrapper for RootLayout {
             | Event::Char('u')
             | Event::Char('a')
             | Event::Char('d')
-            | Event::Char('l') => self.focus_and_forward(RootLayoutChildren::Omnibox, event),
+            | Event::Char('l')
+            | Event::Key(Key::Backspace) => self.focus_and_forward(RootLayoutChildren::Omnibox, event),
             // TODO: wtf?
             // After exiting $EDITOR, for some reason we get a termcap issue. iTerm and Apple Terminal
             // exhibit the same behavior. This was the easiest way to solve the problem for now.
