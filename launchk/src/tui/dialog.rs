@@ -64,58 +64,51 @@ pub fn domain_session_prompt(
         let mut domain_group: RadioGroup<DomainType> = RadioGroup::new();
         let mut st_group: RadioGroup<SessionType> = RadioGroup::new();
 
-        let mut layout = LinearLayout::horizontal()
-            .child(
-                LinearLayout::vertical()
-                    .child(TextView::new("Domain Type").effect(Effect::Bold))
-                    .child(DummyView)
-                    .child(domain_group.button(DomainType::System, "1: System"))
-                    .child(domain_group.button(DomainType::User, "2: User"))
-                    .child(domain_group.button(DomainType::UserLogin, "3: UserLogin"))
-                    .child(domain_group.button(DomainType::Session, "4: Session"))
-                    // TODO: Ask for handle
-                    .child(domain_group.button(DomainType::PID, "5: PID").disabled())
-                    .child(domain_group.button(
-                        DomainType::RequestorUserDomain,
-                        "6: Requester User Domain",
-                    ))
-                    // TODO: Is this a sane default?
-                    .child(
-                        domain_group
-                            .button(DomainType::RequestorDomain, "7: Requester Domain")
-                            .selected(),
-                    ),
-            );
+        let mut layout = LinearLayout::horizontal().child(
+            LinearLayout::vertical()
+                .child(TextView::new("Domain Type").effect(Effect::Bold))
+                .child(DummyView)
+                .child(domain_group.button(DomainType::System, "1: System"))
+                .child(domain_group.button(DomainType::User, "2: User"))
+                .child(domain_group.button(DomainType::UserLogin, "3: UserLogin"))
+                .child(domain_group.button(DomainType::Session, "4: Session"))
+                // TODO: Ask for handle
+                .child(domain_group.button(DomainType::PID, "5: PID").disabled())
+                .child(
+                    domain_group
+                        .button(DomainType::RequestorUserDomain, "6: Requester User Domain"),
+                )
+                // TODO: Is this a sane default?
+                .child(
+                    domain_group
+                        .button(DomainType::RequestorDomain, "7: Requester Domain")
+                        .selected(),
+                ),
+        );
 
         if !domain_only {
-            layout = layout.child(DummyView)
-                .child(
-                    LinearLayout::vertical()
-                        .child(TextView::new("Session Type").effect(Effect::Bold))
-                        .child(DummyView)
-                        .child(
-                            st_group.button(SessionType::Aqua, SessionType::Aqua.to_string()),
-                        )
-                        .child(st_group.button(
-                            SessionType::StandardIO,
-                            SessionType::StandardIO.to_string(),
-                        ))
-                        .child(st_group.button(
-                            SessionType::Background,
-                            SessionType::Background.to_string(),
-                        ))
-                        .child(st_group.button(
-                            SessionType::LoginWindow,
-                            SessionType::LoginWindow.to_string(),
-                        ))
-                        .child(
-                            st_group
-                                .button(SessionType::System, SessionType::System.to_string()),
-                        ),
-                );
+            layout = layout.child(DummyView).child(
+                LinearLayout::vertical()
+                    .child(TextView::new("Session Type").effect(Effect::Bold))
+                    .child(DummyView)
+                    .child(st_group.button(SessionType::Aqua, SessionType::Aqua.to_string()))
+                    .child(
+                        st_group
+                            .button(SessionType::StandardIO, SessionType::StandardIO.to_string()),
+                    )
+                    .child(
+                        st_group
+                            .button(SessionType::Background, SessionType::Background.to_string()),
+                    )
+                    .child(st_group.button(
+                        SessionType::LoginWindow,
+                        SessionType::LoginWindow.to_string(),
+                    ))
+                    .child(st_group.button(SessionType::System, SessionType::System.to_string())),
+            );
         }
 
-        let mut ask = Dialog::new()
+        let ask = Dialog::new()
             .title("Please choose")
             .content(layout)
             .button("OK", move |s| {

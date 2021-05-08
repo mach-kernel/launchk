@@ -15,7 +15,7 @@ use tokio::time::interval;
 
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};
-use crate::launchd::query::{list_all, load, unload, enable, disable};
+use crate::launchd::query::{disable, enable, list_all, load, unload};
 use crate::launchd::{
     entry_status::get_entry_status, entry_status::LaunchdEntryStatus, plist::LaunchdPlist,
 };
@@ -223,18 +223,21 @@ impl ServiceListView {
                 .map(|_| None)
                 .map_err(|e| OmniboxError::CommandError(e.to_string()))
             }
-            OmniboxCommand::Reload => Ok(Some(OmniboxCommand::DomainSessionPrompt(false, |dt, st| {
-                vec![
-                    OmniboxCommand::Unload(dt.clone(), None),
-                    OmniboxCommand::Load(st.expect("Must provide"), dt, None),
-                ]
-            }))),
+            OmniboxCommand::Reload => Ok(Some(OmniboxCommand::DomainSessionPrompt(
+                false,
+                |dt, st| {
+                    vec![
+                        OmniboxCommand::Unload(dt.clone(), None),
+                        OmniboxCommand::Load(st.expect("Must provide"), dt, None),
+                    ]
+                },
+            ))),
             OmniboxCommand::Enable(dt) => {
                 let (ServiceListItem { name, .. }, _) = self.with_active_item_plist()?;
                 enable(name, dt)
                     .map(|_| None)
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
-            },
+            }
             OmniboxCommand::Disable(dt) => {
                 let (ServiceListItem { name, .. }, _) = self.with_active_item_plist()?;
                 disable(name, dt)

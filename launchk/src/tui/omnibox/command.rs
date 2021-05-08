@@ -14,7 +14,10 @@ pub enum OmniboxCommand {
     // (message, on ok)
     Confirm(String, Vec<OmniboxCommand>),
     // (prompt for domain only?, action gen fn)
-    DomainSessionPrompt(bool, fn(DomainType, Option<SessionType>) -> Vec<OmniboxCommand>),
+    DomainSessionPrompt(
+        bool,
+        fn(DomainType, Option<SessionType>) -> Vec<OmniboxCommand>,
+    ),
     FocusServiceList,
     Quit,
 }
@@ -29,7 +32,13 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 7] = [
     (
         "load",
         "▶️  Load highlighted job",
-        OmniboxCommand::DomainSessionPrompt(false, |dt, st| vec![OmniboxCommand::Load(st.expect("Must be provided"), dt, None)]),
+        OmniboxCommand::DomainSessionPrompt(false, |dt, st| {
+            vec![OmniboxCommand::Load(
+                st.expect("Must be provided"),
+                dt,
+                None,
+            )]
+        }),
     ),
     (
         "unload",

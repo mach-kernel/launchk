@@ -1,5 +1,5 @@
-use xpc_sys::objects::xpc_dictionary::XPCDictionary;
 use crate::launchd::query_builder::QueryBuilder;
+use xpc_sys::objects::xpc_dictionary::XPCDictionary;
 
 lazy_static! {
     /// launchctl list [name]

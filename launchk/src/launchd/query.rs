@@ -1,7 +1,7 @@
-use crate::launchd::message::{LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS, ENABLE_NAMES, DISABLE_NAMES};
+use crate::launchd::message::{
+    DISABLE_NAMES, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS,
+};
 use std::collections::HashSet;
-
-use xpc_sys::objects::xpc_object::XPCObject;
 
 use xpc_sys::traits::xpc_pipeable::XPCPipeable;
 
@@ -98,7 +98,10 @@ pub fn unload<S: Into<String>>(
         .pipe_routine_with_error_handling()
 }
 
-pub fn enable<S: Into<String>>(label: S, domain_type: DomainType) -> Result<XPCDictionary, XPCError> {
+pub fn enable<S: Into<String>>(
+    label: S,
+    domain_type: DomainType,
+) -> Result<XPCDictionary, XPCError> {
     let label_string = label.into();
 
     XPCDictionary::new()
@@ -110,7 +113,10 @@ pub fn enable<S: Into<String>>(label: S, domain_type: DomainType) -> Result<XPCD
         .pipe_routine_with_error_handling()
 }
 
-pub fn disable<S: Into<String>>(label: S, domain_type: DomainType) -> Result<XPCDictionary, XPCError> {
+pub fn disable<S: Into<String>>(
+    label: S,
+    domain_type: DomainType,
+) -> Result<XPCDictionary, XPCError> {
     let label_string = label.into();
 
     XPCDictionary::new()

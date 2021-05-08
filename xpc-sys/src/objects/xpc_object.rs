@@ -8,8 +8,8 @@ use std::ffi::{CStr, CString};
 use std::ptr::null_mut;
 use std::sync::Arc;
 
-use std::fmt;
 use crate::objects::xpc_dictionary::XPCDictionary;
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XPCObject(pub Arc<xpc_object_t>, pub XPCType);

@@ -9,7 +9,7 @@ use std::rc::Rc;
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::DictionaryError;
 use crate::objects::xpc_object::XPCObject;
-use crate::{get_bootstrap_port, mach_port_t, objects, xpc_retain};
+use crate::{objects, xpc_retain};
 use crate::{xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t};
 
 use block::ConcreteBlock;

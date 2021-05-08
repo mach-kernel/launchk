@@ -198,7 +198,9 @@ impl ViewWrapper for RootLayout {
             | Event::Char('a')
             | Event::Char('d')
             | Event::Char('l')
-            | Event::Key(Key::Backspace) => self.focus_and_forward(RootLayoutChildren::Omnibox, event),
+            | Event::Key(Key::Backspace) => {
+                self.focus_and_forward(RootLayoutChildren::Omnibox, event)
+            }
             // TODO: wtf?
             // After exiting $EDITOR, for some reason we get a termcap issue. iTerm and Apple Terminal
             // exhibit the same behavior. This was the easiest way to solve the problem for now.
@@ -258,7 +260,11 @@ impl OmniboxSubscriber for RootLayout {
             }
             OmniboxEvent::Command(OmniboxCommand::DomainSessionPrompt(domain_only, f)) => {
                 self.cbsink_channel
-                    .send(dialog::domain_session_prompt(domain_only, self.omnibox_tx.clone(), f))
+                    .send(dialog::domain_session_prompt(
+                        domain_only,
+                        self.omnibox_tx.clone(),
+                        f,
+                    ))
                     .expect("Must show prompt");
                 Ok(None)
             }

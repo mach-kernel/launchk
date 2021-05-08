@@ -137,8 +137,15 @@ mod tests {
         let rs_vec: Vec<XPCObject> = xpc_array.xpc_value().unwrap();
 
         assert_eq!(
-            rs_vec.iter().map(|o| o.xpc_value().unwrap()).collect::<Vec<String>>(),
-            vec!["eins".to_string(), "zwei".to_string(), "polizei".to_string()]
+            rs_vec
+                .iter()
+                .map(|o| o.xpc_value().unwrap())
+                .collect::<Vec<String>>(),
+            vec![
+                "eins".to_string(),
+                "zwei".to_string(),
+                "polizei".to_string()
+            ]
         );
     }
 }
