@@ -13,7 +13,6 @@ use xpc_sys::objects::xpc_error::XPCError;
 use crate::launchd::enums::{DomainType, SessionType};
 use crate::launchd::query_builder::QueryBuilder;
 
-// TODO: reuse list_all()
 pub fn find_in_all<S: Into<String>>(label: S) -> Result<(DomainType, XPCDictionary), XPCError> {
     let label_string = label.into();
 

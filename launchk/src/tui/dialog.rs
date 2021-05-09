@@ -13,6 +13,7 @@ use crate::{
     launchd::enums::{DomainType, SessionType},
     tui::omnibox::command::OmniboxCommand,
 };
+use crate::launchd::entry_status::{get_entry_status, LaunchdEntryStatus};
 
 /// The XPC error key sometimes contains information that is not necessarily a failure,
 /// so let's just call it "Notice" until we figure out what to do next?
@@ -55,7 +56,8 @@ pub fn show_prompt(
     Box::new(cl)
 }
 
-pub fn domain_session_prompt(
+pub fn domain_session_prompt<S: Into<String>>(
+    label: S,
     domain_only: bool,
     tx: Sender<OmniboxEvent>,
     f: fn(DomainType, Option<SessionType>) -> Vec<OmniboxCommand>,
@@ -64,49 +66,45 @@ pub fn domain_session_prompt(
         let mut domain_group: RadioGroup<DomainType> = RadioGroup::new();
         let mut st_group: RadioGroup<SessionType> = RadioGroup::new();
 
-        let mut layout = LinearLayout::horizontal().child(
-            LinearLayout::vertical()
-                .child(TextView::new("Domain Type").effect(Effect::Bold))
-                .child(DummyView)
-                .child(domain_group.button(DomainType::System, "1: System"))
-                .child(domain_group.button(DomainType::User, "2: User"))
-                .child(domain_group.button(DomainType::UserLogin, "3: UserLogin"))
-                .child(domain_group.button(DomainType::Session, "4: Session"))
-                // TODO: Ask for handle
-                .child(domain_group.button(DomainType::PID, "5: PID").disabled())
-                .child(
-                    domain_group
-                        .button(DomainType::RequestorUserDomain, "6: Requester User Domain"),
-                )
-                // TODO: Is this a sane default?
-                .child(
-                    domain_group
-                        .button(DomainType::RequestorDomain, "7: Requester Domain")
-                        .selected(),
-                ),
-        );
+        // Build domain type list
+        let mut domain_type_layout = LinearLayout::vertical()
+            .child(TextView::new("Domain Type").effect(Effect::Bold))
+            .child(DummyView);
+
+        let LaunchdEntryStatus {
+            limit_load_to_session_type,
+            domain,
+            ..
+        } = get_entry_status(&label);
+
+        for d in DomainType::System..DomainType::RequestorDomain {
+            let mut button = domain_group.button(d, format!("{}: {}", &d as u64, &d));
+            if d == domain {
+                button = button.selected();
+            }
+
+            domain_type_layout = domain_type_layout.child(button);
+        }
+
+        let mut session_type_layout = LinearLayout::vertical();
 
         if !domain_only {
-            layout = layout.child(DummyView).child(
-                LinearLayout::vertical()
-                    .child(TextView::new("Session Type").effect(Effect::Bold))
-                    .child(DummyView)
-                    .child(st_group.button(SessionType::Aqua, SessionType::Aqua.to_string()))
-                    .child(
-                        st_group
-                            .button(SessionType::StandardIO, SessionType::StandardIO.to_string()),
-                    )
-                    .child(
-                        st_group
-                            .button(SessionType::Background, SessionType::Background.to_string()),
-                    )
-                    .child(st_group.button(
-                        SessionType::LoginWindow,
-                        SessionType::LoginWindow.to_string(),
-                    ))
-                    .child(st_group.button(SessionType::System, SessionType::System.to_string())),
-            );
+            session_type_layout = session_type_layout
+                .child(TextView::new("Session Type").effect(Effect::Bold))
+                .child(DummyView);
+
+            for s in SessionType::Aqua..SessionType::Unknown {
+                let mut button = st_group.button(s, s.to_string());
+                if s == limit_load_to_session_type {
+                    button = button.selected();
+                }
+                session_type_layout = session_type_layout.child(button);
+            }
         }
+
+        let mut layout = LinearLayout::horizontal()
+            .child(domain_type_layout)
+            .child(session_type_layout);
 
         let ask = Dialog::new()
             .title("Please choose")
