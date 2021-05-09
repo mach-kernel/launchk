@@ -10,7 +10,7 @@ use xpc_sys::traits::xpc_value::TryXPCValue;
 /// https://developer.apple.com/library/archive/technotes/tn2083/_index.html
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SessionType {
-    Aqua,
+    Aqua = 0,
     StandardIO,
     Background,
     LoginWindow,
@@ -21,6 +21,19 @@ pub enum SessionType {
 impl fmt::Display for SessionType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
+    }
+}
+
+impl From<u64> for SessionType {
+    fn from(session_type: u64) -> Self {
+        match session_type {
+            0 => SessionType::Aqua,
+            1 => SessionType::StandardIO,
+            2 => SessionType::Background,
+            3 => SessionType::LoginWindow,
+            4 => SessionType::System,
+            _ => SessionType::Unknown,
+        }
     }
 }
 

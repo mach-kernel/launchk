@@ -62,6 +62,12 @@ pub fn domain_session_prompt<S: Into<String>>(
     tx: Sender<OmniboxEvent>,
     f: fn(DomainType, Option<SessionType>) -> Vec<OmniboxCommand>,
 ) -> CbSinkMessage {
+    let LaunchdEntryStatus {
+        limit_load_to_session_type,
+        domain,
+        ..
+    } = get_entry_status(label);
+
     let cl = move |siv: &mut Cursive| {
         let mut domain_group: RadioGroup<DomainType> = RadioGroup::new();
         let mut st_group: RadioGroup<SessionType> = RadioGroup::new();
@@ -71,15 +77,10 @@ pub fn domain_session_prompt<S: Into<String>>(
             .child(TextView::new("Domain Type").effect(Effect::Bold))
             .child(DummyView);
 
-        let LaunchdEntryStatus {
-            limit_load_to_session_type,
-            domain,
-            ..
-        } = get_entry_status(&label);
-
-        for d in DomainType::System..DomainType::RequestorDomain {
-            let mut button = domain_group.button(d, format!("{}: {}", &d as u64, &d));
-            if d == domain {
+        for d in DomainType::System as u64..DomainType::RequestorDomain as u64 {
+            let as_domain: DomainType = d.into();
+            let mut button = domain_group.button(as_domain, format!("{}: {}", d, as_domain));
+            if as_domain == domain {
                 button = button.selected();
             }
 
@@ -93,9 +94,11 @@ pub fn domain_session_prompt<S: Into<String>>(
                 .child(TextView::new("Session Type").effect(Effect::Bold))
                 .child(DummyView);
 
-            for s in SessionType::Aqua..SessionType::Unknown {
-                let mut button = st_group.button(s, s.to_string());
-                if s == limit_load_to_session_type {
+            for s in SessionType::Aqua as u64..SessionType::Unknown as u64 {
+                let as_session: SessionType = s.into();
+
+                let mut button = st_group.button(as_session, as_session.to_string());
+                if as_session == limit_load_to_session_type {
                     button = button.selected();
                 }
                 session_type_layout = session_type_layout.child(button);
