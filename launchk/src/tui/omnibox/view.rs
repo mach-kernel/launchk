@@ -41,7 +41,7 @@ pub enum OmniboxMode {
 /// Move OmniboxState back to idle some time after the user stops
 /// interacting with it
 async fn tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>) {
-    let mut tick_rate = interval(Duration::from_millis(500));
+    let mut tick_rate = interval(Duration::from_millis(250));
 
     loop {
         tick_rate.tick().await;

@@ -4,6 +4,12 @@ use std::fmt;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum OmniboxCommand {
     Chain(Vec<OmniboxCommand>),
+    // Try to see if we have session type & domain in entry_status,
+    // to avoid having to prompt the user
+    LoadRequest,
+    UnloadRequest,
+    EnableRequest,
+    DisableRequest,
     Load(SessionType, DomainType, Option<u64>),
     Unload(DomainType, Option<u64>),
     // Reuses domain, handle, limit load to session type from existing
@@ -13,8 +19,9 @@ pub enum OmniboxCommand {
     Edit,
     // (message, on ok)
     Confirm(String, Vec<OmniboxCommand>),
-    // (prompt for domain only?, action gen fn)
+    // (unit label, prompt for domain only?, action gen fn)
     DomainSessionPrompt(
+        String,
         bool,
         fn(DomainType, Option<SessionType>) -> Vec<OmniboxCommand>,
     ),
@@ -32,28 +39,23 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 7] = [
     (
         "load",
         "▶️  Load highlighted job",
-        OmniboxCommand::DomainSessionPrompt(false, |dt, st| {
-            vec![OmniboxCommand::Load(
-                st.expect("Must be provided"),
-                dt,
-                None,
-            )]
-        }),
+        OmniboxCommand::LoadRequest,
     ),
     (
         "unload",
         "⏏️  Unload highlighted job",
-        OmniboxCommand::DomainSessionPrompt(false, |dt, _| vec![OmniboxCommand::Unload(dt, None)]),
+        OmniboxCommand::UnloadRequest,
+        // OmniboxCommand::DomainSessionPrompt(false, |dt, _| vec![OmniboxCommand::Unload(dt, None)]),
     ),
     (
         "enable",
         "▶️  Enable highlighted job (enables load)",
-        OmniboxCommand::DomainSessionPrompt(true, |dt, _| vec![OmniboxCommand::Enable(dt)]),
+        OmniboxCommand::EnableRequest,
     ),
     (
         "disable",
         "⏏️  Disable highlighted job (prevents load)",
-        OmniboxCommand::DomainSessionPrompt(true, |dt, _| vec![OmniboxCommand::Disable(dt)]),
+        OmniboxCommand::DisableRequest
     ),
     (
         "edit",

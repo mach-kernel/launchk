@@ -77,9 +77,9 @@ pub fn domain_session_prompt<S: Into<String>>(
             .child(TextView::new("Domain Type").effect(Effect::Bold))
             .child(DummyView);
 
-        for d in DomainType::System as u64..DomainType::RequestorDomain as u64 {
+        for d in DomainType::System as u64..DomainType::Unknown as u64 {
             let as_domain: DomainType = d.into();
-            let mut button = domain_group.button(as_domain, format!("{}: {}", d, as_domain));
+            let mut button = domain_group.button(as_domain.clone(), format!("{}: {}", d, &as_domain));
             if as_domain == domain {
                 button = button.selected();
             }
@@ -97,7 +97,7 @@ pub fn domain_session_prompt<S: Into<String>>(
             for s in SessionType::Aqua as u64..SessionType::Unknown as u64 {
                 let as_session: SessionType = s.into();
 
-                let mut button = st_group.button(as_session, as_session.to_string());
+                let mut button = st_group.button(as_session.clone(), as_session.to_string());
                 if as_session == limit_load_to_session_type {
                     button = button.selected();
                 }
@@ -110,7 +110,7 @@ pub fn domain_session_prompt<S: Into<String>>(
             .child(session_type_layout);
 
         let ask = Dialog::new()
-            .title("Please choose")
+            .title("Please select to continue")
             .content(layout)
             .button("OK", move |s| {
                 let dt = domain_group.selection().as_ref().clone();

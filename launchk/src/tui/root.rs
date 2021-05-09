@@ -7,7 +7,7 @@ use cursive::event::{Event, EventResult, Key};
 use cursive::traits::{Resizable, Scrollable};
 use cursive::view::ViewWrapper;
 use cursive::views::{LinearLayout, NamedView, Panel};
-use cursive::{Cursive, Vec2, View};
+use cursive::{Cursive, Vec2, View, Printer};
 
 use tokio::runtime::Handle;
 use tokio::time::interval;
@@ -183,7 +183,7 @@ impl RootLayout {
 
 impl ViewWrapper for RootLayout {
     wrap_impl!(self.layout: LinearLayout);
-
+    
     fn wrap_on_event(&mut self, event: Event) -> EventResult {
         log::debug!("[root/event]: {:?}", event);
 
@@ -258,9 +258,10 @@ impl OmniboxSubscriber for RootLayout {
                     .expect("Must show prompt");
                 Ok(None)
             }
-            OmniboxEvent::Command(OmniboxCommand::DomainSessionPrompt(domain_only, f)) => {
+            OmniboxEvent::Command(OmniboxCommand::DomainSessionPrompt(label, domain_only, f)) => {
                 self.cbsink_channel
                     .send(dialog::domain_session_prompt(
+                        label,
                         domain_only,
                         self.omnibox_tx.clone(),
                         f,
