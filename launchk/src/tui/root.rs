@@ -51,8 +51,6 @@ async fn poll_omnibox(cb_sink: Sender<CbSinkMessage>, rx: Receiver<OmniboxEvent>
             siv.call_on_name("root_layout", |v: &mut NamedView<RootLayout>| {
                 v.get_mut().handle_omnibox_event(recv);
             });
-
-            siv.refresh();
         }));
     }
 }
@@ -128,17 +126,13 @@ impl RootLayout {
         self.on_omnibox(recv.clone())
             .expect("Root for effects only");
 
-        // The Omnibox command is sent to the actively focused view
         let target = self
             .layout
-            .get_child_mut(self.layout.get_focus_index())
-            .and_then(|v| v.as_any_mut().downcast_mut::<OmniboxSubscribedView>());
+            .get_child_mut(RootLayoutChildren::ServiceList as usize)
+            .and_then(|v| v.as_any_mut().downcast_mut::<OmniboxSubscribedView>())
+            .expect("Must forward to ServiceList");
 
-        if target.is_none() {
-            return;
-        }
-
-        match target.unwrap().on_omnibox(recv) {
+        match target.on_omnibox(recv) {
             // Forward Omnibox command responses from view
             Ok(Some(c)) => self
                 .omnibox_tx

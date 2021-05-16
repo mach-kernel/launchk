@@ -34,9 +34,7 @@ fn main() {
     let mut siv: Cursive = cursive::default();
     siv.load_toml(include_str!("tui/style.toml"))
         .expect("Must load styles");
-
-    siv.set_autorefresh(true);
-
+    
     let root_layout = RootLayout::new(&mut siv, runtime.handle());
     let root_layout = NamedView::new("root_layout", root_layout);
 
