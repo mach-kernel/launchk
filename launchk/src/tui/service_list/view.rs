@@ -59,10 +59,7 @@ pub struct ServiceListView {
 impl ServiceListView {
     pub fn new(runtime_handle: &Handle, cb_sink: Sender<CbSinkMessage>) -> Self {
         let arc_svc = Arc::new(RwLock::new(HashSet::new()));
-        let ref_clone = arc_svc.clone();
-        let cb_sink_clone = cb_sink.clone();
-
-        runtime_handle.spawn(async move { poll_running_jobs(ref_clone, cb_sink_clone).await });
+        runtime_handle.spawn(poll_running_jobs(arc_svc.clone(), cb_sink.clone()));
 
         Self {
             cb_sink,

@@ -100,7 +100,7 @@ impl OmniboxView {
         let tx_state = state.clone();
         let tx_tick = tx.clone();
 
-        handle.spawn(async move { tick(tx_state, tx_tick).await });
+        handle.spawn(tick(tx_state, tx_tick));
 
         (
             Self {

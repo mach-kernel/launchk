@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use cursive::event::{Event, EventResult, Key};
 use cursive::traits::{Resizable, Scrollable};
-use cursive::view::ViewWrapper;
+use cursive::view::{ViewWrapper, AnyView};
 use cursive::views::{LinearLayout, NamedView, Panel};
 use cursive::{Cursive, Vec2, View, Printer};
 
@@ -25,9 +25,7 @@ pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 
 pub struct RootLayout {
     layout: LinearLayout,
-    omnibox_rx: Receiver<OmniboxEvent>,
     omnibox_tx: Sender<OmniboxEvent>,
-    last_focus_index: RefCell<usize>,
     runtime_handle: Handle,
     cbsink_channel: Sender<CbSinkMessage>,
     key_ring: VecDeque<Event>,
@@ -41,16 +39,35 @@ enum RootLayoutChildren {
     ServiceList,
 }
 
+async fn poll_omnibox(cb_sink: Sender<CbSinkMessage>, rx: Receiver<OmniboxEvent>) {
+    loop {
+        let recv = rx
+            .recv()
+            .expect("Must receive event");
+
+        log::info!("[root_layout/poll_omnibox]: RECV {:?}", recv);
+
+        cb_sink.send(Box::new(|siv| {
+            siv.call_on_name("root_layout", |v: &mut NamedView<RootLayout>| {
+                v.get_mut().handle_omnibox_event(recv);
+            });
+
+            siv.refresh();
+        }));
+    }
+}
+
 impl RootLayout {
     pub fn new(siv: &mut Cursive, runtime_handle: &Handle) -> Self {
         let (omnibox, omnibox_tx, omnibox_rx) = OmniboxView::new(runtime_handle);
+        let cbsink_channel = RootLayout::cbsink_channel(siv, runtime_handle);
+
+        runtime_handle.spawn(poll_omnibox(cbsink_channel.clone(), omnibox_rx));
 
         let mut new = Self {
             omnibox_tx,
-            omnibox_rx,
+            cbsink_channel,
             layout: LinearLayout::vertical(),
-            last_focus_index: RefCell::new(RootLayoutChildren::ServiceList as usize),
-            cbsink_channel: RootLayout::cbsink_channel(siv, runtime_handle),
             runtime_handle: runtime_handle.clone(),
             key_ring: VecDeque::with_capacity(3),
         };
@@ -89,11 +106,7 @@ impl RootLayout {
         let sink = siv.cb_sink().clone();
 
         handle.spawn(async move {
-            let mut interval = interval(Duration::from_millis(500));
-
             loop {
-                interval.tick().await;
-
                 if let Ok(cb_sink_msg) = rx.recv() {
                     sink.send(cb_sink_msg)
                         .expect("Cannot forward CbSink message")
@@ -111,24 +124,14 @@ impl RootLayout {
         self.layout.on_event(event)
     }
 
-    /// Poll for Omnibox commands without blocking
-    fn poll_omnibox(&mut self) {
-        let recv = self.omnibox_rx.try_recv();
-
-        if recv.is_err() {
-            return;
-        }
-
-        let recv = recv.unwrap();
-        log::info!("[root/poll_omnibox]: {:?}", recv);
-
+    fn handle_omnibox_event(&mut self, recv: OmniboxEvent) {
         self.on_omnibox(recv.clone())
             .expect("Root for effects only");
 
         // The Omnibox command is sent to the actively focused view
         let target = self
             .layout
-            .get_child_mut(*self.last_focus_index.borrow())
+            .get_child_mut(self.layout.get_focus_index())
             .and_then(|v| v.as_any_mut().downcast_mut::<OmniboxSubscribedView>());
 
         if target.is_none() {
@@ -187,7 +190,6 @@ impl ViewWrapper for RootLayout {
     fn wrap_on_event(&mut self, event: Event) -> EventResult {
         log::debug!("[root/event]: {:?}", event);
 
-        self.poll_omnibox();
         let ev = match event {
             Event::Char('/')
             | Event::Char(':')
@@ -217,13 +219,10 @@ impl ViewWrapper for RootLayout {
             _ => self.layout.on_event(event),
         };
 
-        self.poll_omnibox();
-
         ev
     }
 
     fn wrap_layout(&mut self, size: Vec2) {
-        self.poll_omnibox();
         self.layout.layout(size)
     }
 }

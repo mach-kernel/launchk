@@ -105,7 +105,7 @@ pub fn domain_session_prompt<S: Into<String>>(
             }
         }
 
-        let mut layout = LinearLayout::horizontal()
+        let layout = LinearLayout::horizontal()
             .child(domain_type_layout)
             .child(session_type_layout);
 

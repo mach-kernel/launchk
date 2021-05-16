@@ -243,7 +243,7 @@ pub fn init_plist_map(runtime_handle: &Handle) {
     insert_plists(plists);
 
     // Spawn fsnotify subscriber
-    runtime_handle.spawn(async { fsnotify_subscriber().await });
+    runtime_handle.spawn(fsnotify_subscriber());
 }
 
 /// Get plist for a label
