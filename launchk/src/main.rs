@@ -34,7 +34,7 @@ fn main() {
     let mut siv: Cursive = cursive::default();
     siv.load_toml(include_str!("tui/style.toml"))
         .expect("Must load styles");
-    
+
     let root_layout = RootLayout::new(&mut siv, runtime.handle());
     let root_layout = NamedView::new("root_layout", root_layout);
 
@@ -45,6 +45,10 @@ fn main() {
 
     siv.add_layer(panel);
     siv.run();
+    siv.quit();
 
+    // Fix reset on exit
+    // https://github.com/gyscos/cursive/issues/415
+    drop(siv);
     exit(0);
 }
