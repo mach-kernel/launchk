@@ -8,6 +8,7 @@ use std::ffi::{CStr, CString};
 use std::ptr::null_mut;
 use std::sync::Arc;
 
+use crate::objects::xpc_dictionary::XPCDictionary;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -102,11 +103,11 @@ impl From<&str> for XPCObject {
     }
 }
 
-impl From<Vec<XPCObject>> for XPCObject {
-    fn from(slice: Vec<XPCObject>) -> Self {
+impl<O: Into<XPCObject>> From<Vec<O>> for XPCObject {
+    fn from(value: Vec<O>) -> Self {
         let xpc_array = unsafe { xpc_array_create(null_mut(), 0) };
-        for object in slice {
-            unsafe { xpc_array_append_value(xpc_array, object.as_ptr()) }
+        for object in value {
+            unsafe { xpc_array_append_value(xpc_array, object.into().as_ptr()) }
         }
 
         XPCObject::new(xpc_array)
@@ -118,6 +119,14 @@ impl From<String> for XPCObject {
     fn from(value: String) -> Self {
         let cstr = CString::new(value).unwrap();
         unsafe { XPCObject::new(xpc_string_create(cstr.as_ptr())) }
+    }
+}
+
+impl From<XPCDictionary> for XPCObject {
+    /// Use From<HashMap<Into<String>, XPCObject>>
+    fn from(xpcd: XPCDictionary) -> Self {
+        let XPCDictionary(hm) = xpcd;
+        hm.into()
     }
 }
 

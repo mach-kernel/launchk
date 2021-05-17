@@ -9,8 +9,8 @@ extern crate bitflags;
 
 extern crate plist;
 
-use cursive::view::Resizable;
-use cursive::views::Panel;
+use cursive::view::{Resizable, AnyView};
+use cursive::views::{Panel, NamedView};
 use cursive::Cursive;
 use std::process::exit;
 
@@ -28,7 +28,7 @@ fn main() {
         .build()
         .expect("Must build tokio runtime");
 
-    // Cache launchd job plists, spawn fsnotify to keep up with changes
+    // Cache launchd job plist paths, spawn fsnotify to keep up with changes
     PLIST_MAP_INIT.call_once(|| init_plist_map(runtime.handle()));
 
     let mut siv: Cursive = cursive::default();
@@ -36,6 +36,7 @@ fn main() {
         .expect("Must load styles");
 
     let root_layout = RootLayout::new(&mut siv, runtime.handle());
+    let root_layout = NamedView::new("root_layout", root_layout);
 
     let panel = Panel::new(root_layout)
         .title("launchk")
@@ -44,6 +45,10 @@ fn main() {
 
     siv.add_layer(panel);
     siv.run();
+    siv.quit();
 
+    // Fix reset on exit
+    // https://github.com/gyscos/cursive/issues/415
+    drop(siv);
     exit(0);
 }

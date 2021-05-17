@@ -1,6 +1,6 @@
 # launchctl messages
 
-This is a handy reference of XPC messages sent by `launchctl` for some basic commands, as presented by `xpc_copy_description`.
+XPC messages sent by `launchctl` for some basic commands as presented by `xpc_copy_description`.
 
 #### `launchctl print system`
 
@@ -177,6 +177,28 @@ type 8
 strerr Domain does not support specified action
 ```
 
+Response:
+
+```
+    	"EnableTransactions" => <bool: 0x7fff9464d490>: true
+    	"Sockets" => <dictionary: 0x7fcc6462dc80> { count = 1, transaction: 0, voucher = 0x0, contents =
+    		"Listeners" => <array: 0x7fcc64630370> { count = 1, capacity = 1, contents =
+    			0: <fd: 0x7fcc6462e3c0> { type = (invalid descriptor), path = (invalid path) }
+    		}
+    	}
+    	"LimitLoadToSessionType" => <string: 0x7fcc6462dd90> { length = 6, contents = "System" }
+    	"Label" => <string: 0x7fcc6462de00> { length = 17, contents = "com.apple.usbmuxd" }
+    	"OnDemand" => <bool: 0x7fff9464d4b0>: false
+    	"LastExitStatus" => <int64: 0x97301c3994c391b1>: 0
+    	"PID" => <int64: 0x97301c3994c9c1b1>: 165
+    	"Program" => <string: 0x7fcc64631050> { length = 85, contents = "/System/Library/PrivateFrameworks/MobileDevice.framework/Versions/A/Resources/usbmuxd" }
+    	"ProgramArguments" => <array: 0x7fcc6462dea0> { count = 2, capacity = 2, contents =
+    		0: <string: 0x7fcc6462df30> { length = 85, contents = "/System/Library/PrivateFrameworks/MobileDevice.framework/Versions/A/Resources/usbmuxd" }
+    		1: <string: 0x7fcc64630f80> { length = 8, contents = "-launchd" }
+    	}
+    }
+```
+
 #### `launchctl unload ~/Library/LaunchAgents/homebrew.mxcl.elasticsearch.plist`
 
 ```
@@ -195,8 +217,6 @@ strerr Domain does not support specified action
 	"session" => <string: 0x100305630> { length = 4, contents = "Aqua" }
 	"domain-port" => <mach send right: 0x100304fa0> { name = 1799, right = send, urefs = 5 }
 ```
-
-Type seems same even if trying from `/Library`:
 
 ```
 <dictionary: 0x100604420> { count = 11, transaction: 0, voucher = 0x0, contents =
@@ -250,3 +270,85 @@ As root:
 	"domain-port" => <mach send right: 0x100604540> { name = 1799, right = send, urefs = 5 }
 ```
 
+#### `launchctl disable user/501/homebrew.mxcl.postgresql`
+
+- postgresql runs in the `Aqua` domain
+- Interesting that both `name` and `names` are sent!
+
+```
+<dictionary: 0x100404340> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0x2d24e480c52e0073>: 3
+	"handle" => <uint64: 0x2d24e480c5316073>: 501
+	"routine" => <uint64: 0x2d24e480c51ca073>: 809
+	"name" => <string: 0x100404440> { length = 24, contents = "homebrew.mxcl.postgresql" }
+	"type" => <uint64: 0x2d24e480c52e1073>: 2
+	"names" => <array: 0x1004044a0> { count = 1, capacity = 8, contents =
+		0: <string: 0x100404560> { length = 24, contents = "homebrew.mxcl.postgresql" }
+	}
+```
+
+
+#### `launchctl enable user/501/homebrew.mxcl.postgresql`
+
+```
+<dictionary: 0x1004042b0> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xd49d6ee83bb4aaf3>: 3
+	"handle" => <uint64: 0xd49d6ee83babcaf3>: 501
+	"routine" => <uint64: 0xd49d6ee83b861af3>: 808
+	"name" => <string: 0x1004043f0> { length = 24, contents = "homebrew.mxcl.postgresql" }
+	"type" => <uint64: 0xd49d6ee83bb4baf3>: 2
+	"names" => <array: 0x100404450> { count = 1, capacity = 8, contents =
+		0: <string: 0x100404520> { length = 24, contents = "homebrew.mxcl.postgresql" }
+	}
+```
+
+#### `launchctl disable system/com.apple.FontWorker`
+
+- Must run as root
+- Type `1`
+
+```
+<dictionary: 0x100204480> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xe11a6f0157820409>: 3
+	"handle" => <uint64: 0xe11a6f0157823409>: 0
+	"routine" => <uint64: 0xe11a6f0157b0a409>: 809
+	"name" => <string: 0x100204640> { length = 20, contents = "com.apple.FontWorker" }
+	"type" => <uint64: 0xe11a6f0157822409>: 1
+	"names" => <array: 0x1002046a0> { count = 1, capacity = 8, contents =
+		0: <string: 0x100204760> { length = 20, contents = "com.apple.FontWorker" }
+	}
+```
+
+#### `launchctl enable system/com.apple.FontWorker`
+
+- This has a different `LimitLoadToSessionType` set as background, wanted to see if `type` would change
+
+```
+<dictionary: 0x100404140> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xf489c28b42fa66cd>: 3
+	"handle" => <uint64: 0xf489c28b42fa56cd>: 0
+	"routine" => <uint64: 0xf489c28b42c8d6cd>: 808
+	"name" => <string: 0x100404310> { length = 20, contents = "com.apple.FontWorker" }
+	"type" => <uint64: 0xf489c28b42fa46cd>: 1
+	"names" => <array: 0x100404370> { count = 1, capacity = 8, contents =
+		0: <string: 0x1004045b0> { length = 20, contents = "com.apple.FontWorker" }
+	}
+```
+
+Using a `gui/` domain target:
+
+```	
+<dictionary: 0x100404080> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0x199d6ee9dd75252d>: 3
+	"handle" => <uint64: 0x199d6ee9dd6a452d>: 501
+	"routine" => <uint64: 0x199d6ee9dd47952d>: 808
+	"name" => <string: 0x1004042c0> { length = 17, contents = "com.docker.vmnetd" }
+	"type" => <uint64: 0x199d6ee9dd75952d>: 8
+	"names" => <array: 0x100404320> { count = 1, capacity = 8, contents =
+		0: <string: 0x1004043e0> { length = 17, contents = "com.docker.vmnetd" }
+	}
+```
+
+1: System
+2: User
+8: Login (GUI)?

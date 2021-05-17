@@ -14,45 +14,12 @@ use crate::{xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_valu
 
 use block::ConcreteBlock;
 
+#[derive(Debug, Clone)]
 pub struct XPCDictionary(pub HashMap<String, XPCObject>);
 
 impl XPCDictionary {
-    /// Reify xpc_object_t dictionary as a Rust HashMap
-    pub fn new(object: &XPCObject) -> Result<XPCDictionary, XPCError> {
-        let XPCObject(_, object_type) = *object;
-
-        if object_type != *objects::xpc_type::Dictionary {
-            return Err(DictionaryError(
-                "Only XPC_TYPE_DICTIONARY allowed".to_string(),
-            ));
-        }
-
-        let map: Rc<RefCell<HashMap<String, XPCObject>>> = Rc::new(RefCell::new(HashMap::new()));
-        let map_rc_clone = map.clone();
-
-        let block = ConcreteBlock::new(move |key: *const c_char, value: xpc_object_t| {
-            // Prevent xpc_release() collection on block exit
-            unsafe { xpc_retain(value) };
-
-            let str_key = unsafe { CStr::from_ptr(key).to_string_lossy().to_string() };
-            map_rc_clone.borrow_mut().insert(str_key, value.into());
-        });
-        let block = block.copy();
-
-        let ok = unsafe { xpc_dictionary_apply(object.as_ptr(), &*block as *const _ as *mut _) };
-
-        // Explicitly drop the block so map is the only live reference
-        // so we can collect it below
-        std::mem::drop(block);
-
-        if ok {
-            match Rc::try_unwrap(map) {
-                Ok(cell) => Ok(XPCDictionary(cell.into_inner())),
-                Err(_) => Err(DictionaryError("Unable to unwrap Rc".to_string())),
-            }
-        } else {
-            Err(DictionaryError("xpc_dictionary_apply failed".to_string()))
-        }
+    pub fn new() -> Self {
+        XPCDictionary(HashMap::new())
     }
 
     /// Get value from XPCDictionary with support for nesting
@@ -106,8 +73,41 @@ impl From<HashMap<String, XPCObject>> for XPCDictionary {
 impl TryFrom<&XPCObject> for XPCDictionary {
     type Error = XPCError;
 
-    fn try_from(value: &XPCObject) -> Result<XPCDictionary, XPCError> {
-        XPCDictionary::new(value)
+    fn try_from(object: &XPCObject) -> Result<XPCDictionary, XPCError> {
+        let XPCObject(_, object_type) = *object;
+
+        if object_type != *objects::xpc_type::Dictionary {
+            return Err(DictionaryError(
+                "Only XPC_TYPE_DICTIONARY allowed".to_string(),
+            ));
+        }
+
+        let map: Rc<RefCell<HashMap<String, XPCObject>>> = Rc::new(RefCell::new(HashMap::new()));
+        let map_rc_clone = map.clone();
+
+        let block = ConcreteBlock::new(move |key: *const c_char, value: xpc_object_t| {
+            // Prevent xpc_release() collection on block exit
+            unsafe { xpc_retain(value) };
+
+            let str_key = unsafe { CStr::from_ptr(key).to_string_lossy().to_string() };
+            map_rc_clone.borrow_mut().insert(str_key, value.into());
+        });
+        let block = block.copy();
+
+        let ok = unsafe { xpc_dictionary_apply(object.as_ptr(), &*block as *const _ as *mut _) };
+
+        // Explicitly drop the block so map is the only live reference
+        // so we can collect it below
+        std::mem::drop(block);
+
+        if ok {
+            match Rc::try_unwrap(map) {
+                Ok(cell) => Ok(XPCDictionary(cell.into_inner())),
+                Err(_) => Err(DictionaryError("Unable to unwrap Rc".to_string())),
+            }
+        } else {
+            Err(DictionaryError("xpc_dictionary_apply failed".to_string()))
+        }
     }
 }
 
@@ -115,7 +115,7 @@ impl TryFrom<XPCObject> for XPCDictionary {
     type Error = XPCError;
 
     fn try_from(value: XPCObject) -> Result<XPCDictionary, XPCError> {
-        XPCDictionary::new(&value)
+        (&value).try_into()
     }
 }
 
@@ -126,7 +126,7 @@ impl TryFrom<xpc_object_t> for XPCDictionary {
     /// related to passing in objects other than XPC_TYPE_DICTIONARY
     fn try_from(value: xpc_object_t) -> Result<XPCDictionary, XPCError> {
         let obj: XPCObject = value.into();
-        XPCDictionary::new(&obj)
+        obj.try_into()
     }
 }
 

@@ -32,7 +32,7 @@ impl OmniboxState {
     }
 
     /// Suggest a command based on name filter
-    pub fn suggest_command(&self) -> Option<(OmniboxCommand, &str)> {
+    pub fn suggest_command(&self) -> Option<(&str, &str, OmniboxCommand)> {
         let OmniboxState {
             mode,
             command_filter,
@@ -45,7 +45,7 @@ impl OmniboxState {
 
         OMNIBOX_COMMANDS
             .iter()
-            .filter(|(c, _)| c.to_string().contains(command_filter))
+            .filter(|(c, _, _)| c.to_string().contains(command_filter))
             .next()
             .map(|s| s.clone())
     }

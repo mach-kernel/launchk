@@ -130,4 +130,22 @@ mod tests {
         let rs_u64: u64 = xpc_u64.xpc_value().unwrap();
         assert_eq!(std::u64::MAX, rs_u64);
     }
+
+    #[test]
+    fn xpc_value_array() {
+        let xpc_array = XPCObject::from(vec!["eins", "zwei", "polizei"]);
+        let rs_vec: Vec<XPCObject> = xpc_array.xpc_value().unwrap();
+
+        assert_eq!(
+            rs_vec
+                .iter()
+                .map(|o| o.xpc_value().unwrap())
+                .collect::<Vec<String>>(),
+            vec![
+                "eins".to_string(),
+                "zwei".to_string(),
+                "polizei".to_string()
+            ]
+        );
+    }
 }

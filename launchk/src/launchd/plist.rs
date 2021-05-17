@@ -154,18 +154,18 @@ fn build_label_map_entry(plist_path: DirEntry) -> Option<(String, LaunchdPlist)>
         .and_then(|d| d.get("Label"))
         .and_then(|v| v.as_string());
 
-    let entry_type = if path_string.contains(ADMIN_LAUNCH_DAEMONS)
-        || path_string.contains(GLOBAL_LAUNCH_DAEMONS)
+    let entry_type = if path_string.starts_with(ADMIN_LAUNCH_DAEMONS)
+        || path_string.starts_with(GLOBAL_LAUNCH_DAEMONS)
     {
         LaunchdEntryType::Daemon
     } else {
         LaunchdEntryType::Agent
     };
 
-    let entry_location = if path_string.contains(USER_LAUNCH_AGENTS) {
+    let entry_location = if path_string.starts_with(USER_LAUNCH_AGENTS) {
         LaunchdEntryLocation::User
-    } else if path_string.contains(GLOBAL_LAUNCH_AGENTS)
-        || path_string.contains(ADMIN_LAUNCH_DAEMONS)
+    } else if path_string.starts_with(GLOBAL_LAUNCH_AGENTS)
+        || path_string.starts_with(ADMIN_LAUNCH_DAEMONS)
     {
         LaunchdEntryLocation::Global
     } else {
@@ -243,7 +243,7 @@ pub fn init_plist_map(runtime_handle: &Handle) {
     insert_plists(plists);
 
     // Spawn fsnotify subscriber
-    runtime_handle.spawn(async { fsnotify_subscriber().await });
+    runtime_handle.spawn(fsnotify_subscriber());
 }
 
 /// Get plist for a label
@@ -291,7 +291,8 @@ pub fn edit_and_replace(plist_meta: &LaunchdPlist) -> Result<(), String> {
     }
 
     // temp file -> validate with crate -> original
-    let plist = plist::Value::from_file(&temp_path).map_err(|e| e.to_string())?;
+    let plist =
+        plist::Value::from_file(&temp_path).map_err(|e| format!("Changes not saved: {}", e))?;
     let writer = if is_binary {
         plist::Value::to_file_binary
     } else {

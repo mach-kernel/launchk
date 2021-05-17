@@ -15,11 +15,10 @@ use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::state::OmniboxState;
 
-/// Consumers impl OmniboxSubscriber receive these commands
+/// Consumers impl OmniboxSubscriber receive these events
 /// via a channel in a wrapped view
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum OmniboxEvent {
-    FocusServiceList,
     StateUpdate(OmniboxState),
     Command(OmniboxCommand),
 }
@@ -42,7 +41,7 @@ pub enum OmniboxMode {
 /// Move OmniboxState back to idle some time after the user stops
 /// interacting with it
 async fn tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>) {
-    let mut tick_rate = interval(Duration::from_millis(500));
+    let mut tick_rate = interval(Duration::from_millis(250));
 
     loop {
         tick_rate.tick().await;
@@ -70,14 +69,13 @@ async fn tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>) {
         drop(read);
         let mut write = state.write().expect("Must write");
 
-        let out = [
-            tx.send(OmniboxEvent::FocusServiceList),
-            tx.send(OmniboxEvent::StateUpdate(new.clone())),
-        ];
-
-        for msg in out.iter() {
-            msg.as_ref().expect("Must send");
-        }
+        [
+            OmniboxEvent::Command(OmniboxCommand::FocusServiceList),
+            OmniboxEvent::StateUpdate(new.clone()),
+        ]
+        .iter()
+        .try_for_each(|e| tx.send(e.clone()))
+        .expect("Must send events");
 
         log::debug!("[omnibox/tick]: New state: {:?}", &new);
 
@@ -102,7 +100,7 @@ impl OmniboxView {
         let tx_state = state.clone();
         let tx_tick = tx.clone();
 
-        handle.spawn(async move { tick(tx_state, tx_tick).await });
+        handle.spawn(tick(tx_state, tx_tick));
 
         (
             Self {
@@ -127,8 +125,8 @@ impl OmniboxView {
 
         let matched_command = suggested_command
             .as_ref()
-            .filter(|(cmd, _)| cmd.to_string() == *command_filter)
-            .map(|(cmd, _)| cmd.clone());
+            .filter(|(cmd, _, _)| *cmd == *command_filter)
+            .map(|(_, _, oc)| oc.clone());
 
         let (lf_char, cf_char) = match (event, mode) {
             (Event::Char(c), OmniboxMode::LabelFilter) => {
@@ -167,7 +165,7 @@ impl OmniboxView {
             }
             // Complete suggestion
             (Event::Key(Key::Tab), OmniboxMode::CommandFilter) if suggested_command.is_some() => {
-                let (cmd, _) = suggested_command.unwrap();
+                let (cmd, _, _) = suggested_command.unwrap();
 
                 // Can submit from here, but catching a glimpse of the whole command
                 // highlighting before flushing back out is confirmation that it did something
@@ -272,7 +270,7 @@ impl OmniboxView {
         if suggestion.is_none() {
             return;
         }
-        let (cmd, desc) = suggestion.unwrap();
+        let (cmd, desc, ..) = suggestion.unwrap();
         let cmd_string = cmd.to_string().replace(&state.command_filter, "");
 
         printer.with_style(Style::from(Color::Light(BaseColor::Black)), |p| {
@@ -359,13 +357,13 @@ impl View for OmniboxView {
         let new_state = match (event, mode) {
             (Event::CtrlChar('u'), _) => {
                 self.tx
-                    .send(OmniboxEvent::FocusServiceList)
+                    .send(OmniboxEvent::Command(OmniboxCommand::FocusServiceList))
                     .expect("Must focus");
                 Some(OmniboxState::default())
             }
             (Event::Key(Key::Esc), _) => {
                 self.tx
-                    .send(OmniboxEvent::FocusServiceList)
+                    .send(OmniboxEvent::Command(OmniboxCommand::FocusServiceList))
                     .expect("Must focus");
                 Some(state.with_new(Some(OmniboxMode::Idle), None, Some("".to_string()), None))
             }

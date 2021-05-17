@@ -1,11 +1,19 @@
 use std::sync::mpsc::Sender;
 
-use cursive::views::{Dialog, TextView};
 use cursive::Cursive;
+use cursive::{
+    theme::Effect,
+    view::Margins,
+    views::{Dialog, DummyView, LinearLayout, RadioGroup, TextView},
+};
 
-use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::view::OmniboxEvent;
 use crate::tui::root::CbSinkMessage;
+use crate::{
+    launchd::enums::{DomainType, SessionType},
+    tui::omnibox::command::OmniboxCommand,
+};
+use crate::launchd::entry_status::{get_entry_status, LaunchdEntryStatus};
 
 /// The XPC error key sometimes contains information that is not necessarily a failure,
 /// so let's just call it "Notice" until we figure out what to do next?
@@ -32,16 +40,95 @@ pub fn show_prompt(
     let cl = move |siv: &mut Cursive| {
         let ask = Dialog::around(TextView::new(prompt.clone()))
             .button("Yes", move |s| {
-                for cmd in &commands {
-                    tx.send(OmniboxEvent::Command(cmd.clone()))
-                        .expect("Must send command");
-                }
+                commands
+                    .iter()
+                    .try_for_each(|c| tx.send(OmniboxEvent::Command(c.clone())))
+                    .expect("Must sent commands");
+
                 s.pop_layer();
             })
-            .button("No", |s| {
-                s.pop_layer();
-            })
+            .dismiss_button("No")
             .title("Notice");
+
+        siv.add_layer(ask);
+    };
+
+    Box::new(cl)
+}
+
+pub fn domain_session_prompt<S: Into<String>>(
+    label: S,
+    domain_only: bool,
+    tx: Sender<OmniboxEvent>,
+    f: fn(DomainType, Option<SessionType>) -> Vec<OmniboxCommand>,
+) -> CbSinkMessage {
+    let LaunchdEntryStatus {
+        limit_load_to_session_type,
+        domain,
+        ..
+    } = get_entry_status(label);
+
+    let cl = move |siv: &mut Cursive| {
+        let mut domain_group: RadioGroup<DomainType> = RadioGroup::new();
+        let mut st_group: RadioGroup<SessionType> = RadioGroup::new();
+
+        // Build domain type list
+        let mut domain_type_layout = LinearLayout::vertical()
+            .child(TextView::new("Domain Type").effect(Effect::Bold))
+            .child(DummyView);
+
+        for d in DomainType::System as u64..DomainType::Unknown as u64 {
+            let as_domain: DomainType = d.into();
+            let mut button = domain_group.button(as_domain.clone(), format!("{}: {}", d, &as_domain));
+            if as_domain == domain {
+                button = button.selected();
+            }
+
+            domain_type_layout = domain_type_layout.child(button);
+        }
+
+        let mut session_type_layout = LinearLayout::vertical();
+
+        if !domain_only {
+            session_type_layout = session_type_layout
+                .child(TextView::new("Session Type").effect(Effect::Bold))
+                .child(DummyView);
+
+            for s in SessionType::Aqua as u64..SessionType::Unknown as u64 {
+                let as_session: SessionType = s.into();
+
+                let mut button = st_group.button(as_session.clone(), as_session.to_string());
+                if as_session == limit_load_to_session_type {
+                    button = button.selected();
+                }
+                session_type_layout = session_type_layout.child(button);
+            }
+        }
+
+        let layout = LinearLayout::horizontal()
+            .child(domain_type_layout)
+            .child(session_type_layout);
+
+        let ask = Dialog::new()
+            .title("Please select to continue")
+            .content(layout)
+            .button("OK", move |s| {
+                let dt = domain_group.selection().as_ref().clone();
+                let st = if domain_only {
+                    None
+                } else {
+                    Some(st_group.selection().as_ref().clone())
+                };
+
+                f(dt, st)
+                    .iter()
+                    .try_for_each(|c| tx.send(OmniboxEvent::Command(c.clone())))
+                    .expect("Must send commands");
+
+                s.pop_layer();
+            })
+            .dismiss_button("Cancel")
+            .padding(Margins::trbl(5, 5, 5, 5));
 
         siv.add_layer(ask);
     };
