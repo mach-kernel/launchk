@@ -14,6 +14,7 @@ use crate::{
     tui::omnibox::command::OmniboxCommand,
 };
 use crate::launchd::entry_status::{get_entry_status, LaunchdEntryStatus};
+use xpc_sys::csr::{CsrConfig, csr_check};
 
 /// The XPC error key sometimes contains information that is not necessarily a failure,
 /// so let's just call it "Notice" until we figure out what to do next?
@@ -134,4 +135,18 @@ pub fn domain_session_prompt<S: Into<String>>(
     };
 
     Box::new(cl)
+}
+
+pub fn show_csr_info() -> CbSinkMessage {
+    let csr_flags = (0..11).map(|s| {
+        let mask = CsrConfig::from_bits(1 << s).expect("Must be in CsrConfig");
+        format!("{:?}: {}", mask, unsafe { csr_check(mask.bits()) } == 0)
+    }).collect::<Vec<String>>();
+
+    Box::new(move |siv| siv.add_layer(
+        Dialog::new()
+            .title("CSR Info")
+            .content(TextView::new(csr_flags.join("\n")))
+            .dismiss_button("OK")
+    ))
 }

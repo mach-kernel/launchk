@@ -20,6 +20,7 @@ use crate::tui::omnibox::subscribed_view::{
 use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxView};
 use crate::tui::service_list::view::ServiceListView;
 use crate::tui::sysinfo::SysInfo;
+use crate::tui::dialog::show_csr_info;
 
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 
@@ -260,6 +261,13 @@ impl OmniboxSubscriber for RootLayout {
                         f,
                     ))
                     .expect("Must show prompt");
+                Ok(None)
+            }
+            OmniboxEvent::Command(OmniboxCommand::CSRInfo) => {
+                self.cbsink_channel
+                    .send(show_csr_info())
+                    .expect("Must show prompt");
+
                 Ok(None)
             }
             _ => Ok(None),

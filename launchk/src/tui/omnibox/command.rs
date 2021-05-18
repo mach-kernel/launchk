@@ -26,6 +26,7 @@ pub enum OmniboxCommand {
         fn(DomainType, Option<SessionType>) -> Vec<OmniboxCommand>,
     ),
     FocusServiceList,
+    CSRInfo,
     Quit,
 }
 
@@ -35,7 +36,7 @@ impl fmt::Display for OmniboxCommand {
     }
 }
 
-pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 7] = [
+pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 8] = [
     (
         "load",
         "▶️  Load highlighted job",
@@ -66,6 +67,11 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 7] = [
         "reload",
         "🔄  Reload highlighted job",
         OmniboxCommand::Reload,
+    ),
+    (
+        "csrinfo",
+        "ℹ️  See all CSR flags",
+        OmniboxCommand::CSRInfo,
     ),
     ("exit", "🚪 see ya!", OmniboxCommand::Quit),
 ];

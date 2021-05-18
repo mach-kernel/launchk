@@ -290,11 +290,9 @@ impl OmniboxView {
         } = &*read;
 
         let jtf_ofs = if *mode != OmniboxMode::JobTypeFilter {
-            // "[sguadl]"
-            8
+            "[sguadl]".len()
         } else {
-            // "[system global user agent daemon loaded]"
-            40
+            "[system global user agent daemon loaded]".len()
         };
 
         let mut jtf_ofs = self.last_size.borrow().x - jtf_ofs;
