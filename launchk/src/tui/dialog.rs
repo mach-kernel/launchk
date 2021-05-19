@@ -15,6 +15,7 @@ use crate::{
 };
 use crate::launchd::entry_status::{get_entry_status, LaunchdEntryStatus};
 use xpc_sys::csr::{CsrConfig, csr_check};
+use crate::tui::omnibox::command::OMNIBOX_COMMANDS;
 
 /// The XPC error key sometimes contains information that is not necessarily a failure,
 /// so let's just call it "Notice" until we figure out what to do next?
@@ -148,5 +149,21 @@ pub fn show_csr_info() -> CbSinkMessage {
             .title("CSR Info")
             .content(TextView::new(csr_flags.join("\n")))
             .dismiss_button("OK")
+            .padding(Margins::trbl(2, 2, 2, 2))
+    ))
+}
+
+pub fn show_help() -> CbSinkMessage {
+    let commands = OMNIBOX_COMMANDS
+        .iter()
+        .map(|(cmd, desc, _)| format!("{}: {}", cmd, desc))
+        .collect::<Vec<String>>();
+
+    Box::new(move |siv| siv.add_layer(
+        Dialog::new()
+            .title("Help")
+            .content(TextView::new(commands.join("\n")))
+            .dismiss_button("OK")
+            .padding(Margins::trbl(2, 2, 2, 2))
     ))
 }
