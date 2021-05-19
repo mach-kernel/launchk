@@ -47,7 +47,6 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 9] = [
         "unload",
         "⏏️  Unload highlighted job",
         OmniboxCommand::UnloadRequest,
-        // OmniboxCommand::DomainSessionPrompt(false, |dt, _| vec![OmniboxCommand::Unload(dt, None)]),
     ),
     (
         "enable",
