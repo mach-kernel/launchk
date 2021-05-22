@@ -27,11 +27,11 @@ pub trait QueryBuilder {
         self.entry("session", session.unwrap_or(SessionType::Aqua).to_string())
     }
 
-    fn with_handle_or_default(self, session: Option<u64>) -> XPCDictionary
+    fn with_handle_or_default(self, handle: Option<u64>) -> XPCDictionary
     where
         Self: Sized,
     {
-        self.entry("handle", session.unwrap_or(0))
+        self.entry("handle", handle.unwrap_or(0))
     }
 
     fn with_domain_type_or_default(self, t: Option<DomainType>) -> XPCDictionary

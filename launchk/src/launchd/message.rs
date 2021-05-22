@@ -45,4 +45,10 @@ lazy_static! {
         // .entry("handle", UID or ASID)
         .entry("routine", 809 as u64)
         .entry("subsystem", 3 as u64);
+
+    pub static ref DUMPSTATE: XPCDictionary = XPCDictionary::new()
+        .entry("subsystem", 3 as u64)
+        .entry("routine", 834 as u64)
+        .entry("type", 1 as u64)
+        .with_handle_or_default(None);
 }

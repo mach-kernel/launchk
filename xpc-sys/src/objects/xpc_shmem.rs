@@ -1,5 +1,5 @@
-use crate::{vm_address_t, mach_port_t, vm_size_t, vm_allocate, rs_strerror, vm_deallocate, mach_task_self_};
-use std::sync::Arc;
+use crate::{vm_address_t, mach_port_t, vm_size_t, vm_allocate, rs_strerror, vm_deallocate, mach_task_self_, xpc_shmem_create};
+use std::{ffi::c_void, sync::Arc};
 use crate::objects::xpc_object::XPCObject;
 use std::os::raw::c_int;
 use crate::objects::xpc_error::XPCError;
@@ -35,7 +35,9 @@ impl XPCShmem {
                 task,
                 size,
                 region: Arc::new(region),
-                xpc_object: Default::default()
+                xpc_object: unsafe {
+                    xpc_shmem_create(region as *mut c_void, size as u64).into()
+                }
             })
         }
     }

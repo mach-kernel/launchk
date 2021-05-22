@@ -1,9 +1,9 @@
 use crate::launchd::message::{
-    DISABLE_NAMES, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS,
+    DISABLE_NAMES, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS, DUMPSTATE
 };
 use std::collections::HashSet;
 
-use xpc_sys::traits::xpc_pipeable::XPCPipeable;
+use xpc_sys::{objects::xpc_shmem::XPCShmem, traits::xpc_pipeable::XPCPipeable};
 
 use crate::launchd::entry_status::ENTRY_STATUS_CACHE;
 use std::iter::FromIterator;
@@ -124,5 +124,15 @@ pub fn disable<S: Into<String>>(
         .entry("name", label_string.clone())
         .entry("names", vec![label_string])
         .with_handle_or_default(None)
+        .pipe_routine_with_error_handling()
+}
+
+pub fn dumpstate() -> Result<XPCDictionary, XPCError> {
+    let shmem = XPCShmem::new_task_self(0x1400000, 0)?;
+
+    XPCDictionary::new()
+        .extend(&DUMPSTATE)
+        // this is going to vm_deallocate when this function exits. need better solve.
+        .entry("shmem", shmem.xpc_object.clone())
         .pipe_routine_with_error_handling()
 }
