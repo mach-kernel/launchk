@@ -11,3 +11,4 @@ pub mod xpc_type;
 pub mod xpc_pipe;
 
 pub mod xpc_error;
+pub mod xpc_shmem;
