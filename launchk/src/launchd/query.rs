@@ -1,9 +1,10 @@
 use crate::launchd::message::{
     DISABLE_NAMES, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS, DUMPSTATE
 };
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, convert::TryInto, sync::Arc};
+use std::convert::TryFrom;
 
-use xpc_sys::{objects::{xpc_object::XPCObject, xpc_shmem::XPCShmem}, traits::xpc_pipeable::XPCPipeable};
+use xpc_sys::{MAP_SHARED, objects::{xpc_object::XPCObject, xpc_shmem::XPCShmem}, traits::xpc_pipeable::XPCPipeable};
 
 use crate::launchd::entry_status::ENTRY_STATUS_CACHE;
 use std::iter::FromIterator;
@@ -128,7 +129,7 @@ pub fn disable<S: Into<String>>(
 }
 
 pub fn dumpstate() -> Result<XPCDictionary, XPCError> {
-    let shmem = XPCShmem::new_task_self(0x1400000, 0)?;
+    let shmem = XPCShmem::new_task_self(0x1400000, i32::try_from(MAP_SHARED).expect("Must conv flags"))?;
 
     log::info!("Made shmem {:?}", shmem);
 
