@@ -130,6 +130,13 @@ impl From<XPCDictionary> for XPCObject {
     }
 }
 
+impl From<&Arc<XPCObject>> for XPCObject {
+    fn from(value: &Arc<XPCObject>) -> Self {
+        let XPCObject(ref arc, ref xpc_type) = **value;
+        XPCObject(arc.clone(), xpc_type.clone())
+    }
+}
+
 /// Cloning an XPC object will clone the underlying Arc -- we will
 /// call xpc_release() only if we are the last valid reference
 /// (and underlying data is not null)

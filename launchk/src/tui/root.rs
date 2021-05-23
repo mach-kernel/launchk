@@ -12,7 +12,7 @@ use cursive::{Cursive, Vec2, View, Printer};
 use tokio::runtime::Handle;
 use tokio::time::interval;
 
-use crate::tui::dialog;
+use crate::{launchd::query::dumpstate, tui::dialog};
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::subscribed_view::{
     OmniboxResult, OmniboxSubscribedView, OmniboxSubscriber, Subscribable,
@@ -268,6 +268,11 @@ impl OmniboxSubscriber for RootLayout {
                     .send(show_csr_info())
                     .expect("Must show prompt");
 
+                Ok(None)
+            }
+            OmniboxEvent::Command(OmniboxCommand::DumpState) => {
+                let res = dumpstate();
+                log::info!("dumpstate! {:?}", res);
                 Ok(None)
             }
             OmniboxEvent::Command(OmniboxCommand::Help) => {

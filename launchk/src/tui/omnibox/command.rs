@@ -27,6 +27,7 @@ pub enum OmniboxCommand {
     ),
     FocusServiceList,
     CSRInfo,
+    DumpState,
     Help,
     Quit,
 }
@@ -37,7 +38,7 @@ impl fmt::Display for OmniboxCommand {
     }
 }
 
-pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 9] = [
+pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 10] = [
     (
         "load",
         "▶️  Load highlighted job",
@@ -72,6 +73,11 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 9] = [
         "csrinfo",
         "ℹ️  See all CSR flags",
         OmniboxCommand::CSRInfo,
+    ),
+    (
+        "dumpstate",
+        "ℹ️  launchctl dumpstate",
+        OmniboxCommand::DumpState,
     ),
     ("help", "🤔  Show all commands", OmniboxCommand::Help),
     ("exit", "🚪 see ya!", OmniboxCommand::Quit),

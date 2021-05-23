@@ -1,15 +1,16 @@
-use crate::{vm_address_t, mach_port_t, vm_size_t, vm_allocate, rs_strerror, vm_deallocate, mach_task_self_, xpc_shmem_create};
+use crate::{vm_address_t, mach_port_t, vm_size_t, vm_allocate, rs_strerror, vm_deallocate, mach_task_self_, xpc_shmem_create, xpc_object_t};
 use std::{ffi::c_void, sync::Arc};
 use crate::objects::xpc_object::XPCObject;
 use std::os::raw::c_int;
 use crate::objects::xpc_error::XPCError;
 use std::ptr::null_mut;
 
+#[derive(Debug, Clone)]
 pub struct XPCShmem {
     pub task: mach_port_t,
     pub size: vm_size_t,
-    pub region: Arc<*mut vm_address_t>,
-    pub xpc_object: XPCObject,
+    pub region: *mut c_void,
+    pub xpc_object: Arc<XPCObject>,
 }
 
 impl XPCShmem {
@@ -18,11 +19,11 @@ impl XPCShmem {
         size: vm_size_t,
         flags: c_int,
     ) -> Result<XPCShmem, XPCError> {
-        let mut region: *mut vm_address_t = null_mut();
+        let mut region: *mut c_void = null_mut();
         let err = unsafe {
             vm_allocate(
                 task,
-                region,
+                &mut region as *const _ as *mut vm_address_t,
                 size,
                 flags,
             )
@@ -34,10 +35,10 @@ impl XPCShmem {
             Ok(XPCShmem {
                 task,
                 size,
-                region: Arc::new(region),
-                xpc_object: unsafe {
+                region,
+                xpc_object: Arc::new(unsafe {
                     xpc_shmem_create(region as *mut c_void, size as u64).into()
-                }
+                })
             })
         }
     }
@@ -52,19 +53,19 @@ impl XPCShmem {
 
 impl Drop for XPCShmem {
     fn drop(&mut self) {
-        let XPCShmem { size, task, region, .. } = self;
-        if **region == null_mut() {
+        let XPCShmem { size, task, region, xpc_object } = self;
+        if *region == null_mut() {
             return;
         }
 
-        let refs = Arc::strong_count(&region);
+        let refs = Arc::strong_count(xpc_object);
         if refs > 1 {
             log::warn!("vm_allocated region {:p} still has {} refs, cannot vm_deallocate", *region, refs);
             return;
         }
 
         unsafe {
-            vm_deallocate(*task, ***region, *size)
+            vm_deallocate(*task, *region as vm_address_t, *size)
         };
     }
 }
