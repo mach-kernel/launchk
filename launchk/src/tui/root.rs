@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, ffi::{CStr, CString}};
 use std::collections::VecDeque;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
@@ -21,6 +21,8 @@ use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxView};
 use crate::tui::service_list::view::ServiceListView;
 use crate::tui::sysinfo::SysInfo;
 use crate::tui::dialog::{show_csr_info, show_help};
+
+use super::dialog::show_dumpstate;
 
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 
@@ -271,8 +273,20 @@ impl OmniboxSubscriber for RootLayout {
                 Ok(None)
             }
             OmniboxEvent::Command(OmniboxCommand::DumpState) => {
-                let res = dumpstate();
-                log::info!("dumpstate! {:?}", res);
+                let (size, shmem) = dumpstate()
+                    .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+
+                log::info!("shmem response {}: {:?}", size, shmem);
+
+                // It'll probably do the right thing
+                let c_str = unsafe {
+                    CStr::from_ptr(shmem.region as *mut _)
+                };
+
+                self.cbsink_channel
+                    .send(show_dumpstate(c_str.to_string_lossy()))
+                    .expect("Must show prompt");
+
                 Ok(None)
             }
             OmniboxEvent::Command(OmniboxCommand::Help) => {

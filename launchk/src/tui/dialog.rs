@@ -1,6 +1,6 @@
 use std::sync::mpsc::Sender;
 
-use cursive::Cursive;
+use cursive::{Cursive, traits::Scrollable};
 use cursive::{
     theme::Effect,
     view::Margins,
@@ -165,5 +165,16 @@ pub fn show_help() -> CbSinkMessage {
             .content(TextView::new(commands.join("\n")))
             .dismiss_button("OK")
             .padding(Margins::trbl(2, 2, 2, 2))
+    ))
+}
+
+pub fn show_dumpstate<S: Into<String>>(text: S) -> CbSinkMessage {
+    let text = text.into();
+
+    Box::new(move |siv| siv.add_layer(
+        Dialog::new()
+            .title("dumpstate")
+            .content(TextView::new(text).scrollable())
+            .dismiss_button("OK")
     ))
 }
