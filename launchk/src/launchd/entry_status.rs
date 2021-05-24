@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
-use crate::launchd::enums::{SessionType, DomainType};
+use crate::launchd::enums::{DomainType, SessionType};
 use crate::launchd::plist::LaunchdPlist;
 use crate::launchd::query::find_in_all;
 use xpc_sys::traits::xpc_value::TryXPCValue;

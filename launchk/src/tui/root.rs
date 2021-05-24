@@ -1,18 +1,24 @@
-use std::{cell::RefCell, ffi::{CStr, CString}};
 use std::collections::VecDeque;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::time::Duration;
+
+use std::{
+    cell::RefCell,
+    ffi::{CStr, CString},
+    io::Write,
+    os::raw::c_char,
+    process::{Command, Stdio},
+    ptr::slice_from_raw_parts,
+};
 
 use cursive::event::{Event, EventResult, Key};
 use cursive::traits::{Resizable, Scrollable};
-use cursive::view::{ViewWrapper, AnyView};
+use cursive::view::{AnyView, ViewWrapper};
 use cursive::views::{LinearLayout, NamedView, Panel};
-use cursive::{Cursive, Vec2, View, Printer};
+use cursive::{Cursive, Vec2, View};
 
 use tokio::runtime::Handle;
-use tokio::time::interval;
 
-use crate::{launchd::query::dumpstate, tui::dialog};
+use crate::tui::dialog::{show_csr_info, show_help};
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::subscribed_view::{
     OmniboxResult, OmniboxSubscribedView, OmniboxSubscriber, Subscribable,
@@ -20,9 +26,11 @@ use crate::tui::omnibox::subscribed_view::{
 use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxView};
 use crate::tui::service_list::view::ServiceListView;
 use crate::tui::sysinfo::SysInfo;
-use crate::tui::dialog::{show_csr_info, show_help};
+use crate::{launchd::query::dumpstate, tui::dialog};
 
-use super::dialog::show_dumpstate;
+lazy_static! {
+    static ref PAGER: &'static str = option_env!("PAGER").unwrap_or("less");
+}
 
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 
@@ -44,17 +52,17 @@ enum RootLayoutChildren {
 
 async fn poll_omnibox(cb_sink: Sender<CbSinkMessage>, rx: Receiver<OmniboxEvent>) {
     loop {
-        let recv = rx
-            .recv()
-            .expect("Must receive event");
+        let recv = rx.recv().expect("Must receive event");
 
         log::info!("[root_layout/poll_omnibox]: RECV {:?}", recv);
 
-        cb_sink.send(Box::new(|siv| {
-            siv.call_on_name("root_layout", |v: &mut NamedView<RootLayout>| {
-                v.get_mut().handle_omnibox_event(recv);
-            });
-        }));
+        cb_sink
+            .send(Box::new(|siv| {
+                siv.call_on_name("root_layout", |v: &mut NamedView<RootLayout>| {
+                    v.get_mut().handle_omnibox_event(recv);
+                });
+            }))
+            .expect("Must forward to root")
     }
 }
 
@@ -183,7 +191,7 @@ impl RootLayout {
 
 impl ViewWrapper for RootLayout {
     wrap_impl!(self.layout: LinearLayout);
-    
+
     fn wrap_on_event(&mut self, event: Event) -> EventResult {
         log::debug!("[root/event]: {:?}", event);
 
@@ -273,21 +281,45 @@ impl OmniboxSubscriber for RootLayout {
                 Ok(None)
             }
             OmniboxEvent::Command(OmniboxCommand::DumpState) => {
-                let (size, shmem) = dumpstate()
+                let (size, shmem) =
+                    dumpstate().map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+
+                log::info!("shmem response sz {}", size);
+
+                let mut pager = Command::new(*PAGER)
+                    .stdin(Stdio::piped())
+                    .spawn()
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
 
-                log::info!("shmem response {}: {:?}", size, shmem);
+                let pager_stdin = pager.stdin.take();
 
-                // It'll probably do the right thing
-                let c_str = unsafe {
-                    CStr::from_ptr(shmem.region as *mut _)
-                };
+                self.runtime_handle.spawn(async move {
+                    let raw_slice = slice_from_raw_parts(shmem.region as *mut u8, size);
+
+                    unsafe {
+                        pager_stdin
+                            .expect("Must have pager stdin")
+                            .write_all(&*raw_slice)
+                            .expect("Must write dumpstate")
+                    };
+                });
+
+                let res = pager
+                    .wait()
+                    .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
 
                 self.cbsink_channel
-                    .send(show_dumpstate(c_str.to_string_lossy()))
-                    .expect("Must show prompt");
+                    .send(Box::new(Cursive::clear))
+                    .expect("Must clear");
 
-                Ok(None)
+                if !res.success() {
+                    Err(OmniboxError::CommandError(format!(
+                        "{} exited {:?}",
+                        *PAGER, res
+                    )))
+                } else {
+                    Ok(None)
+                }
             }
             OmniboxEvent::Command(OmniboxCommand::Help) => {
                 self.cbsink_channel

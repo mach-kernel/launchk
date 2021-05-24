@@ -1,4 +1,6 @@
-use crate::objects::xpc_error::XPCError::{DictionaryError, PipeError, QueryError, ShmemError, ValueError};
+use crate::objects::xpc_error::XPCError::{
+    DictionaryError, PipeError, QueryError, ShmemError, ValueError,
+};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 

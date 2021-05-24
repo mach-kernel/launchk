@@ -1,10 +1,14 @@
 use crate::launchd::message::{
-    DISABLE_NAMES, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS, DUMPSTATE
+    DISABLE_NAMES, DUMPSTATE, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS,
 };
-use std::{collections::HashSet};
+use std::collections::HashSet;
 use std::convert::TryFrom;
 
-use xpc_sys::{MAP_SHARED, objects::{xpc_object::XPCObject, xpc_shmem::XPCShmem}, traits::{xpc_pipeable::XPCPipeable, xpc_value::TryXPCValue}};
+use xpc_sys::{
+    objects::{xpc_object::XPCObject, xpc_shmem::XPCShmem},
+    traits::{xpc_pipeable::XPCPipeable, xpc_value::TryXPCValue},
+    MAP_SHARED,
+};
 
 use crate::launchd::entry_status::ENTRY_STATUS_CACHE;
 use std::iter::FromIterator;
@@ -129,10 +133,13 @@ pub fn disable<S: Into<String>>(
 }
 
 /// Create a shared shmem region for the XPC routine to write
-/// dumpstate contents into, and return the bytes written and 
+/// dumpstate contents into, and return the bytes written and
 /// shmem region
 pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
-    let shmem = XPCShmem::new_task_self(0x1400000, i32::try_from(MAP_SHARED).expect("Must conv flags"))?;
+    let shmem = XPCShmem::new_task_self(
+        0x1400000,
+        i32::try_from(MAP_SHARED).expect("Must conv flags"),
+    )?;
 
     log::info!("Made shmem {:?}", shmem);
 

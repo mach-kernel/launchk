@@ -13,6 +13,7 @@ use cursive::{Cursive, View, XY};
 use tokio::runtime::Handle;
 use tokio::time::interval;
 
+use crate::launchd::enums::{DomainType, SessionType};
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};
 use crate::launchd::query::{disable, enable, list_all, load, unload};
@@ -20,14 +21,13 @@ use crate::launchd::{
     entry_status::get_entry_status, entry_status::LaunchdEntryStatus, plist::LaunchdPlist,
 };
 use crate::tui::omnibox::command::OmniboxCommand;
+
 use crate::tui::omnibox::state::OmniboxState;
 use crate::tui::omnibox::subscribed_view::{OmniboxResult, OmniboxSubscriber};
 use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxMode};
 use crate::tui::root::CbSinkMessage;
 use crate::tui::service_list::list_item::ServiceListItem;
 use crate::tui::table::table_list_view::TableListView;
-use crate::launchd::enums::{SessionType, DomainType};
-use crate::tui::omnibox::command::OmniboxCommand::DomainSessionPrompt;
 
 /// Polls XPC for job list
 async fn poll_running_jobs(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSinkMessage>) {
@@ -194,24 +194,20 @@ impl ServiceListView {
                 } = get_entry_status(&name);
 
                 match (limit_load_to_session_type, domain) {
-                    (_, DomainType::Unknown) | (SessionType::Unknown, _) => {
-                        Ok(Some(OmniboxCommand::DomainSessionPrompt(
-                            name.clone(),
-                            false,
-                            |dt, st| {
-                                vec![
-                                    OmniboxCommand::Unload(dt.clone(), None),
-                                    OmniboxCommand::Load(st.expect("Must provide"), dt, None),
-                                ]
-                            },
-                        )))
-                    },
+                    (_, DomainType::Unknown) | (SessionType::Unknown, _) => Ok(Some(
+                        OmniboxCommand::DomainSessionPrompt(name.clone(), false, |dt, st| {
+                            vec![
+                                OmniboxCommand::Unload(dt.clone(), None),
+                                OmniboxCommand::Load(st.expect("Must provide"), dt, None),
+                            ]
+                        }),
+                    )),
                     (st, dt) => Ok(Some(OmniboxCommand::Chain(vec![
                         OmniboxCommand::Unload(dt.clone(), None),
                         OmniboxCommand::Load(st, dt, None),
-                    ])))
+                    ]))),
                 }
-            },
+            }
             OmniboxCommand::LoadRequest => {
                 let (ServiceListItem { name, .. }, ..) = self.with_active_item_plist()?;
                 Ok(Some(OmniboxCommand::DomainSessionPrompt(
@@ -223,45 +219,43 @@ impl ServiceListView {
                             dt,
                             None,
                         )]
-                    }
-                )))
-            },
-            OmniboxCommand::UnloadRequest => {
-                let (ServiceListItem { name, .. }, ..) = self.with_active_item_plist()?;
-                let LaunchdEntryStatus {
-                    domain,
-                    ..
-                } = get_entry_status(&name);
-
-                match domain {
-                    DomainType::Unknown => Ok(Some(OmniboxCommand::DomainSessionPrompt(name.clone(), true, |dt, _| vec![OmniboxCommand::Unload(dt, None)]))),
-                    _ => Ok(Some(OmniboxCommand::Unload(domain, None)))
-                }
-            },
-            OmniboxCommand::EnableRequest => {
-                let (ServiceListItem { name, .. }, ..) = self.with_active_item_plist()?;
-                Ok(Some(OmniboxCommand::DomainSessionPrompt(
-                    name.clone(),
-                    true,
-                    |dt, _| vec![OmniboxCommand::Enable(dt)]
+                    },
                 )))
             }
-            OmniboxCommand::DisableRequest => {
+            OmniboxCommand::UnloadRequest => {
                 let (ServiceListItem { name, .. }, ..) = self.with_active_item_plist()?;
-                let LaunchdEntryStatus {
-                    domain,
-                    ..
-                } = get_entry_status(&name);
+                let LaunchdEntryStatus { domain, .. } = get_entry_status(&name);
 
                 match domain {
                     DomainType::Unknown => Ok(Some(OmniboxCommand::DomainSessionPrompt(
                         name.clone(),
                         true,
-                        |dt, _| vec![OmniboxCommand::Disable(dt)]
+                        |dt, _| vec![OmniboxCommand::Unload(dt, None)],
                     ))),
-                    _ => Ok(Some(OmniboxCommand::Chain(vec![
-                        OmniboxCommand::Disable(domain)
-                    ])))
+                    _ => Ok(Some(OmniboxCommand::Unload(domain, None))),
+                }
+            }
+            OmniboxCommand::EnableRequest => {
+                let (ServiceListItem { name, .. }, ..) = self.with_active_item_plist()?;
+                Ok(Some(OmniboxCommand::DomainSessionPrompt(
+                    name.clone(),
+                    true,
+                    |dt, _| vec![OmniboxCommand::Enable(dt)],
+                )))
+            }
+            OmniboxCommand::DisableRequest => {
+                let (ServiceListItem { name, .. }, ..) = self.with_active_item_plist()?;
+                let LaunchdEntryStatus { domain, .. } = get_entry_status(&name);
+
+                match domain {
+                    DomainType::Unknown => Ok(Some(OmniboxCommand::DomainSessionPrompt(
+                        name.clone(),
+                        true,
+                        |dt, _| vec![OmniboxCommand::Disable(dt)],
+                    ))),
+                    _ => Ok(Some(OmniboxCommand::Chain(vec![OmniboxCommand::Disable(
+                        domain,
+                    )]))),
                 }
             }
             OmniboxCommand::Edit => {
@@ -283,7 +277,7 @@ impl ServiceListView {
                 load(name, plist.plist_path, Some(dt), Some(st), None)
                     .map(|_| None)
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
-            },
+            }
             OmniboxCommand::Unload(dt, _handle) => {
                 let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
                 let LaunchdEntryStatus {

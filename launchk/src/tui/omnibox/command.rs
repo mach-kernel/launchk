@@ -57,7 +57,7 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 10] = [
     (
         "disable",
         "⏏️  Disable highlighted job (prevents load)",
-        OmniboxCommand::DisableRequest
+        OmniboxCommand::DisableRequest,
     ),
     (
         "edit",
@@ -69,11 +69,7 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 10] = [
         "🔄  Reload highlighted job",
         OmniboxCommand::Reload,
     ),
-    (
-        "csrinfo",
-        "ℹ️  See all CSR flags",
-        OmniboxCommand::CSRInfo,
-    ),
+    ("csrinfo", "ℹ️  See all CSR flags", OmniboxCommand::CSRInfo),
     (
         "dumpstate",
         "ℹ️  launchctl dumpstate",

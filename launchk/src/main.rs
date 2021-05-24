@@ -9,8 +9,8 @@ extern crate bitflags;
 
 extern crate plist;
 
-use cursive::view::{Resizable, AnyView};
-use cursive::views::{Panel, NamedView};
+use cursive::view::Resizable;
+use cursive::views::{NamedView, Panel};
 use cursive::Cursive;
 use std::process::exit;
 
