@@ -153,45 +153,9 @@ pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
     Ok((usize::try_from(bytes_written).unwrap(), shmem))
 }
 
-pub fn dumpjpcategory() -> Result<String, XPCError> {
-    let fifo_name = unsafe { 
-        CStr::from_ptr(tmpnam(null_mut()))
-    };
-
-    let err = unsafe {
-        mkfifo(fifo_name.as_ptr(), 0o777)
-    };
-
-    if err != 0 {
-        return Err(XPCError::IOError(rs_strerror(err)));
-    }
-
-    let fifo_fd_read = unsafe {
-        open(fifo_name.as_ptr(), O_RDONLY | O_NONBLOCK)
-    };
-
-    let fifo_fd_write = unsafe {
-        open(fifo_name.as_ptr(), O_WRONLY | O_NONBLOCK)
-    };
-
-    log::info!("Named FIFO: {}, {}", fifo_name.to_string_lossy(), fifo_fd_write);
-
+pub fn dumpjpcategory(fd: RawFd) -> Result<XPCDictionary, XPCError> {
     XPCDictionary::new()
         .extend(&DUMPJPCATEGORY)
-        .entry("fd", fifo_fd_write as RawFd)
-        .pipe_routine_with_error_handling()?;
-
-    unsafe { 
-        close(fifo_fd_write)
-    };
-
-    let mut fifo_read = unsafe {
-        File::from_raw_fd(fifo_fd_read)
-    };
-
-    let mut buf = String::new();
-    fifo_read.read_to_string(&mut buf)
-        .map_err(|e| XPCError::IOError(e.to_string()))?;
-
-    Ok(buf)
+        .entry("fd", fd)
+        .pipe_routine_with_error_handling()
 }

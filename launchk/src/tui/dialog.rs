@@ -175,18 +175,3 @@ pub fn show_help() -> CbSinkMessage {
         )
     })
 }
-
-pub fn scrollable_dialog<S: Into<String>>(title: S, content: S) -> CbSinkMessage {
-    let title = title.into();
-    let content = content.into();
-
-    Box::new(move |siv| {
-        siv.add_layer(
-            Dialog::new()
-                .title(title)
-                .content(TextView::new(content).scrollable())
-                .dismiss_button("OK")
-                .padding(Margins::trbl(2, 2, 2, 2)),
-        )
-    })
-}

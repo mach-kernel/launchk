@@ -1,4 +1,8 @@
 use std::collections::VecDeque;
+use std::fs::File;
+use std::io::Read;
+use std::os::unix::prelude::FromRawFd;
+use std::ptr::null_mut;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 use std::{
@@ -16,7 +20,15 @@ use cursive::view::{AnyView, ViewWrapper};
 use cursive::views::{LinearLayout, NamedView, Panel};
 use cursive::{Cursive, Vec2, View};
 
+use libc::O_NONBLOCK;
+use libc::O_RDONLY;
+use libc::O_WRONLY;
+use libc::mkfifo;
+use libc::open;
+use libc::tmpnam;
 use tokio::runtime::Handle;
+use tokio::task::block_in_place;
+use xpc_sys::rs_strerror;
 
 use crate::tui::dialog::scrollable_dialog;
 use crate::{launchd::query::dumpjpcategory, tui::dialog::{show_csr_info, show_help}};
@@ -135,8 +147,9 @@ impl RootLayout {
     }
 
     fn handle_omnibox_event(&mut self, recv: OmniboxEvent) {
+        // TODO: handle this error with dialog as well
         self.on_omnibox(recv.clone())
-            .expect("Root for effects only");
+            .expect("i am a shitty error");
 
         let target = self
             .layout
@@ -323,18 +336,81 @@ impl OmniboxSubscriber for RootLayout {
                 }
             }
             OmniboxEvent::Command(OmniboxCommand::DumpJetsamPropertiesCategory) => {
+                let fifo_name = unsafe { 
+                    CStr::from_ptr(tmpnam(null_mut()))
+                };
+            
+                let err = unsafe {
+                    mkfifo(fifo_name.as_ptr(), 0o777)
+                };
+            
+                if err != 0 {
+                    return Err(OmniboxError::CommandError(rs_strerror(err)));
+                }
 
-                // let res = dumpjpcategory();
-                // log::info!("XPCR: {:?}", res);
-                // Ok(None)
-                let res = dumpjpcategory()
+                // Spawn pipe reader
+                let fd_read_thread = std::thread::spawn(move || {
+                    let fifo_fd_read = unsafe {
+                        open(fifo_name.as_ptr(), O_RDONLY)
+                    };
+
+                    let mut file = unsafe {
+                        File::from_raw_fd(fifo_fd_read)
+                    };
+
+                    let mut buf = String::new();
+                    file.read_to_string(&mut buf).expect("Must read string");
+
+                    buf
+                });
+
+                // Spawn pipe writer (XPC endpoint)
+                self.runtime_handle.spawn(async move {
+                    let fifo_fd_write = unsafe {
+                        open(fifo_name.as_ptr(), O_WRONLY | O_NONBLOCK)
+                    };
+    
+                    dumpjpcategory(fifo_fd_write).expect("Must OK");
+
+                    unsafe { 
+                        libc::close(fifo_fd_write)
+                    };
+                });
+
+                // Join reader thread
+                let jetsam_data = fd_read_thread
+                    .join()
+                    .expect("Must get jetsam data");
+
+                let mut pager = Command::new(*PAGER)
+                    .stdin(Stdio::piped())
+                    .spawn()
+                    .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+
+                pager
+                    .stdin
+                    .take()
+                    .expect("Must get pager stdin")
+                    .write_all(jetsam_data.as_bytes());
+                    // TODO: broken pipe
+                    // .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+
+                let res = pager
+                    .wait()
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
 
                 self.cbsink_channel
-                    .send(scrollable_dialog("dumpjpstate", &res))
-                    .expect("Must show dialog");
+                    .send(Box::new(Cursive::clear))
+                    .expect("Must clear");
 
-                Ok(None)
+                if !res.success() {
+                    Err(OmniboxError::CommandError(format!(
+                        "{} exited {:?}",
+                        *PAGER, res
+                    )))
+                } else {
+                    Ok(None)
+                }
             }
             OmniboxEvent::Command(OmniboxCommand::Help) => {
                 self.cbsink_channel
