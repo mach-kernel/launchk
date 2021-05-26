@@ -1,14 +1,10 @@
 use crate::launchd::message::{
-    DISABLE_NAMES, DUMPSTATE, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS,
+    DISABLE_NAMES, DUMPSTATE, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS, DUMPJPCATEGORY
 };
-use std::collections::HashSet;
+use std::{collections::HashSet, ffi::{CStr, CString, OsStr}, fs::File, io::Read, os::unix::prelude::{FromRawFd, RawFd}, path::Path, ptr::{null, null_mut}};
 use std::convert::TryFrom;
 
-use xpc_sys::{
-    objects::{xpc_object::XPCObject, xpc_shmem::XPCShmem},
-    traits::{xpc_pipeable::XPCPipeable, xpc_value::TryXPCValue},
-    MAP_SHARED,
-};
+use xpc_sys::{MAP_SHARED, errno, objects::{xpc_object::{XPCObject}, xpc_shmem::XPCShmem}, rs_strerror, traits::{xpc_pipeable::XPCPipeable, xpc_value::TryXPCValue}};
 
 use crate::launchd::entry_status::ENTRY_STATUS_CACHE;
 use std::iter::FromIterator;
@@ -17,6 +13,10 @@ use xpc_sys::objects::xpc_error::XPCError;
 
 use crate::launchd::enums::{DomainType, SessionType};
 use crate::launchd::query_builder::QueryBuilder;
+
+use libc::{self, O_NONBLOCK, close, fdopen, fileno, fopen, mkfifo, pipe, tmpnam};
+
+use std::os::raw::c_int;
 
 pub fn find_in_all<S: Into<String>>(label: S) -> Result<(DomainType, XPCDictionary), XPCError> {
     let label_string = label.into();
@@ -151,4 +151,47 @@ pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
     let bytes_written: u64 = response.get(&["bytes-written"])?.xpc_value()?;
 
     Ok((usize::try_from(bytes_written).unwrap(), shmem))
+}
+
+pub fn dumpjpcategory() -> Result<String, XPCError> {
+    // [r, w]
+    let mut pipes: [c_int; 2] = [-1; 2];
+    let err = unsafe {
+        pipe(pipes.as_mut_ptr())
+    };
+
+    log::info!("Made pipe [r,w]: {:?}", pipes);
+
+    if err != 0 {
+        return Err(XPCError::IOError(unsafe {
+            rs_strerror(errno)
+        }));
+    }
+
+    XPCDictionary::new()
+        .extend(&DUMPJPCATEGORY)
+        .entry("fd", pipes[1] as RawFd)
+        .pipe_routine_with_error_handling()?;
+
+    log::info!("Made XPC query, closing pipe");
+
+    let err = unsafe {
+        close(pipes[1])
+    };
+
+    if err != 0 {
+        return Err(XPCError::IOError(unsafe {
+            rs_strerror(errno)
+        }));
+    }
+
+    let mut fifo_read = unsafe {
+        File::from_raw_fd(pipes[0])
+    };
+
+    let mut buf = String::new();
+    fifo_read.read_to_string(&mut buf)
+        .map_err(|e| XPCError::IOError(e.to_string()))?;
+
+    Ok(buf)
 }

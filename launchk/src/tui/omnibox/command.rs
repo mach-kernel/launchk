@@ -28,6 +28,7 @@ pub enum OmniboxCommand {
     FocusServiceList,
     CSRInfo,
     DumpState,
+    DumpJetsamPropertiesCategory,
     Help,
     Quit,
 }
@@ -38,7 +39,7 @@ impl fmt::Display for OmniboxCommand {
     }
 }
 
-pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 10] = [
+pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 11] = [
     (
         "load",
         "▶️  Load highlighted job",
@@ -74,6 +75,11 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 10] = [
         "dumpstate",
         "ℹ️  launchctl dumpstate",
         OmniboxCommand::DumpState,
+    ),
+    (
+        "dumpjpcategory",
+        "ℹ️  launchctl dumpjpcategory",
+        OmniboxCommand::DumpJetsamPropertiesCategory,
     ),
     ("help", "🤔  Show all commands", OmniboxCommand::Help),
     ("exit", "🚪 see ya!", OmniboxCommand::Quit),

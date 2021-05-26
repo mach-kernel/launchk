@@ -18,7 +18,8 @@ use cursive::{Cursive, Vec2, View};
 
 use tokio::runtime::Handle;
 
-use crate::tui::dialog::{show_csr_info, show_help};
+use crate::tui::dialog::scrollable_dialog;
+use crate::{launchd::query::dumpjpcategory, tui::dialog::{show_csr_info, show_help}};
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::subscribed_view::{
     OmniboxResult, OmniboxSubscribedView, OmniboxSubscriber, Subscribable,
@@ -320,6 +321,20 @@ impl OmniboxSubscriber for RootLayout {
                 } else {
                     Ok(None)
                 }
+            }
+            OmniboxEvent::Command(OmniboxCommand::DumpJetsamPropertiesCategory) => {
+
+                let res = dumpjpcategory();
+                log::info!("XPCR: {:?}", res);
+                Ok(None)
+                // let res = dumpjpcategory()
+                //     .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+
+                // self.cbsink_channel
+                //     .send(scrollable_dialog("dumpjpstate", &res))
+                //     .expect("Must show dialog");
+
+                // Ok(None)
             }
             OmniboxEvent::Command(OmniboxCommand::Help) => {
                 self.cbsink_channel

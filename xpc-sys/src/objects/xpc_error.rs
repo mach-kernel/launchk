@@ -1,5 +1,5 @@
 use crate::objects::xpc_error::XPCError::{
-    DictionaryError, PipeError, QueryError, ShmemError, ValueError,
+    DictionaryError, PipeError, QueryError, IOError, ValueError,
 };
 use std::error::Error;
 use std::fmt::{Display, Formatter};
@@ -10,7 +10,7 @@ pub enum XPCError {
     PipeError(String),
     ValueError(String),
     QueryError(String),
-    ShmemError(String),
+    IOError(String),
     StandardError,
     NotFound,
 }
@@ -22,7 +22,7 @@ impl Display for XPCError {
             PipeError(e) => e,
             QueryError(e) => e,
             ValueError(e) => e,
-            ShmemError(e) => e,
+            IOError(e) => e,
             _ => "",
         };
 

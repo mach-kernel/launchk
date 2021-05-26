@@ -51,4 +51,10 @@ lazy_static! {
         .entry("routine", 834 as u64)
         .entry("type", 1 as u64)
         .with_handle_or_default(None);
+
+    pub static ref DUMPJPCATEGORY: XPCDictionary = XPCDictionary::new()
+        .entry("subsystem", 3 as u64)
+        .entry("routine", 837 as u64)
+        .entry("type", 1 as u64)
+        .with_handle_or_default(None);
 }

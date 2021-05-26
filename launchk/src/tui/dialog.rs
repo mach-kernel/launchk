@@ -1,6 +1,7 @@
 use std::sync::mpsc::Sender;
 
 use cursive::Cursive;
+use cursive::traits::Scrollable;
 use cursive::{
     theme::Effect,
     view::Margins,
@@ -169,6 +170,21 @@ pub fn show_help() -> CbSinkMessage {
             Dialog::new()
                 .title("Help")
                 .content(TextView::new(commands.join("\n")))
+                .dismiss_button("OK")
+                .padding(Margins::trbl(2, 2, 2, 2)),
+        )
+    })
+}
+
+pub fn scrollable_dialog<S: Into<String>>(title: S, content: S) -> CbSinkMessage {
+    let title = title.into();
+    let content = content.into();
+
+    Box::new(move |siv| {
+        siv.add_layer(
+            Dialog::new()
+                .title(title)
+                .content(TextView::new(content).scrollable())
                 .dismiss_button("OK")
                 .padding(Margins::trbl(2, 2, 2, 2)),
         )

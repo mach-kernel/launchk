@@ -31,7 +31,7 @@ impl XPCShmem {
         };
 
         if err > 0 {
-            Err(XPCError::ShmemError(rs_strerror(err)))
+            Err(XPCError::IOError(rs_strerror(err)))
         } else {
             Ok(XPCShmem {
                 task,
