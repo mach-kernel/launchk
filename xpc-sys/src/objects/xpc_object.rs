@@ -141,6 +141,7 @@ impl From<&Arc<XPCObject>> for XPCObject {
 impl From<RawFd> for XPCObject {
     /// Use std::os::unix::prelude type for xpc_fd_create
     fn from(value: RawFd) -> Self {
+        log::info!("Making FD from {}", value);
         unsafe {
             XPCObject::new(
                 xpc_fd_create(value)

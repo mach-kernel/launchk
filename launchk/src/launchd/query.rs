@@ -14,7 +14,7 @@ use xpc_sys::objects::xpc_error::XPCError;
 use crate::launchd::enums::{DomainType, SessionType};
 use crate::launchd::query_builder::QueryBuilder;
 
-use libc::{self, O_NONBLOCK, close, fdopen, fileno, fopen, mkfifo, pipe, tmpnam};
+use libc::{self, O_NONBLOCK, O_RDONLY, O_WRONLY, close, fdopen, fileno, fopen, mkfifo, open, pipe, tmpnam};
 
 use std::os::raw::c_int;
 
@@ -154,39 +154,39 @@ pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
 }
 
 pub fn dumpjpcategory() -> Result<String, XPCError> {
-    // [r, w]
-    let mut pipes: [c_int; 2] = [-1; 2];
-    let err = unsafe {
-        pipe(pipes.as_mut_ptr())
+    let fifo_name = unsafe { 
+        CStr::from_ptr(tmpnam(null_mut()))
     };
 
-    log::info!("Made pipe [r,w]: {:?}", pipes);
+    let err = unsafe {
+        mkfifo(fifo_name.as_ptr(), 0o777)
+    };
 
     if err != 0 {
-        return Err(XPCError::IOError(unsafe {
-            rs_strerror(errno)
-        }));
+        return Err(XPCError::IOError(rs_strerror(err)));
     }
+
+    let fifo_fd_read = unsafe {
+        open(fifo_name.as_ptr(), O_RDONLY | O_NONBLOCK)
+    };
+
+    let fifo_fd_write = unsafe {
+        open(fifo_name.as_ptr(), O_WRONLY | O_NONBLOCK)
+    };
+
+    log::info!("Named FIFO: {}, {}", fifo_name.to_string_lossy(), fifo_fd_write);
 
     XPCDictionary::new()
         .extend(&DUMPJPCATEGORY)
-        .entry("fd", pipes[1] as RawFd)
+        .entry("fd", fifo_fd_write as RawFd)
         .pipe_routine_with_error_handling()?;
 
-    log::info!("Made XPC query, closing pipe");
-
-    let err = unsafe {
-        close(pipes[1])
+    unsafe { 
+        close(fifo_fd_write)
     };
 
-    if err != 0 {
-        return Err(XPCError::IOError(unsafe {
-            rs_strerror(errno)
-        }));
-    }
-
     let mut fifo_read = unsafe {
-        File::from_raw_fd(pipes[0])
+        File::from_raw_fd(fifo_fd_read)
     };
 
     let mut buf = String::new();

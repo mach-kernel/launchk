@@ -324,17 +324,17 @@ impl OmniboxSubscriber for RootLayout {
             }
             OmniboxEvent::Command(OmniboxCommand::DumpJetsamPropertiesCategory) => {
 
-                let res = dumpjpcategory();
-                log::info!("XPCR: {:?}", res);
-                Ok(None)
-                // let res = dumpjpcategory()
-                //     .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
-
-                // self.cbsink_channel
-                //     .send(scrollable_dialog("dumpjpstate", &res))
-                //     .expect("Must show dialog");
-
+                // let res = dumpjpcategory();
+                // log::info!("XPCR: {:?}", res);
                 // Ok(None)
+                let res = dumpjpcategory()
+                    .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+
+                self.cbsink_channel
+                    .send(scrollable_dialog("dumpjpstate", &res))
+                    .expect("Must show dialog");
+
+                Ok(None)
             }
             OmniboxEvent::Command(OmniboxCommand::Help) => {
                 self.cbsink_channel
