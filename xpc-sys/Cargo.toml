@@ -1,14 +1,17 @@
 [package]
 name = "xpc-sys"
 description = "Conveniently call routines with wrappers for xpc_pipe_routine() and go from Rust types to XPC objects and back!"
-version = "0.1.0-a1"
+version = "0.1.0-a2"
 authors = ["David Stancu <dstancu@nyu.edu>"]
 license = "MIT"
 edition = "2018"
 keywords = ["apple", "xpc", "xpc-dictionary"]
 categories = ["external-ffi-bindings", "os::macos-apis"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[package.metadata.docs.rs]
+# This sets the default target to `x86_64-unknown-linux-gnu`
+# and only builds that target
+targets = ["x86_64-apple-darwin"]
 
 [dependencies]
 block = "0.1.6"
