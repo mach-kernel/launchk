@@ -41,7 +41,14 @@ extern "C" {
     pub fn xpc_pipe_routine(pipe: xpc_pipe_t, msg: xpc_object_t, reply: *mut xpc_object_t)
         -> c_int;
 
+    // https://grep.app/search?q=_xpc_type_mach_.%2A&regexp=true
     pub fn xpc_mach_send_create(port: mach_port_t) -> xpc_object_t;
+    pub fn xpc_mach_recv_create(port: mach_port_t) -> xpc_object_t;
+    pub fn xpc_mach_send_get_right(object: xpc_object_t) -> mach_port_t;
+
+    pub static _xpc_type_mach_send: _xpc_type_s;
+    pub static _xpc_type_mach_recv: _xpc_type_s;
+
     pub fn xpc_dictionary_set_mach_send(
         object: xpc_object_t,
         name: *const c_char,

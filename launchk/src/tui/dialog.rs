@@ -1,7 +1,6 @@
 use std::sync::mpsc::Sender;
 
 use cursive::Cursive;
-use cursive::traits::Scrollable;
 use cursive::{
     theme::Effect,
     view::Margins,

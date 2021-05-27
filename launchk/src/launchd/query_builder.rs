@@ -1,5 +1,6 @@
 use crate::launchd::enums::{DomainType, SessionType};
 use xpc_sys::objects::xpc_dictionary::XPCDictionary;
+use xpc_sys::objects::xpc_object::MachPortType;
 use xpc_sys::objects::xpc_object::XPCObject;
 use xpc_sys::{get_bootstrap_port, mach_port_t};
 
@@ -17,7 +18,7 @@ pub trait QueryBuilder {
     where
         Self: Sized,
     {
-        self.entry("domain-port", get_bootstrap_port() as mach_port_t)
+        self.entry("domain-port", (MachPortType::Send, get_bootstrap_port() as mach_port_t))
     }
 
     fn with_session_type_or_default(self, session: Option<SessionType>) -> XPCDictionary

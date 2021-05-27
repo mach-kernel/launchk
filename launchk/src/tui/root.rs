@@ -30,7 +30,6 @@ use tokio::runtime::Handle;
 use tokio::task::block_in_place;
 use xpc_sys::rs_strerror;
 
-use crate::tui::dialog::scrollable_dialog;
 use crate::{launchd::query::dumpjpcategory, tui::dialog::{show_csr_info, show_help}};
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::subscribed_view::{

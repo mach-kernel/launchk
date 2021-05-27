@@ -2,7 +2,7 @@ use crate::objects::xpc_type::XPCType;
 use crate::{
     mach_port_t, xpc_array_append_value, xpc_array_create, xpc_bool_create, xpc_copy_description,
     xpc_double_create, xpc_int64_create, xpc_mach_send_create, xpc_object_t, xpc_release,
-    xpc_string_create, xpc_uint64_create, xpc_fd_create
+    xpc_string_create, xpc_uint64_create, xpc_fd_create, xpc_mach_recv_create
 };
 use std::ffi::{CStr, CString};
 use std::os::unix::prelude::RawFd;
@@ -82,10 +82,23 @@ impl From<f64> for XPCObject {
     }
 }
 
-impl From<mach_port_t> for XPCObject {
-    /// Create XPCObject via xpc_uint64_create
-    fn from(value: mach_port_t) -> Self {
-        unsafe { XPCObject::new(xpc_mach_send_create(value)) }
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum MachPortType {
+    Send,
+    Recv,
+}
+
+impl From<(MachPortType, mach_port_t)> for XPCObject {
+    /// Create XPCObject via xpc_mach_send_create or xpc_mach_recv_create
+    fn from((mpt, value): (MachPortType, mach_port_t)) -> Self {
+        let xpc_object = unsafe {
+            match mpt {
+                MachPortType::Send => xpc_mach_send_create(value),
+                MachPortType::Recv => xpc_mach_recv_create(value)
+            }
+        };
+
+        XPCObject::new(xpc_object)
     }
 }
 
