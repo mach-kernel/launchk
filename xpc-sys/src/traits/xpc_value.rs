@@ -3,13 +3,17 @@ use std::cell::RefCell;
 use std::ffi::CStr;
 use std::rc::Rc;
 
-use crate::objects::xpc_object::{XPCObject, MachPortType};
+use crate::objects::xpc_object::{MachPortType, XPCObject};
 use crate::objects::xpc_type;
-use crate::{size_t, xpc_array_apply, xpc_bool_get_value, xpc_int64_get_value, xpc_object_t, xpc_retain, xpc_string_get_string_ptr, xpc_uint64_get_value, xpc_double_get_value, xpc_mach_send_get_right, mach_port_t, xpc_type_get_name};
+use crate::{
+    mach_port_t, size_t, xpc_array_apply, xpc_bool_get_value, xpc_double_get_value,
+    xpc_int64_get_value, xpc_mach_send_get_right, xpc_object_t, xpc_retain,
+    xpc_string_get_string_ptr, xpc_type_get_name, xpc_uint64_get_value,
+};
 
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::ValueError;
-use crate::objects::xpc_type::{check_xpc_type, XPCType};
+use crate::objects::xpc_type::check_xpc_type;
 
 /// Implement to get data out of xpc_type_t and into
 /// a Rust native data type
@@ -76,11 +80,10 @@ impl TryXPCValue<(MachPortType, mach_port_t)> for XPCObject {
             }
         }
 
-        Err(XPCError::ValueError(
-            format!("Object is {} and neither _xpc_type_mach_send nor _xpc_type_mach_recv", unsafe {
-                CStr::from_ptr(xpc_type_get_name(xpc_type.0)).to_string_lossy()
-            })
-        ))
+        Err(XPCError::ValueError(format!(
+            "Object is {} and neither _xpc_type_mach_send nor _xpc_type_mach_recv",
+            unsafe { CStr::from_ptr(xpc_type_get_name(xpc_type.0)).to_string_lossy() }
+        )))
     }
 }
 
@@ -117,12 +120,12 @@ impl TryXPCValue<Vec<XPCObject>> for XPCObject {
 #[cfg(test)]
 mod tests {
     use crate::get_bootstrap_port;
+    use crate::mach_port_t;
     use crate::objects::xpc_error::XPCError;
     use crate::objects::xpc_error::XPCError::ValueError;
     use crate::objects::xpc_object::MachPortType;
     use crate::objects::xpc_object::XPCObject;
     use crate::traits::xpc_value::TryXPCValue;
-    use crate::mach_port_t;
 
     #[test]
     fn xpc_to_rs_with_wrong_type() {
@@ -173,7 +176,8 @@ mod tests {
 
     #[test]
     fn xpc_value_mach_send() {
-        let xpc_bootstrap_port = XPCObject::from((MachPortType::Send, get_bootstrap_port() as mach_port_t));
+        let xpc_bootstrap_port =
+            XPCObject::from((MachPortType::Send, get_bootstrap_port() as mach_port_t));
         let (mpt, port): (MachPortType, mach_port_t) = xpc_bootstrap_port.xpc_value().unwrap();
 
         assert_eq!(MachPortType::Send, mpt);

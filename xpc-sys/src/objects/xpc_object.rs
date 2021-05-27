@@ -1,8 +1,8 @@
 use crate::objects::xpc_type::XPCType;
 use crate::{
     mach_port_t, xpc_array_append_value, xpc_array_create, xpc_bool_create, xpc_copy_description,
-    xpc_double_create, xpc_int64_create, xpc_mach_send_create, xpc_object_t, xpc_release,
-    xpc_string_create, xpc_uint64_create, xpc_fd_create, xpc_mach_recv_create
+    xpc_double_create, xpc_fd_create, xpc_int64_create, xpc_mach_recv_create, xpc_mach_send_create,
+    xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
 };
 use std::ffi::{CStr, CString};
 use std::os::unix::prelude::RawFd;
@@ -94,7 +94,7 @@ impl From<(MachPortType, mach_port_t)> for XPCObject {
         let xpc_object = unsafe {
             match mpt {
                 MachPortType::Send => xpc_mach_send_create(value),
-                MachPortType::Recv => xpc_mach_recv_create(value)
+                MachPortType::Recv => xpc_mach_recv_create(value),
             }
         };
 
@@ -155,11 +155,7 @@ impl From<RawFd> for XPCObject {
     /// Use std::os::unix::prelude type for xpc_fd_create
     fn from(value: RawFd) -> Self {
         log::info!("Making FD from {}", value);
-        unsafe {
-            XPCObject::new(
-                xpc_fd_create(value)
-            )
-        }
+        unsafe { XPCObject::new(xpc_fd_create(value)) }
     }
 }
 

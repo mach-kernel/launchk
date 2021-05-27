@@ -18,7 +18,10 @@ pub trait QueryBuilder {
     where
         Self: Sized,
     {
-        self.entry("domain-port", (MachPortType::Send, get_bootstrap_port() as mach_port_t))
+        self.entry(
+            "domain-port",
+            (MachPortType::Send, get_bootstrap_port() as mach_port_t),
+        )
     }
 
     fn with_session_type_or_default(self, session: Option<SessionType>) -> XPCDictionary

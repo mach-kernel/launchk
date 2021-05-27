@@ -1,5 +1,5 @@
 use crate::objects::xpc_error::XPCError::{
-    DictionaryError, PipeError, QueryError, IOError, ValueError,
+    DictionaryError, IOError, PipeError, QueryError, ValueError,
 };
 use std::error::Error;
 use std::fmt::{Display, Formatter};

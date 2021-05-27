@@ -1,10 +1,24 @@
 use crate::launchd::message::{
-    DISABLE_NAMES, DUMPSTATE, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS, DUMPJPCATEGORY
+    DISABLE_NAMES, DUMPJPCATEGORY, DUMPSTATE, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS,
 };
-use std::{collections::HashSet, ffi::{CStr, CString, OsStr}, fs::File, io::Read, os::unix::prelude::{FromRawFd, RawFd}, path::Path, ptr::{null, null_mut}};
 use std::convert::TryFrom;
+use std::{
+    collections::HashSet,
+    ffi::{CStr, CString, OsStr},
+    fs::File,
+    io::Read,
+    os::unix::prelude::{FromRawFd, RawFd},
+    path::Path,
+    ptr::{null, null_mut},
+};
 
-use xpc_sys::{MAP_SHARED, errno, objects::{xpc_object::{XPCObject}, xpc_shmem::XPCShmem}, rs_strerror, traits::{xpc_pipeable::XPCPipeable, xpc_value::TryXPCValue}};
+use xpc_sys::{
+    errno,
+    objects::{xpc_object::XPCObject, xpc_shmem::XPCShmem},
+    rs_strerror,
+    traits::{xpc_pipeable::XPCPipeable, xpc_value::TryXPCValue},
+    MAP_SHARED,
+};
 
 use crate::launchd::entry_status::ENTRY_STATUS_CACHE;
 use std::iter::FromIterator;
@@ -13,10 +27,6 @@ use xpc_sys::objects::xpc_error::XPCError;
 
 use crate::launchd::enums::{DomainType, SessionType};
 use crate::launchd::query_builder::QueryBuilder;
-
-use libc::{self, O_NONBLOCK, O_RDONLY, O_WRONLY, close, fdopen, fileno, fopen, mkfifo, open, pipe, tmpnam};
-
-use std::os::raw::c_int;
 
 pub fn find_in_all<S: Into<String>>(label: S) -> Result<(DomainType, XPCDictionary), XPCError> {
     let label_string = label.into();

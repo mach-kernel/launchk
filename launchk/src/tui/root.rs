@@ -20,17 +20,16 @@ use cursive::view::{AnyView, ViewWrapper};
 use cursive::views::{LinearLayout, NamedView, Panel};
 use cursive::{Cursive, Vec2, View};
 
-use libc::O_NONBLOCK;
-use libc::O_RDONLY;
-use libc::O_WRONLY;
 use libc::mkfifo;
 use libc::open;
 use libc::tmpnam;
+use libc::O_NONBLOCK;
+use libc::O_RDONLY;
+use libc::O_WRONLY;
 use tokio::runtime::Handle;
-use tokio::task::block_in_place;
+
 use xpc_sys::rs_strerror;
 
-use crate::{launchd::query::dumpjpcategory, tui::dialog::{show_csr_info, show_help}};
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::subscribed_view::{
     OmniboxResult, OmniboxSubscribedView, OmniboxSubscriber, Subscribable,
@@ -38,6 +37,10 @@ use crate::tui::omnibox::subscribed_view::{
 use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxView};
 use crate::tui::service_list::view::ServiceListView;
 use crate::tui::sysinfo::SysInfo;
+use crate::{
+    launchd::query::dumpjpcategory,
+    tui::dialog::{show_csr_info, show_help},
+};
 use crate::{launchd::query::dumpstate, tui::dialog};
 
 lazy_static! {
@@ -147,8 +150,7 @@ impl RootLayout {
 
     fn handle_omnibox_event(&mut self, recv: OmniboxEvent) {
         // TODO: handle this error with dialog as well
-        self.on_omnibox(recv.clone())
-            .expect("i am a shitty error");
+        self.on_omnibox(recv.clone()).expect("i am a shitty error");
 
         let target = self
             .layout
@@ -335,27 +337,19 @@ impl OmniboxSubscriber for RootLayout {
                 }
             }
             OmniboxEvent::Command(OmniboxCommand::DumpJetsamPropertiesCategory) => {
-                let fifo_name = unsafe { 
-                    CStr::from_ptr(tmpnam(null_mut()))
-                };
-            
-                let err = unsafe {
-                    mkfifo(fifo_name.as_ptr(), 0o777)
-                };
-            
+                let fifo_name = unsafe { CStr::from_ptr(tmpnam(null_mut())) };
+
+                let err = unsafe { mkfifo(fifo_name.as_ptr(), 0o777) };
+
                 if err != 0 {
                     return Err(OmniboxError::CommandError(rs_strerror(err)));
                 }
 
                 // Spawn pipe reader
                 let fd_read_thread = std::thread::spawn(move || {
-                    let fifo_fd_read = unsafe {
-                        open(fifo_name.as_ptr(), O_RDONLY)
-                    };
+                    let fifo_fd_read = unsafe { open(fifo_name.as_ptr(), O_RDONLY) };
 
-                    let mut file = unsafe {
-                        File::from_raw_fd(fifo_fd_read)
-                    };
+                    let mut file = unsafe { File::from_raw_fd(fifo_fd_read) };
 
                     let mut buf = String::new();
                     file.read_to_string(&mut buf).expect("Must read string");
@@ -365,21 +359,15 @@ impl OmniboxSubscriber for RootLayout {
 
                 // Spawn pipe writer (XPC endpoint)
                 self.runtime_handle.spawn(async move {
-                    let fifo_fd_write = unsafe {
-                        open(fifo_name.as_ptr(), O_WRONLY | O_NONBLOCK)
-                    };
-    
+                    let fifo_fd_write = unsafe { open(fifo_name.as_ptr(), O_WRONLY | O_NONBLOCK) };
+
                     dumpjpcategory(fifo_fd_write).expect("Must OK");
 
-                    unsafe { 
-                        libc::close(fifo_fd_write)
-                    };
+                    unsafe { libc::close(fifo_fd_write) };
                 });
 
                 // Join reader thread
-                let jetsam_data = fd_read_thread
-                    .join()
-                    .expect("Must get jetsam data");
+                let jetsam_data = fd_read_thread.join().expect("Must get jetsam data");
 
                 let mut pager = Command::new(*PAGER)
                     .stdin(Stdio::piped())
@@ -391,8 +379,8 @@ impl OmniboxSubscriber for RootLayout {
                     .take()
                     .expect("Must get pager stdin")
                     .write_all(jetsam_data.as_bytes());
-                    // TODO: broken pipe
-                    // .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+                // TODO: broken pipe
+                // .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
 
                 let res = pager
                     .wait()
