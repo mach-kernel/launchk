@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use std::fs::File;
+use std::fs::{File, remove_file};
 use std::io::Read;
 use std::os::unix::prelude::FromRawFd;
 use std::ptr::null_mut;
@@ -149,8 +149,7 @@ impl RootLayout {
     }
 
     fn handle_omnibox_event(&mut self, recv: OmniboxEvent) {
-        // TODO: handle this error with dialog as well
-        self.on_omnibox(recv.clone()).expect("i am a shitty error");
+        let self_event = self.on_omnibox(recv.clone());
 
         let target = self
             .layout
@@ -158,18 +157,25 @@ impl RootLayout {
             .and_then(|v| v.as_any_mut().downcast_mut::<OmniboxSubscribedView>())
             .expect("Must forward to ServiceList");
 
-        match target.on_omnibox(recv) {
-            // Forward Omnibox command responses from view
-            Ok(Some(c)) => self
-                .omnibox_tx
-                .send(OmniboxEvent::Command(c))
-                .expect("Must send response commands"),
-            Err(OmniboxError::CommandError(s)) => self
-                .cbsink_channel
-                .send(dialog::show_error(s))
-                .expect("Must show error"),
-            _ => {}
-        };
+        let omnibox_events = [
+            self_event,
+            target.on_omnibox(recv)
+        ];
+
+        for omnibox_event in &omnibox_events {
+            match omnibox_event {
+                // Forward Omnibox command responses from view
+                Ok(Some(c)) => self
+                    .omnibox_tx
+                    .send(OmniboxEvent::Command(c.clone()))
+                    .expect("Must send response commands"),
+                Err(OmniboxError::CommandError(s)) => self
+                    .cbsink_channel
+                    .send(dialog::show_error(s.clone()))
+                    .expect("Must show error"),
+                _ => {}
+            }
+        }
     }
 
     fn ring_to_arrows(&mut self) -> Option<Event> {
@@ -338,7 +344,6 @@ impl OmniboxSubscriber for RootLayout {
             }
             OmniboxEvent::Command(OmniboxCommand::DumpJetsamPropertiesCategory) => {
                 let fifo_name = unsafe { CStr::from_ptr(tmpnam(null_mut())) };
-
                 let err = unsafe { mkfifo(fifo_name.as_ptr(), 0o777) };
 
                 if err != 0 {
@@ -348,39 +353,40 @@ impl OmniboxSubscriber for RootLayout {
                 // Spawn pipe reader
                 let fd_read_thread = std::thread::spawn(move || {
                     let fifo_fd_read = unsafe { open(fifo_name.as_ptr(), O_RDONLY) };
-
                     let mut file = unsafe { File::from_raw_fd(fifo_fd_read) };
 
                     let mut buf = String::new();
                     file.read_to_string(&mut buf).expect("Must read string");
 
+                    unsafe { libc::close(fifo_fd_read) };
+
                     buf
                 });
 
                 // Spawn pipe writer (XPC endpoint)
-                self.runtime_handle.spawn(async move {
+                let fd_write_thread = std::thread::spawn(move || {
                     let fifo_fd_write = unsafe { open(fifo_name.as_ptr(), O_WRONLY | O_NONBLOCK) };
-
                     dumpjpcategory(fifo_fd_write).expect("Must OK");
-
                     unsafe { libc::close(fifo_fd_write) };
                 });
 
-                // Join reader thread
-                let jetsam_data = fd_read_thread.join().expect("Must get jetsam data");
+                // Join reader thread (and close fd)
+                let jetsam_data = fd_read_thread.join().expect("Must read jetsam data");
+                // Join writer thread (and close fd)
+                fd_write_thread.join().expect("Must finish dump query");
 
                 let mut pager = Command::new(*PAGER)
                     .stdin(Stdio::piped())
                     .spawn()
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
 
+                // Broken pipe unless scroll to end, do not throw an error
                 pager
                     .stdin
                     .take()
                     .expect("Must get pager stdin")
-                    .write_all(jetsam_data.as_bytes());
-                // TODO: broken pipe
-                // .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+                    .write_all(jetsam_data.as_bytes())
+                    .unwrap_or(());
 
                 let res = pager
                     .wait()
@@ -389,6 +395,8 @@ impl OmniboxSubscriber for RootLayout {
                 self.cbsink_channel
                     .send(Box::new(Cursive::clear))
                     .expect("Must clear");
+
+                remove_file(fifo_name.to_string_lossy().to_string()).map_err(|e| OmniboxError::CommandError(e.to_string()))?;
 
                 if !res.success() {
                     Err(OmniboxError::CommandError(format!(

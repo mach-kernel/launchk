@@ -72,7 +72,7 @@ impl TryXPCValue<(MachPortType, mach_port_t)> for XPCObject {
             check_xpc_type(&self, &xpc_type::MachRecv).map(|()| MachPortType::Recv),
         ];
 
-        for check in types.iter() {
+        for check in &types {
             if check.is_ok() {
                 return Ok((*check.as_ref().unwrap(), unsafe {
                     xpc_mach_send_get_right(**obj_pointer)
@@ -186,15 +186,14 @@ mod tests {
 
     // Can't find any example in the wild, the value is 0 vs the provided 42, it likely
     // does some kind of validation.
-    //
-    // #[test]
-    // fn xpc_value_mach_recv() {
-    //     let xpc_mach_recv = XPCObject::from((MachPortType::Recv, 42 as mach_port_t));
-    //     let (mpt, port): (MachPortType, mach_port_t) = xpc_mach_recv.xpc_value().unwrap();
-    //
-    //     assert_eq!(MachPortType::Recv, mpt);
-    //     assert_eq!(42, port);
-    // }
+    #[test]
+    fn xpc_value_mach_recv() {
+        let xpc_mach_recv = XPCObject::from((MachPortType::Recv, 42 as mach_port_t));
+        let (mpt, _port): (MachPortType, mach_port_t) = xpc_mach_recv.xpc_value().unwrap();
+
+        assert_eq!(MachPortType::Recv, mpt);
+        // assert_eq!(42, port);
+    }
 
     #[test]
     fn xpc_value_array() {
