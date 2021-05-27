@@ -1,8 +1,12 @@
 [package]
 name = "xpc-sys"
-version = "0.1.0"
+description = "Conveniently call routines with wrappers for xpc_pipe_routine() and go from Rust types to XPC objects and back!"
+version = "0.1.0-a1"
 authors = ["David Stancu <dstancu@nyu.edu>"]
+license = "MIT"
 edition = "2018"
+keywords = ["apple", "xpc", "xpc-dictionary"]
+categories = ["external-ffi-bindings", "os::macos-apis"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
