@@ -1,5 +1,5 @@
 use crate::launchd::message::{
-    DISABLE_NAMES, DUMPJPCATEGORY, DUMPSTATE, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS,
+    DISABLE_NAMES, DUMPJPCATEGORY, DUMPSTATE, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS, PROCINFO,
 };
 use std::convert::TryFrom;
 use std::{
@@ -167,5 +167,13 @@ pub fn dumpjpcategory(fd: RawFd) -> Result<XPCDictionary, XPCError> {
     XPCDictionary::new()
         .extend(&DUMPJPCATEGORY)
         .entry("fd", fd)
+        .pipe_routine_with_error_handling()
+}
+
+pub fn procinfo(pid: i64, fd: RawFd) -> Result<XPCDictionary, XPCError> {
+    XPCDictionary::new()
+        .extend(&PROCINFO)
+        .entry("fd", fd)
+        .entry("pid", pid)
         .pipe_routine_with_error_handling()
 }

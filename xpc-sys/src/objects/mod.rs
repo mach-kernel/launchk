@@ -12,3 +12,4 @@ pub mod xpc_pipe;
 
 pub mod xpc_error;
 pub mod xpc_shmem;
+pub mod unix_fifo;

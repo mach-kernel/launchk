@@ -29,6 +29,7 @@ pub enum OmniboxCommand {
     CSRInfo,
     DumpState,
     DumpJetsamPropertiesCategory,
+    ProcInfo,
     Help,
     Quit,
 }
@@ -39,7 +40,7 @@ impl fmt::Display for OmniboxCommand {
     }
 }
 
-pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 11] = [
+pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 12] = [
     (
         "load",
         "▶️  Load highlighted job",
@@ -80,6 +81,11 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 11] = [
         "dumpjpcategory",
         "ℹ️  launchctl dumpjpcategory",
         OmniboxCommand::DumpJetsamPropertiesCategory,
+    ),
+    (
+        "procinfo",
+        "ℹ️  launchctl procinfo for highlighted process",
+        OmniboxCommand::ProcInfo,
     ),
     ("help", "🤔  Show all commands", OmniboxCommand::Help),
     ("exit", "🚪 see ya!", OmniboxCommand::Quit),

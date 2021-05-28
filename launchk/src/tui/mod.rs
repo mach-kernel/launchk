@@ -4,3 +4,4 @@ pub mod root;
 mod service_list;
 mod sysinfo;
 mod table;
+mod pager;

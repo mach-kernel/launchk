@@ -98,10 +98,10 @@ impl ServiceListView {
                     return None;
                 }
 
-                let entry_info = get_entry_status(label);
+                let status = get_entry_status(label);
                 let is_loaded = running.contains(label);
 
-                let entry_job_type_filter = entry_info
+                let entry_job_type_filter = status
                     .plist
                     .as_ref()
                     .map(|ec| ec.job_type_filter(is_loaded))
@@ -117,8 +117,8 @@ impl ServiceListView {
                 }
 
                 Some(ServiceListItem {
+                    status,
                     name: label.clone(),
-                    status: entry_info,
                     job_type_filter: entry_job_type_filter,
                 })
             })
@@ -186,12 +186,12 @@ impl ServiceListView {
     fn handle_command(&self, cmd: OmniboxCommand) -> OmniboxResult {
         match cmd {
             OmniboxCommand::Reload => {
-                let (ServiceListItem { name, .. }, ..) = self.with_active_item_plist()?;
+                let (ServiceListItem { name, status, .. }, ..) = self.with_active_item_plist()?;
                 let LaunchdEntryStatus {
                     limit_load_to_session_type,
                     domain,
                     ..
-                } = get_entry_status(&name);
+                } = status;
 
                 match (limit_load_to_session_type, domain) {
                     (_, DomainType::Unknown) | (SessionType::Unknown, _) => Ok(Some(
@@ -223,8 +223,8 @@ impl ServiceListView {
                 )))
             }
             OmniboxCommand::UnloadRequest => {
-                let (ServiceListItem { name, .. }, ..) = self.with_active_item_plist()?;
-                let LaunchdEntryStatus { domain, .. } = get_entry_status(&name);
+                let (ServiceListItem { name, status, .. }, ..) = self.with_active_item_plist()?;
+                let LaunchdEntryStatus { domain, .. } = status;
 
                 match domain {
                     DomainType::Unknown => Ok(Some(OmniboxCommand::DomainSessionPrompt(
@@ -244,8 +244,8 @@ impl ServiceListView {
                 )))
             }
             OmniboxCommand::DisableRequest => {
-                let (ServiceListItem { name, .. }, ..) = self.with_active_item_plist()?;
-                let LaunchdEntryStatus { domain, .. } = get_entry_status(&name);
+                let (ServiceListItem { name, status, .. }, ..) = self.with_active_item_plist()?;
+                let LaunchdEntryStatus { domain, .. } = status;
 
                 match domain {
                     DomainType::Unknown => Ok(Some(OmniboxCommand::DomainSessionPrompt(
@@ -279,11 +279,8 @@ impl ServiceListView {
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
             }
             OmniboxCommand::Unload(dt, _handle) => {
-                let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
-                let LaunchdEntryStatus {
-                    limit_load_to_session_type,
-                    ..
-                } = get_entry_status(&name);
+                let (ServiceListItem { name, status, .. }, plist) = self.with_active_item_plist()?;
+                let LaunchdEntryStatus { limit_load_to_session_type, .. } = status;
 
                 unload(
                     name,
@@ -307,6 +304,11 @@ impl ServiceListView {
                     .map(|_| None)
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
             }
+            // OmniboxCommand::ProcInfo => {
+            //     let (ServiceListItem { name, status, .. }, _) = self.with_active_item_plist()?;
+
+
+            // }
             _ => Ok(None),
         }
     }

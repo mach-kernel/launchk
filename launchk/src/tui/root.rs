@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::fs::{File, remove_file};
 use std::io::Read;
-use std::os::unix::prelude::FromRawFd;
+use std::os::unix::prelude::{FromRawFd, RawFd};
 use std::ptr::null_mut;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
@@ -29,6 +29,7 @@ use libc::O_WRONLY;
 use tokio::runtime::Handle;
 
 use xpc_sys::rs_strerror;
+use xpc_sys::objects::unix_fifo::UnixFifo;
 
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::subscribed_view::{
@@ -42,6 +43,7 @@ use crate::{
     tui::dialog::{show_csr_info, show_help},
 };
 use crate::{launchd::query::dumpstate, tui::dialog};
+use crate::tui::pager::show_pager;
 
 lazy_static! {
     static ref PAGER: &'static str = option_env!("PAGER").unwrap_or("less");
@@ -307,105 +309,35 @@ impl OmniboxSubscriber for RootLayout {
 
                 log::info!("shmem response sz {}", size);
 
-                let mut pager = Command::new(*PAGER)
-                    .stdin(Stdio::piped())
-                    .spawn()
-                    .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+                show_pager(&self.cbsink_channel, unsafe {
+                    &*slice_from_raw_parts(shmem.region as *mut u8, size)
+                }).map_err(|e| OmniboxError::CommandError(e))?;
 
-                let pager_stdin = pager.stdin.take();
-
-                self.runtime_handle.spawn(async move {
-                    let raw_slice = slice_from_raw_parts(shmem.region as *mut u8, size);
-
-                    unsafe {
-                        pager_stdin
-                            .expect("Must have pager stdin")
-                            .write_all(&*raw_slice)
-                            .expect("Must write dumpstate")
-                    };
-                });
-
-                let res = pager
-                    .wait()
-                    .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
-
-                self.cbsink_channel
-                    .send(Box::new(Cursive::clear))
-                    .expect("Must clear");
-
-                if !res.success() {
-                    Err(OmniboxError::CommandError(format!(
-                        "{} exited {:?}",
-                        *PAGER, res
-                    )))
-                } else {
-                    Ok(None)
-                }
+                Ok(None)
             }
             OmniboxEvent::Command(OmniboxCommand::DumpJetsamPropertiesCategory) => {
-                let fifo_name = unsafe { CStr::from_ptr(tmpnam(null_mut())) };
-                let err = unsafe { mkfifo(fifo_name.as_ptr(), 0o777) };
+                let fifo = UnixFifo::new(0o777)
+                    .map_err(|e| OmniboxError::CommandError(e))?;
 
-                if err != 0 {
-                    return Err(OmniboxError::CommandError(rs_strerror(err)));
-                }
+                let fifo_clone = fifo.clone();
 
                 // Spawn pipe reader
                 let fd_read_thread = std::thread::spawn(move || {
-                    let fifo_fd_read = unsafe { open(fifo_name.as_ptr(), O_RDONLY) };
-                    let mut file = unsafe { File::from_raw_fd(fifo_fd_read) };
-
-                    let mut buf = String::new();
-                    file.read_to_string(&mut buf).expect("Must read string");
-
-                    unsafe { libc::close(fifo_fd_read) };
-
-                    buf
+                    fifo_clone.block_and_read_bytes()
                 });
 
-                // Spawn pipe writer (XPC endpoint)
-                let fd_write_thread = std::thread::spawn(move || {
-                    let fifo_fd_write = unsafe { open(fifo_name.as_ptr(), O_WRONLY | O_NONBLOCK) };
-                    dumpjpcategory(fifo_fd_write).expect("Must OK");
-                    unsafe { libc::close(fifo_fd_write) };
-                });
+                fifo.with_writer(|fd_write| {
+                    dumpjpcategory(fd_write as RawFd)
+                }).map_err(|e| OmniboxError::CommandError(e.to_string()))?;
 
                 // Join reader thread (and close fd)
                 let jetsam_data = fd_read_thread.join().expect("Must read jetsam data");
-                // Join writer thread (and close fd)
-                fd_write_thread.join().expect("Must finish dump query");
+                fifo.delete();
 
-                let mut pager = Command::new(*PAGER)
-                    .stdin(Stdio::piped())
-                    .spawn()
-                    .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+                show_pager(&self.cbsink_channel, &jetsam_data)
+                    .map_err(|e| OmniboxError::CommandError(e))?;
 
-                // Broken pipe unless scroll to end, do not throw an error
-                pager
-                    .stdin
-                    .take()
-                    .expect("Must get pager stdin")
-                    .write_all(jetsam_data.as_bytes())
-                    .unwrap_or(());
-
-                let res = pager
-                    .wait()
-                    .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
-
-                self.cbsink_channel
-                    .send(Box::new(Cursive::clear))
-                    .expect("Must clear");
-
-                remove_file(fifo_name.to_string_lossy().to_string()).map_err(|e| OmniboxError::CommandError(e.to_string()))?;
-
-                if !res.success() {
-                    Err(OmniboxError::CommandError(format!(
-                        "{} exited {:?}",
-                        *PAGER, res
-                    )))
-                } else {
-                    Ok(None)
-                }
+                Ok(None)
             }
             OmniboxEvent::Command(OmniboxCommand::Help) => {
                 self.cbsink_channel
