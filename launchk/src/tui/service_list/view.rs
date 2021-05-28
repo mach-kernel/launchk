@@ -12,10 +12,12 @@ use cursive::{Cursive, View, XY};
 
 use tokio::runtime::Handle;
 use tokio::time::interval;
+use xpc_sys::objects::unix_fifo::UnixFifo;
 
 use crate::launchd::enums::{DomainType, SessionType};
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};
+use crate::launchd::query::procinfo;
 use crate::launchd::query::{disable, enable, list_all, load, unload};
 use crate::launchd::{
     entry_status::get_entry_status, entry_status::LaunchdEntryStatus, plist::LaunchdPlist,
@@ -25,6 +27,7 @@ use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::state::OmniboxState;
 use crate::tui::omnibox::subscribed_view::{OmniboxResult, OmniboxSubscriber};
 use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxMode};
+use crate::tui::pager::show_pager;
 use crate::tui::root::CbSinkMessage;
 use crate::tui::service_list::list_item::ServiceListItem;
 use crate::tui::table::table_list_view::TableListView;
@@ -304,11 +307,39 @@ impl ServiceListView {
                     .map(|_| None)
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
             }
-            // OmniboxCommand::ProcInfo => {
-            //     let (ServiceListItem { name, status, .. }, _) = self.with_active_item_plist()?;
+            OmniboxCommand::ProcInfo => {
+                let (ServiceListItem { name, status, .. }, _) = self.with_active_item_plist()?;
+                
+                if status.pid == 0 {
+                    return Err(OmniboxError::CommandError(
+                        format!("No PID available for {}", name)
+                    ));
+                }
 
+                let fifo = Arc::new(
+                    UnixFifo::new(0o777)
+                        .map_err(|e| OmniboxError::CommandError(e))?
+                );
 
-            // }
+                let fifo_clone = fifo.clone();
+
+                // Spawn pipe reader
+                let fd_read_thread = std::thread::spawn(move || {
+                    fifo_clone.block_and_read_bytes()
+                });
+
+                fifo.with_writer(|fd_write| {
+                    procinfo(status.pid, fd_write)
+                }).map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+
+                // Join reader thread (and close fd)
+                let procinfo_data = fd_read_thread.join().expect("Must read jetsam data");
+
+                show_pager(&self.cb_sink, &procinfo_data)
+                    .map_err(|e| OmniboxError::CommandError(e))?;
+
+                Ok(None)
+            }
             _ => Ok(None),
         }
     }

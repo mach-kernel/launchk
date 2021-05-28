@@ -3,6 +3,7 @@ use std::fs::{File, remove_file};
 use std::io::Read;
 use std::os::unix::prelude::{FromRawFd, RawFd};
 use std::ptr::null_mut;
+use std::sync::Arc;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 use std::{
@@ -316,8 +317,10 @@ impl OmniboxSubscriber for RootLayout {
                 Ok(None)
             }
             OmniboxEvent::Command(OmniboxCommand::DumpJetsamPropertiesCategory) => {
-                let fifo = UnixFifo::new(0o777)
-                    .map_err(|e| OmniboxError::CommandError(e))?;
+                let fifo = Arc::new(
+                    UnixFifo::new(0o777)
+                        .map_err(|e| OmniboxError::CommandError(e))?
+                );
 
                 let fifo_clone = fifo.clone();
 
@@ -332,7 +335,6 @@ impl OmniboxSubscriber for RootLayout {
 
                 // Join reader thread (and close fd)
                 let jetsam_data = fd_read_thread.join().expect("Must read jetsam data");
-                fifo.delete();
 
                 show_pager(&self.cbsink_channel, &jetsam_data)
                     .map_err(|e| OmniboxError::CommandError(e))?;
