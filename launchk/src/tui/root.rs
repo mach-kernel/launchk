@@ -1,19 +1,12 @@
 use std::collections::VecDeque;
-use std::fs::{File, remove_file};
-use std::io::Read;
-use std::os::unix::prelude::{FromRawFd, RawFd};
-use std::ptr::null_mut;
-use std::sync::Arc;
-use std::sync::mpsc::{channel, Receiver, Sender};
 
-use std::{
-    cell::RefCell,
-    ffi::{CStr, CString},
-    io::Write,
-    os::raw::c_char,
-    process::{Command, Stdio},
-    ptr::slice_from_raw_parts,
-};
+use std::io::Read;
+use std::os::unix::prelude::RawFd;
+
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
+
+use std::ptr::slice_from_raw_parts;
 
 use cursive::event::{Event, EventResult, Key};
 use cursive::traits::{Resizable, Scrollable};
@@ -21,15 +14,8 @@ use cursive::view::{AnyView, ViewWrapper};
 use cursive::views::{LinearLayout, NamedView, Panel};
 use cursive::{Cursive, Vec2, View};
 
-use libc::mkfifo;
-use libc::open;
-use libc::tmpnam;
-use libc::O_NONBLOCK;
-use libc::O_RDONLY;
-use libc::O_WRONLY;
 use tokio::runtime::Handle;
 
-use xpc_sys::rs_strerror;
 use xpc_sys::objects::unix_fifo::UnixFifo;
 
 use crate::tui::omnibox::command::OmniboxCommand;
@@ -37,6 +23,7 @@ use crate::tui::omnibox::subscribed_view::{
     OmniboxResult, OmniboxSubscribedView, OmniboxSubscriber, Subscribable,
 };
 use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxView};
+use crate::tui::pager::show_pager;
 use crate::tui::service_list::view::ServiceListView;
 use crate::tui::sysinfo::SysInfo;
 use crate::{
@@ -44,7 +31,6 @@ use crate::{
     tui::dialog::{show_csr_info, show_help},
 };
 use crate::{launchd::query::dumpstate, tui::dialog};
-use crate::tui::pager::show_pager;
 
 lazy_static! {
     static ref PAGER: &'static str = option_env!("PAGER").unwrap_or("less");
@@ -160,10 +146,7 @@ impl RootLayout {
             .and_then(|v| v.as_any_mut().downcast_mut::<OmniboxSubscribedView>())
             .expect("Must forward to ServiceList");
 
-        let omnibox_events = [
-            self_event,
-            target.on_omnibox(recv)
-        ];
+        let omnibox_events = [self_event, target.on_omnibox(recv)];
 
         for omnibox_event in &omnibox_events {
             match omnibox_event {
@@ -312,26 +295,22 @@ impl OmniboxSubscriber for RootLayout {
 
                 show_pager(&self.cbsink_channel, unsafe {
                     &*slice_from_raw_parts(shmem.region as *mut u8, size)
-                }).map_err(|e| OmniboxError::CommandError(e))?;
+                })
+                .map_err(|e| OmniboxError::CommandError(e))?;
 
                 Ok(None)
             }
             OmniboxEvent::Command(OmniboxCommand::DumpJetsamPropertiesCategory) => {
-                let fifo = Arc::new(
-                    UnixFifo::new(0o777)
-                        .map_err(|e| OmniboxError::CommandError(e))?
-                );
+                let fifo =
+                    Arc::new(UnixFifo::new(0o777).map_err(|e| OmniboxError::CommandError(e))?);
 
                 let fifo_clone = fifo.clone();
 
                 // Spawn pipe reader
-                let fd_read_thread = std::thread::spawn(move || {
-                    fifo_clone.block_and_read_bytes()
-                });
+                let fd_read_thread = std::thread::spawn(move || fifo_clone.block_and_read_bytes());
 
-                fifo.with_writer(|fd_write| {
-                    dumpjpcategory(fd_write as RawFd)
-                }).map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+                fifo.with_writer(|fd_write| dumpjpcategory(fd_write as RawFd))
+                    .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
 
                 // Join reader thread (and close fd)
                 let jetsam_data = fd_read_thread.join().expect("Must read jetsam data");

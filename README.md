@@ -20,6 +20,7 @@ Should work on macOS 10.10+ according to the availability sec. [in the docs](htt
 - unload
 - dumpstate (opens in `$PAGER`)
 - dumpjpcategory (opens in `$PAGER`)
+- procinfo (opens in `$PAGER`, does not require root!)
 - `:edit` -> Open plist in `$EDITOR`, defaulting to `vim`. Supports binary plists -> shown as XML for edit, then marshalled back into binary format on save.
 
 ### xpc-sys crate

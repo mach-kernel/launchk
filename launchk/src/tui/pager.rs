@@ -1,6 +1,5 @@
-use std::error::Error;
-use std::process::{Command, Stdio};
 use std::io::Write;
+use std::process::{Command, Stdio};
 use std::sync::mpsc::Sender;
 
 use cursive::Cursive;
@@ -24,13 +23,9 @@ pub fn show_pager(cbsink: &Sender<CbSinkMessage>, buf: &[u8]) -> Result<(), Stri
         .write_all(buf)
         .unwrap_or(());
 
-    let res = pager
-        .wait()
-        .map_err(|e| e.to_string())?;
+    let res = pager.wait().map_err(|e| e.to_string())?;
 
-    cbsink
-        .send(Box::new(Cursive::clear))
-        .expect("Must clear");
+    cbsink.send(Box::new(Cursive::clear)).expect("Must clear");
 
     if res.success() {
         Ok(())

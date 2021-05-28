@@ -282,8 +282,12 @@ impl ServiceListView {
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
             }
             OmniboxCommand::Unload(dt, _handle) => {
-                let (ServiceListItem { name, status, .. }, plist) = self.with_active_item_plist()?;
-                let LaunchdEntryStatus { limit_load_to_session_type, .. } = status;
+                let (ServiceListItem { name, status, .. }, plist) =
+                    self.with_active_item_plist()?;
+                let LaunchdEntryStatus {
+                    limit_load_to_session_type,
+                    ..
+                } = status;
 
                 unload(
                     name,
@@ -309,31 +313,27 @@ impl ServiceListView {
             }
             OmniboxCommand::ProcInfo => {
                 let (ServiceListItem { name, status, .. }, _) = self.with_active_item_plist()?;
-                
+
                 if status.pid == 0 {
-                    return Err(OmniboxError::CommandError(
-                        format!("No PID available for {}", name)
-                    ));
+                    return Err(OmniboxError::CommandError(format!(
+                        "No PID available for {}",
+                        name
+                    )));
                 }
 
-                let fifo = Arc::new(
-                    UnixFifo::new(0o777)
-                        .map_err(|e| OmniboxError::CommandError(e))?
-                );
+                let fifo =
+                    Arc::new(UnixFifo::new(0o777).map_err(|e| OmniboxError::CommandError(e))?);
 
                 let fifo_clone = fifo.clone();
 
                 // Spawn pipe reader
-                let fd_read_thread = std::thread::spawn(move || {
-                    fifo_clone.block_and_read_bytes()
-                });
+                let fd_read_thread = std::thread::spawn(move || fifo_clone.block_and_read_bytes());
 
-                fifo.with_writer(|fd_write| {
-                    procinfo(status.pid, fd_write)
-                }).map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+                fifo.with_writer(|fd_write| procinfo(status.pid, fd_write))
+                    .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
 
                 // Join reader thread (and close fd)
-                let procinfo_data = fd_read_thread.join().expect("Must read jetsam data");
+                let procinfo_data = fd_read_thread.join().expect("Must read procinfo data");
 
                 show_pager(&self.cb_sink, &procinfo_data)
                     .map_err(|e| OmniboxError::CommandError(e))?;

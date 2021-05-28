@@ -68,5 +68,5 @@ lazy_static! {
     /// Requires a FD".entry("fd", 1 as RawFd)"
     pub static ref PROCINFO: XPCDictionary = XPCDictionary::new()
         .entry("subsystem", 2 as u64)
-        .entry("routine", 708);
+        .entry("routine", 708 as u64);
 }
