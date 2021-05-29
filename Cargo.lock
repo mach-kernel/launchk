@@ -630,7 +630,6 @@ dependencies = [
  "env_logger 0.8.3",
  "futures",
  "lazy_static",
- "libc",
  "log",
  "notify",
  "plist",

@@ -8,7 +8,6 @@ edition = "2018"
 
 [dependencies]
 xpc-sys = { path= "../xpc-sys" }
-libc = "0.2.94"
 lazy_static = "1.4.0"
 cursive = { version = "0.15.0", features = ["toml"] }
 tokio = { version = "1", features = ["full"] }
