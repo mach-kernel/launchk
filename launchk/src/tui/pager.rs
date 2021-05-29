@@ -9,6 +9,7 @@ lazy_static! {
     static ref PAGER: &'static str = option_env!("PAGER").unwrap_or("less");
 }
 
+/// Show $PAGER (or less), write buf, and clear Cursive after exiting
 pub fn show_pager(cbsink: &Sender<CbSinkMessage>, buf: &[u8]) -> Result<(), String> {
     let mut pager = Command::new(*PAGER)
         .stdin(Stdio::piped())

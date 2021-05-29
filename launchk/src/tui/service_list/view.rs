@@ -47,7 +47,7 @@ async fn poll_running_jobs(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<C
         let mut write = write.unwrap();
         *write = list_all();
 
-        cb_sink.send(Box::new(Cursive::noop)).unwrap();
+        cb_sink.send(Box::new(Cursive::noop)).expect("Must send");
     }
 }
 
@@ -316,7 +316,7 @@ impl ServiceListView {
 
                 if status.pid == 0 {
                     return Err(OmniboxError::CommandError(format!(
-                        "No PID available for {}",
+                        "No PID for {}",
                         name
                     )));
                 }

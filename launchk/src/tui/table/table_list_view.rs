@@ -12,7 +12,6 @@ use cursive::views::{LinearLayout, ResizedView, ScrollView, SelectView};
 use cursive::{Vec2, View, XY};
 
 use crate::tui::table::table_headers::TableHeaders;
-
 pub trait TableListItem {
     fn as_row(&self) -> Vec<String>;
 }
@@ -36,19 +35,15 @@ impl<T: 'static + TableListItem> TableListView<T> {
     fn build_user_col_sizes(
         columns: &Vec<(&str, Option<usize>)>,
     ) -> Arc<(HashMap<usize, usize>, usize)> {
-        let mut user_col_sizes: HashMap<usize, usize> = HashMap::new();
-        let mut user_col_size_total: usize = 0;
+        let user_col_sizes: HashMap<usize, usize> = columns
+            .iter()
+            .zip(0..columns.len())
+            .filter_map(|((_, user_len), i)| user_len.map(|ul| (i, ul)))
+            .collect();
 
-        for (i, (_, sz)) in columns.iter().enumerate() {
-            if sz.is_none() {
-                continue;
-            }
-            let sz = sz.unwrap();
-            user_col_size_total += sz;
-            user_col_sizes.insert(i, sz);
-        }
+        let total = user_col_sizes.values().sum();
 
-        Arc::new((user_col_sizes, user_col_size_total))
+        Arc::new((user_col_sizes, total))
     }
 
     pub fn new(columns: Vec<(&str, Option<usize>)>) -> Self {
@@ -88,8 +83,6 @@ impl<T: 'static + TableListItem> TableListView<T> {
     where
         I: IntoIterator<Item = T>,
     {
-        // self.compute_sizes();
-
         let (dyn_max, padding) = *self.dynamic_cols_sz.borrow();
         let (user_col_sizes, _) = &*self.user_col_sizes;
 
@@ -116,6 +109,7 @@ impl<T: 'static + TableListItem> TableListView<T> {
                         };
 
                         truncated.truncate(field_width - 1);
+                        // truncated.truncate(pad - 1);
                         format!("{:pad$}", truncated, pad = pad)
                     })
                     .collect();
@@ -138,8 +132,8 @@ impl<T: 'static + TableListItem> TableListView<T> {
 
     /// "Responsive"
     fn compute_sizes(&mut self) {
+        // Total is sum of all defined sizes
         let (user_col_sizes, user_col_sizes_total) = &*self.user_col_sizes;
-
         let num_dynamic = self.num_columns - user_col_sizes.len();
 
         // All sizes are static
@@ -147,6 +141,7 @@ impl<T: 'static + TableListItem> TableListView<T> {
             return;
         }
 
+        // Amount remaining for dynamically sized columns to split
         let remaining = self.last_layout_size.borrow().x - user_col_sizes_total;
         let mut per_dynamic_col = remaining / num_dynamic;
 

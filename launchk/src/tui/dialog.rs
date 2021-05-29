@@ -17,8 +17,7 @@ use crate::{
 };
 use xpc_sys::csr::{csr_check, CsrConfig};
 
-/// The XPC error key sometimes contains information that is not necessarily a failure,
-/// so let's just call it "Notice" until we figure out what to do next?
+/// XPC "error" key can be present with no failure..."notice"?
 pub fn show_error(err: String) -> CbSinkMessage {
     let cl = |siv: &mut Cursive| {
         let dialog = Dialog::around(TextView::new(err))
@@ -58,6 +57,8 @@ pub fn show_prompt(
     Box::new(cl)
 }
 
+/// Don't know how to get this info when job is not running,
+/// so we can ask user and suggest a default (domain 7, aqua)
 pub fn domain_session_prompt<S: Into<String>>(
     label: S,
     domain_only: bool,
