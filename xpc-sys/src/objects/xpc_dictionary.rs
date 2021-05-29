@@ -136,7 +136,7 @@ where
 {
     /// Creates a XPC dictionary
     ///
-    /// Values must be XPCObject newtype but can encapsulate any
+    /// Values must be XPCObject but can encapsulate any
     /// valid xpc_object_t
     fn from(message: HashMap<S, XPCObject>) -> Self {
         let dict = unsafe { xpc_dictionary_create(null(), null_mut(), 0) };

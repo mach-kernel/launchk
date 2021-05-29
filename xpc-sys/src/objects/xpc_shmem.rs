@@ -4,16 +4,18 @@ use crate::{
     mach_port_t, mach_task_self_, rs_strerror, vm_address_t, vm_allocate, vm_deallocate, vm_size_t,
     xpc_shmem_create,
 };
+use std::ffi::c_void;
 use std::os::raw::c_int;
 use std::ptr::null_mut;
-use std::{ffi::c_void, sync::Arc};
 
+/// Wrapper around vm_allocate() vm_deallocate() with an XPCObject
+/// member of XPC type _xpc_type_shmem
 #[derive(Debug, Clone)]
 pub struct XPCShmem {
     pub task: mach_port_t,
     pub size: vm_size_t,
     pub region: *mut c_void,
-    pub xpc_object: Arc<XPCObject>,
+    pub xpc_object: XPCObject,
 }
 
 unsafe impl Send for XPCShmem {}
@@ -37,9 +39,7 @@ impl XPCShmem {
                 task,
                 size,
                 region,
-                xpc_object: Arc::new(unsafe {
-                    xpc_shmem_create(region as *mut c_void, size as u64).into()
-                }),
+                xpc_object: unsafe { xpc_shmem_create(region as *mut c_void, size as u64).into() },
             })
         }
     }
@@ -52,22 +52,9 @@ impl XPCShmem {
 impl Drop for XPCShmem {
     fn drop(&mut self) {
         let XPCShmem {
-            size,
-            task,
-            region,
-            xpc_object,
+            size, task, region, ..
         } = self;
         if *region == null_mut() {
-            return;
-        }
-
-        let refs = Arc::strong_count(xpc_object);
-        if refs > 1 {
-            log::warn!(
-                "vm_allocated region {:p} still has {} refs, cannot vm_deallocate",
-                *region,
-                refs
-            );
             return;
         }
 

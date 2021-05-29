@@ -3,20 +3,10 @@ use crate::launchd::message::{
     UNLOAD_PATHS,
 };
 use std::convert::TryFrom;
-use std::{
-    collections::HashSet,
-    ffi::{CStr, CString, OsStr},
-    fs::File,
-    io::Read,
-    os::unix::prelude::{FromRawFd, RawFd},
-    path::Path,
-    ptr::{null, null_mut},
-};
+use std::{collections::HashSet, os::unix::prelude::RawFd};
 
 use xpc_sys::{
-    errno,
-    objects::{xpc_object::XPCObject, xpc_shmem::XPCShmem},
-    rs_strerror,
+    objects::xpc_shmem::XPCShmem,
     traits::{xpc_pipeable::XPCPipeable, xpc_value::TryXPCValue},
     MAP_SHARED,
 };
@@ -156,7 +146,7 @@ pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
 
     let response = XPCDictionary::new()
         .extend(&DUMPSTATE)
-        .entry("shmem", XPCObject::from(&shmem.xpc_object))
+        .entry("shmem", shmem.xpc_object.clone())
         .pipe_routine_with_error_handling()?;
 
     let bytes_written: u64 = response.get(&["bytes-written"])?.xpc_value()?;

@@ -1,12 +1,67 @@
 # xpc-sys
 
-##### Object lifecycle
+[![Rust](https://github.com/mach-kernel/launchk/actions/workflows/rust.yml/badge.svg?branch=master)](https://github.com/mach-kernel/launchk/actions/workflows/rust.yml) ![crates.io](https://img.shields.io/crates/v/xpc-sys.svg)
+
+Various utilities for conveniently dealing with XPC in Rust.
+
+- [Object lifecycle](#object-lifecycle)
+- [QueryBuilder](#query-builder)
+- [XPC Dictionary](#xpc-dictionary)
+- [XPC Array](#xpc-array)
+- [XPC Shmem](#xpc-shmem)
+
+#### Getting Started
+
+Conversions to/from Rust/XPC objects uses the [xpc.h functions documented on Apple Developer](https://developer.apple.com/documentation/xpc/xpc_services_xpc_h?language=objc) using the `From` trait. Complex types such as arrays and shared memory objects described in greater detail below.
+
+| Rust                                   | XPC                        |
+|----------------------------------------|----------------------------|
+| i64                                    | _xpc_type_int64            |
+| u64                                    | _xpc_type_uint64           |
+| f64                                    | _xpc_type_double           |
+| bool                                   | _xpc_bool_true/false       |
+| Into<String>                           | _xpc_type_string           |
+| HashMap<Into<String>, Into<XPCObject>> | _xpc_type_dictionary       |
+| Vec<Into<XPCObject>>                   | _xpc_type_array            |
+| std::os::unix::prelude::RawFd          | _xpc_type_fd               |
+| (MachPortType::Send, mach_port_t)      | _xpc_type_mach_send        |
+| (MachPortType::Recv, mach_port_t)      | _xpc_type_mach_recv        |
+| XPCShmem                               | _xpc_type_shmem            |
+
+Make XPC objects for anything with `From<T>`. Make sure to use the correct type for file descriptors and Mach ports:
+```rust
+let mut message: HashMap<&str, XPCObject> = HashMap::new();
+
+message.insert(
+    "domain-port",
+    XPCObject::from((MachPortType::Send, get_bootstrap_port() as mach_port_t)),
+);
+```
+
+Go from an XPC object to value via the `TryXPCValue` trait. It checks your object's type via `xpc_get_type()` and yields a clear error if you're using the wrong type:
+```rust
+#[test]
+fn deserialize_as_wrong_type() {
+    let an_i64: XPCObject = XPCObject::from(42 as i64);
+    let as_u64: Result<u64, XPCError> = an_i64.xpc_value();
+    assert_eq!(
+        as_u64.err().unwrap(),
+        XPCValueError("Cannot get int64 as uint64".to_string())
+    );
+}
+```
+
+[Top](#xpc-sys)
+
+#### Object lifecycle
 
 XPCObject wraps `xpc_object_t` in an `Arc`. `Drop` will invoke `xpc_release()` on objects being dropped with no other [strong refs](https://doc.rust-lang.org/std/sync/struct.Arc.html#method.strong_count).
 
 **NOTE**: When using Objective-C blocks with the [block crate](https://crates.io/crates/block) (e.g. looping over an array), make sure to invoke `xpc_retain()` on any object you wish to keep after the closure is dropped, or else the XPC objects in the closure will be dropped as well! See the `XPCDictionary` implementation for more details. xpc-sys handles this for you for its conversions.
 
-#### XPCDictionary and QueryBuilder
+[Top](#xpc-sys)
+
+#### QueryBuilder
 
 While we can go from `HashMap<&str, XPCObject>` to `XPCObject`, it can be a little verbose. A `QueryBuilder` trait exposes some builder methods to make building an XPC dictionary a little easier (without all of the `into()`s, and some additional error checking).
 
@@ -32,47 +87,9 @@ To write the query for `launchctl list`:
 
 In addition to checking `errno` is 0, `pipe_routine_with_error_handling` also looks for possible `error`  and `errors` keys in the response dictionary and provides an `Err()` with `xpc_strerror` contents.
 
-#### Rust to XPC
+[Top](#xpc-sys)
 
-Conversions to/from Rust/XPC objects uses the [xpc.h functions documented on Apple Developer](https://developer.apple.com/documentation/xpc/xpc_services_xpc_h?language=objc) using the `From` trait.
-
-| Rust                                   | XPC                        |
-|----------------------------------------|----------------------------|
-| i64                                    | _xpc_type_int64            |
-| u64                                    | _xpc_type_uint64           |
-| f64                                    | _xpc_type_double           |
-| bool                                   | _xpc_bool_true/false       |
-| Into<String>                           | _xpc_type_string           |
-| HashMap<Into<String>, Into<XPCObject>> | _xpc_type_dictionary       |
-| Vec<Into<XPCObject>>                   | _xpc_type_array            |
-| std::os::unix::prelude::RawFd          | _xpc_type_fd               |
-| (MachPortType::Send, mach_port_t)      | _xpc_type_mach_send        |
-| (MachPortType::Recv, mach_port_t)      | _xpc_type_mach_recv        |
-
-Make XPC objects for anything with `From<T>`. Make sure to use the correct type for file descriptors and Mach ports:
-```rust
-let mut message: HashMap<&str, XPCObject> = HashMap::new();
-
-message.insert(
-    "domain-port",
-    XPCObject::from((MachPortType::Send, get_bootstrap_port() as mach_port_t)),
-);
-```
-
-Go from an XPC object to value via the `TryXPCValue` trait. It checks your object's type via `xpc_get_type()` and yields a clear error if you're using the wrong type:
-```rust
-#[test]
-fn deserialize_as_wrong_type() {
-    let an_i64: XPCObject = XPCObject::from(42 as i64);
-    let as_u64: Result<u64, XPCError> = an_i64.xpc_value();
-    assert_eq!(
-        as_u64.err().unwrap(),
-        XPCValueError("Cannot get int64 as uint64".to_string())
-    );
-}
-```
-
-##### XPC Dictionaries
+#### XPC Dictionary
 
 Go from a `HashMap` to `xpc_object_t` with the `XPCObject` type:
 
@@ -138,7 +155,9 @@ let XPCDictionary(hm) = response.unwrap();
 let whatever = hm.get("...");
 ```
 
-##### XPC Arrays
+[Top](#xpc-sys)
+
+#### XPC Array
 
 An XPC array can be made from either `Vec<XPCObject>` or `Vec<Into<XPCObject>>`:
 
@@ -153,3 +172,59 @@ Go back to `Vec` using `xpc_value`:
 ```rust
 let rs_vec: Vec<XPCObject> = xpc_array.xpc_value().unwrap();
 ```
+
+[Top](#xpc-sys)
+
+#### XPC Shmem
+
+Make XPC shared memory objects by providing a size and vm_allocate/mmap flags. [`vm_allocate`](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/ManagingMemory/Articles/MemoryAlloc.html) is used under the hood:
+
+```rust
+let shmem = XPCShmem::new_task_self(
+    0x1400000,
+    i32::try_from(MAP_SHARED).expect("Must conv flags"),
+)?;
+
+// Use as _xpc_type_shmem argument in XPCDictionary
+let response = XPCDictionary::new()
+    .extend(&DUMPSTATE)
+    .entry("shmem", shmem.xpc_object.clone())
+    .pipe_routine_with_error_handling()?;
+```
+
+To work with the shmem region, use [`slice_from_raw_parts`](https://doc.rust-lang.org/std/slice/fn.from_raw_parts.html):
+
+```rust
+let bytes: &[u8] = unsafe {
+    &*slice_from_raw_parts(shmem.region as *mut u8, size)
+};
+
+// Make a string from bytes in the shmem
+let mut hey_look_a_string = String::new();
+bytes.read_to_string(buf);
+```
+
+[Top](#xpc-sys)
+
+### Credits
+
+A big thanks to these open source projects and general resources:
+
+
+- [block](https://crates.io/crates/block) Obj-C block support, necessary for any XPC function taking `xpc_*_applier_t`  
+- [Cursive](https://github.com/gyscos/cursive) TUI  
+- [tokio](https://github.com/tokio-rs/tokio) ASIO  
+- [plist](https://crates.io/crates/plist) Parsing & validation for XML and binary plists  
+- [notify](https://docs.rs/notify/4.0.16/notify/) fsnotify  
+- [bitflags](https://docs.rs/bitflags/1.2.1/bitflags/)  
+- [Apple Developer XPC services](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingXPCServices.html)  
+- [Apple Developer XPC API reference](https://developer.apple.com/documentation/xpc?language=objc)  
+- [MOXIL / launjctl](http://newosxbook.com/articles/jlaunchctl.html)  
+- [geosnow - A Long Evening With macOS' sandbox](https://geosn0w.github.io/A-Long-Evening-With-macOS%27s-Sandbox/)  
+- [Bits of launchd - @5aelo](https://saelo.github.io/presentations/bits_of_launchd.pdf)  
+- [Audit tokens explained (e.g. ASID)](https://knight.sc/reverse%20engineering/2020/03/20/audit-tokens-explained.html)  
+- [objc.io XPC guide](https://www.objc.io/issues/14-mac/xpc/)  
+- The various source links found in comments, from Chrome's sandbox and other headers with definitions for private API functions.
+- Last but not least, this is Apple's launchd after all, right :>)? I did not know systemd was inspired by launchd until I read [this HN comment](https://news.ycombinator.com/item?id=2565780), which sent me down this eventual rabbit hole :)  
+
+Everything else (C) David Stancu & Contributors 2021

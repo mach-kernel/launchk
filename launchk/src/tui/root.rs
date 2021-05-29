@@ -1,16 +1,12 @@
 use std::collections::VecDeque;
-
-use std::io::Read;
 use std::os::unix::prelude::RawFd;
-
+use std::ptr::slice_from_raw_parts;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 
-use std::ptr::slice_from_raw_parts;
-
 use cursive::event::{Event, EventResult, Key};
 use cursive::traits::{Resizable, Scrollable};
-use cursive::view::{AnyView, ViewWrapper};
+use cursive::view::ViewWrapper;
 use cursive::views::{LinearLayout, NamedView, Panel};
 use cursive::{Cursive, Vec2, View};
 
@@ -113,7 +109,7 @@ impl RootLayout {
             .unwrap_or(());
     }
 
-    /// Cursive uses a different crate for its channel, so this is some glue
+    /// Cursive uses a different crate for its channels (?), so this is some glue
     fn cbsink_channel(siv: &mut Cursive, handle: &Handle) -> Sender<CbSinkMessage> {
         let (tx, rx): (Sender<CbSinkMessage>, Receiver<CbSinkMessage>) = channel();
         let sink = siv.cb_sink().clone();

@@ -1,6 +1,8 @@
 use crate::launchd::query_builder::QueryBuilder;
 use xpc_sys::objects::xpc_dictionary::XPCDictionary;
 
+// A bunch of XPCDictionary 'protos' that can be extended to make XPC queries
+
 lazy_static! {
     /// launchctl list [name]
     pub static ref LIST_SERVICES: XPCDictionary = XPCDictionary::new()
@@ -13,7 +15,7 @@ lazy_static! {
 
     /// launchctl load [path]
     pub static ref LOAD_PATHS: XPCDictionary = XPCDictionary::new()
-        .with_domain_port()
+        .with_domain_port_as_bootstrap_port()
         .entry("routine", 800 as u64)
         .entry("subsystem", 3 as u64)
         .entry("handle", 0 as u64)
@@ -24,7 +26,7 @@ lazy_static! {
 
     /// launchctl unload [path]
     pub static ref UNLOAD_PATHS: XPCDictionary = XPCDictionary::new()
-        .with_domain_port()
+        .with_domain_port_as_bootstrap_port()
         .entry("routine", 801 as u64)
         .entry("subsystem", 3 as u64)
         .entry("handle", 0 as u64)
@@ -36,14 +38,14 @@ lazy_static! {
 
     /// launchctl enable
     pub static ref ENABLE_NAMES: XPCDictionary = XPCDictionary::new()
-        .with_domain_port()
+        .with_domain_port_as_bootstrap_port()
         // .entry("handle", UID or ASID)
         .entry("routine", 808 as u64)
         .entry("subsystem", 3 as u64);
 
     /// launchctl disable
     pub static ref DISABLE_NAMES: XPCDictionary = XPCDictionary::new()
-        .with_domain_port()
+        .with_domain_port_as_bootstrap_port()
         // .entry("handle", UID or ASID)
         .entry("routine", 809 as u64)
         .entry("subsystem", 3 as u64);

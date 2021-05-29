@@ -21,10 +21,8 @@ lazy_static! {
     pub static ref LABEL_TO_ENTRY_CONFIG: RwLock<HashMap<String, LaunchdPlist>> =
         RwLock::new(HashMap::new());
     static ref EDITOR: &'static str = option_env!("EDITOR").unwrap_or("vim");
+    static ref TMP_DIR: &'static str = option_env!("TMPDIR").unwrap_or("/tmp");
 }
-
-// TODO: fall back on /tmp
-static TMP_DIR: &str = env!("TMPDIR");
 
 /*
 od -xc binary.plist
@@ -277,7 +275,7 @@ pub fn edit_and_replace(plist_meta: &LaunchdPlist) -> Result<(), String> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Must get ts");
-    let temp_path = Path::new(TMP_DIR).join(format!("{}", now.as_secs()));
+    let temp_path = Path::new(*TMP_DIR).join(format!("{}", now.as_secs()));
     plist.to_file_xml(&temp_path).map_err(|e| e.to_string())?;
 
     // Start $EDITOR

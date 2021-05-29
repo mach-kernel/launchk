@@ -41,7 +41,8 @@ impl Default for XPCObject {
 }
 
 impl fmt::Display for XPCObject {
-    /// Use xpc_copy_description to get an easy snapshot of a dictionary
+    /// Use xpc_copy_description to show as a string, for
+    /// _xpc_type_dictionary contents are shown!
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let XPCObject(arc, _) = self;
 
@@ -118,6 +119,7 @@ impl From<&str> for XPCObject {
 }
 
 impl<O: Into<XPCObject>> From<Vec<O>> for XPCObject {
+    /// Create XPCObject via xpc_array_create
     fn from(value: Vec<O>) -> Self {
         let xpc_array = unsafe { xpc_array_create(null_mut(), 0) };
         for object in value {
@@ -144,9 +146,11 @@ impl From<XPCDictionary> for XPCObject {
     }
 }
 
-impl From<&Arc<XPCObject>> for XPCObject {
-    fn from(value: &Arc<XPCObject>) -> Self {
-        let XPCObject(ref arc, ref xpc_type) = **value;
+impl<R: AsRef<XPCObject>> From<R> for XPCObject {
+    /// Create XPCObject from another ref
+    fn from(other: R) -> Self {
+        let other_ref = other.as_ref();
+        let XPCObject(ref arc, ref xpc_type) = other_ref;
         XPCObject(arc.clone(), xpc_type.clone())
     }
 }

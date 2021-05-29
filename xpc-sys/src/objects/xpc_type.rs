@@ -1,7 +1,7 @@
 use crate::{
     _xpc_type_array, _xpc_type_bool, _xpc_type_dictionary, _xpc_type_double, _xpc_type_fd,
-    _xpc_type_int64, _xpc_type_mach_recv, _xpc_type_mach_send, _xpc_type_s, _xpc_type_string,
-    _xpc_type_uint64, xpc_get_type, xpc_object_t, xpc_type_get_name, xpc_type_t,
+    _xpc_type_int64, _xpc_type_mach_recv, _xpc_type_mach_send, _xpc_type_s, _xpc_type_shmem,
+    _xpc_type_string, _xpc_type_uint64, xpc_get_type, xpc_object_t, xpc_type_get_name, xpc_type_t,
 };
 
 use crate::objects::xpc_error::XPCError;
@@ -68,6 +68,7 @@ lazy_static! {
     pub static ref MachRecv: XPCType =
         unsafe { (&_xpc_type_mach_recv as *const _xpc_type_s).into() };
     pub static ref Fd: XPCType = unsafe { (&_xpc_type_fd as *const _xpc_type_s).into() };
+    pub static ref Shmem: XPCType = unsafe { (&_xpc_type_shmem as *const _xpc_type_s).into() };
 }
 
 /// Runtime type check for XPC object. I do not know if possible/advantageous to represent
