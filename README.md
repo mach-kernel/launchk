@@ -10,6 +10,8 @@ Should work on macOS 10.10+ according to the availability sec. [in the docs](htt
 
 #### Features
 
+Use `:` to enter command mode, `/` to enter filtering mode, and any of `sguadl` for filtering by [system, global, user, agent, daemon, loaded]. `Ctrl-U` to clear, `Tab` to complete, `Enter` to submit. 
+
 - Poll XPC for jobs and display changes as they happen
 - Filter by `LaunchAgents` and `LaunchDaemons` in scopes:
   - System (/System/Library/)
