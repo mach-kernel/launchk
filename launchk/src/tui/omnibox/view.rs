@@ -113,7 +113,7 @@ impl OmniboxView {
         )
     }
 
-    /// Commands 
+    /// Commands
     fn handle_active(event: &Event, state: &OmniboxState) -> Option<OmniboxState> {
         let OmniboxState {
             mode,

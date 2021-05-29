@@ -315,10 +315,7 @@ impl ServiceListView {
                 let (ServiceListItem { name, status, .. }, _) = self.with_active_item_plist()?;
 
                 if status.pid == 0 {
-                    return Err(OmniboxError::CommandError(format!(
-                        "No PID for {}",
-                        name
-                    )));
+                    return Err(OmniboxError::CommandError(format!("No PID for {}", name)));
                 }
 
                 let fifo =
