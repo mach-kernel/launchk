@@ -45,7 +45,7 @@ impl OmniboxState {
 
         OMNIBOX_COMMANDS
             .iter()
-            .filter(|(c, _, _)| c.to_string().contains(command_filter))
+            .filter(|(c, _, _)| c.to_string().starts_with(command_filter))
             .next()
             .map(|s| s.clone())
     }

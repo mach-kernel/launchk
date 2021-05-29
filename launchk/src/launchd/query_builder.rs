@@ -1,25 +1,36 @@
 use crate::launchd::enums::{DomainType, SessionType};
 use xpc_sys::objects::xpc_dictionary::XPCDictionary;
+use xpc_sys::objects::xpc_object::MachPortType;
 use xpc_sys::objects::xpc_object::XPCObject;
 use xpc_sys::{get_bootstrap_port, mach_port_t};
 
+/// Builder methods for XPCDictionary to make querying easier
 pub trait QueryBuilder {
+    /// Add entry to query
     fn entry<S: Into<String>, O: Into<XPCObject>>(self, key: S, value: O) -> XPCDictionary;
+
+    /// Add entry if option is Some()
     fn entry_if_present<S: Into<String>, O: Into<XPCObject>>(
         self,
         key: S,
         value: Option<O>,
     ) -> XPCDictionary;
 
+    /// Extend an existing XPCDictionary
     fn extend(self, other: &XPCDictionary) -> XPCDictionary;
 
-    fn with_domain_port(self) -> XPCDictionary
+    /// Adds "domain_port" with get_bootstrap_port() -> _xpc_type_mach_send
+    fn with_domain_port_as_bootstrap_port(self) -> XPCDictionary
     where
         Self: Sized,
     {
-        self.entry("domain-port", get_bootstrap_port() as mach_port_t)
+        self.entry(
+            "domain-port",
+            (MachPortType::Send, get_bootstrap_port() as mach_port_t),
+        )
     }
 
+    /// Adds provided session type or falls back on Aqua
     fn with_session_type_or_default(self, session: Option<SessionType>) -> XPCDictionary
     where
         Self: Sized,
@@ -27,13 +38,15 @@ pub trait QueryBuilder {
         self.entry("session", session.unwrap_or(SessionType::Aqua).to_string())
     }
 
-    fn with_handle_or_default(self, session: Option<u64>) -> XPCDictionary
+    /// Adds provided handle or falls back on 0
+    fn with_handle_or_default(self, handle: Option<u64>) -> XPCDictionary
     where
         Self: Sized,
     {
-        self.entry("handle", session.unwrap_or(0))
+        self.entry("handle", handle.unwrap_or(0))
     }
 
+    /// Adds provided DomainType, falls back on 7 (requestor's domain)
     fn with_domain_type_or_default(self, t: Option<DomainType>) -> XPCDictionary
     where
         Self: Sized,

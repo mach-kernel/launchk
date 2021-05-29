@@ -1,25 +1,36 @@
-use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::os::unix::prelude::RawFd;
+use std::ptr::slice_from_raw_parts;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::time::Duration;
+use std::sync::Arc;
 
 use cursive::event::{Event, EventResult, Key};
 use cursive::traits::{Resizable, Scrollable};
-use cursive::view::{ViewWrapper, AnyView};
+use cursive::view::ViewWrapper;
 use cursive::views::{LinearLayout, NamedView, Panel};
-use cursive::{Cursive, Vec2, View, Printer};
+use cursive::{Cursive, Vec2, View};
 
 use tokio::runtime::Handle;
-use tokio::time::interval;
 
-use crate::tui::dialog;
+use xpc_sys::objects::unix_fifo::UnixFifo;
+
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::subscribed_view::{
     OmniboxResult, OmniboxSubscribedView, OmniboxSubscriber, Subscribable,
 };
 use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxView};
+use crate::tui::pager::show_pager;
 use crate::tui::service_list::view::ServiceListView;
 use crate::tui::sysinfo::SysInfo;
+use crate::{
+    launchd::query::dumpjpcategory,
+    tui::dialog::{show_csr_info, show_help},
+};
+use crate::{launchd::query::dumpstate, tui::dialog};
+
+lazy_static! {
+    static ref PAGER: &'static str = option_env!("PAGER").unwrap_or("less");
+}
 
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 
@@ -41,17 +52,17 @@ enum RootLayoutChildren {
 
 async fn poll_omnibox(cb_sink: Sender<CbSinkMessage>, rx: Receiver<OmniboxEvent>) {
     loop {
-        let recv = rx
-            .recv()
-            .expect("Must receive event");
+        let recv = rx.recv().expect("Must receive event");
 
         log::info!("[root_layout/poll_omnibox]: RECV {:?}", recv);
 
-        cb_sink.send(Box::new(|siv| {
-            siv.call_on_name("root_layout", |v: &mut NamedView<RootLayout>| {
-                v.get_mut().handle_omnibox_event(recv);
-            });
-        }));
+        cb_sink
+            .send(Box::new(|siv| {
+                siv.call_on_name("root_layout", |v: &mut NamedView<RootLayout>| {
+                    v.get_mut().handle_omnibox_event(recv);
+                });
+            }))
+            .expect("Must forward to root")
     }
 }
 
@@ -98,7 +109,7 @@ impl RootLayout {
             .unwrap_or(());
     }
 
-    /// Cursive uses a different crate for its channel, so this is some glue
+    /// Cursive uses a different crate for its channels (?), so this is some glue
     fn cbsink_channel(siv: &mut Cursive, handle: &Handle) -> Sender<CbSinkMessage> {
         let (tx, rx): (Sender<CbSinkMessage>, Receiver<CbSinkMessage>) = channel();
         let sink = siv.cb_sink().clone();
@@ -123,8 +134,7 @@ impl RootLayout {
     }
 
     fn handle_omnibox_event(&mut self, recv: OmniboxEvent) {
-        self.on_omnibox(recv.clone())
-            .expect("Root for effects only");
+        let self_event = self.on_omnibox(recv.clone());
 
         let target = self
             .layout
@@ -132,18 +142,22 @@ impl RootLayout {
             .and_then(|v| v.as_any_mut().downcast_mut::<OmniboxSubscribedView>())
             .expect("Must forward to ServiceList");
 
-        match target.on_omnibox(recv) {
-            // Forward Omnibox command responses from view
-            Ok(Some(c)) => self
-                .omnibox_tx
-                .send(OmniboxEvent::Command(c))
-                .expect("Must send response commands"),
-            Err(OmniboxError::CommandError(s)) => self
-                .cbsink_channel
-                .send(dialog::show_error(s))
-                .expect("Must show error"),
-            _ => {}
-        };
+        let omnibox_events = [self_event, target.on_omnibox(recv)];
+
+        for omnibox_event in &omnibox_events {
+            match omnibox_event {
+                // Forward Omnibox command responses from view
+                Ok(Some(c)) => self
+                    .omnibox_tx
+                    .send(OmniboxEvent::Command(c.clone()))
+                    .expect("Must send response commands"),
+                Err(OmniboxError::CommandError(s)) => self
+                    .cbsink_channel
+                    .send(dialog::show_error(s.clone()))
+                    .expect("Must show error"),
+                _ => {}
+            }
+        }
     }
 
     fn ring_to_arrows(&mut self) -> Option<Event> {
@@ -180,7 +194,7 @@ impl RootLayout {
 
 impl ViewWrapper for RootLayout {
     wrap_impl!(self.layout: LinearLayout);
-    
+
     fn wrap_on_event(&mut self, event: Event) -> EventResult {
         log::debug!("[root/event]: {:?}", event);
 
@@ -260,6 +274,53 @@ impl OmniboxSubscriber for RootLayout {
                         f,
                     ))
                     .expect("Must show prompt");
+                Ok(None)
+            }
+            OmniboxEvent::Command(OmniboxCommand::CSRInfo) => {
+                self.cbsink_channel
+                    .send(show_csr_info())
+                    .expect("Must show prompt");
+
+                Ok(None)
+            }
+            OmniboxEvent::Command(OmniboxCommand::DumpState) => {
+                let (size, shmem) =
+                    dumpstate().map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+
+                log::info!("shmem response sz {}", size);
+
+                show_pager(&self.cbsink_channel, unsafe {
+                    &*slice_from_raw_parts(shmem.region as *mut u8, size)
+                })
+                .map_err(|e| OmniboxError::CommandError(e))?;
+
+                Ok(None)
+            }
+            OmniboxEvent::Command(OmniboxCommand::DumpJetsamPropertiesCategory) => {
+                let fifo =
+                    Arc::new(UnixFifo::new(0o777).map_err(|e| OmniboxError::CommandError(e))?);
+
+                let fifo_clone = fifo.clone();
+
+                // Spawn pipe reader
+                let fd_read_thread = std::thread::spawn(move || fifo_clone.block_and_read_bytes());
+
+                fifo.with_writer(|fd_write| dumpjpcategory(fd_write as RawFd))
+                    .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+
+                // Join reader thread (and close fd)
+                let jetsam_data = fd_read_thread.join().expect("Must read jetsam data");
+
+                show_pager(&self.cbsink_channel, &jetsam_data)
+                    .map_err(|e| OmniboxError::CommandError(e))?;
+
+                Ok(None)
+            }
+            OmniboxEvent::Command(OmniboxCommand::Help) => {
+                self.cbsink_channel
+                    .send(show_help())
+                    .expect("Must show prompt");
+
                 Ok(None)
             }
             _ => Ok(None),

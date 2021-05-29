@@ -113,6 +113,7 @@ impl OmniboxView {
         )
     }
 
+    /// Commands
     fn handle_active(event: &Event, state: &OmniboxState) -> Option<OmniboxState> {
         let OmniboxState {
             mode,
@@ -128,7 +129,8 @@ impl OmniboxView {
             .filter(|(cmd, _, _)| *cmd == *command_filter)
             .map(|(_, _, oc)| oc.clone());
 
-        let (lf_char, cf_char) = match (event, mode) {
+        // Avoid extra clauses below, use same options for string filters
+        let (lf_char_update, cf_char_update) = match (event, mode) {
             (Event::Char(c), OmniboxMode::LabelFilter) => {
                 (Some(format!("{}{}", label_filter, c)), None)
             }
@@ -139,6 +141,7 @@ impl OmniboxView {
         };
 
         match (event, mode) {
+            // Toggle back to query from bitmask filters
             (Event::Char(':'), OmniboxMode::JobTypeFilter) => {
                 Some(state.with_new(Some(OmniboxMode::CommandFilter), None, None, None))
             }
@@ -149,7 +152,7 @@ impl OmniboxView {
             // User -> string filters
             (Event::Char(_), OmniboxMode::LabelFilter)
             | (Event::Char(_), OmniboxMode::CommandFilter) => {
-                Some(state.with_new(None, lf_char, cf_char, None))
+                Some(state.with_new(None, lf_char_update, cf_char_update, None))
             }
             (Event::Key(Key::Backspace), OmniboxMode::LabelFilter) if !label_filter.is_empty() => {
                 let mut lf = label_filter.clone();
@@ -184,6 +187,7 @@ impl OmniboxView {
         }
     }
 
+    /// Toggle bitmask on key
     fn handle_job_type_filter(event: &Event, state: &OmniboxState) -> Option<OmniboxState> {
         let mut jtf = state.job_type_filter.clone();
 
@@ -200,6 +204,7 @@ impl OmniboxView {
         Some(state.with_new(Some(OmniboxMode::JobTypeFilter), None, None, Some(jtf)))
     }
 
+    /// Leave idle state
     fn handle_idle(event: &Event, state: &OmniboxState) -> Option<OmniboxState> {
         match event {
             Event::Char('/') => Some(state.with_new(
@@ -271,7 +276,7 @@ impl OmniboxView {
             return;
         }
         let (cmd, desc, ..) = suggestion.unwrap();
-        let cmd_string = cmd.to_string().replace(&state.command_filter, "");
+        let cmd_string = cmd.to_string().replacen(&state.command_filter, "", 1);
 
         printer.with_style(Style::from(Color::Light(BaseColor::Black)), |p| {
             p.print(XY::new(0, 0), cmd_string.as_str())
@@ -289,15 +294,16 @@ impl OmniboxView {
             ..
         } = &*read;
 
-        let jtf_ofs = if *mode != OmniboxMode::JobTypeFilter {
-            // "[sguadl]"
-            8
+        let mut jtf_ofs = if *mode != OmniboxMode::JobTypeFilter {
+            "[sguadl]".len()
         } else {
-            // "[system global user agent daemon loaded]"
-            40
+            "[system global user agent daemon loaded]".len()
         };
 
-        let mut jtf_ofs = self.last_size.borrow().x - jtf_ofs;
+        if jtf_ofs < self.last_size.borrow().x {
+            jtf_ofs = self.last_size.borrow().x - jtf_ofs;
+        }
+
         printer.print(XY::new(jtf_ofs, 0), "[");
         jtf_ofs += 1;
 

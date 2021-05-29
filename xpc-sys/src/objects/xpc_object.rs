@@ -1,10 +1,11 @@
 use crate::objects::xpc_type::XPCType;
 use crate::{
     mach_port_t, xpc_array_append_value, xpc_array_create, xpc_bool_create, xpc_copy_description,
-    xpc_double_create, xpc_int64_create, xpc_mach_send_create, xpc_object_t, xpc_release,
-    xpc_string_create, xpc_uint64_create,
+    xpc_double_create, xpc_fd_create, xpc_int64_create, xpc_mach_recv_create, xpc_mach_send_create,
+    xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
 };
 use std::ffi::{CStr, CString};
+use std::os::unix::prelude::RawFd;
 use std::ptr::null_mut;
 use std::sync::Arc;
 
@@ -40,7 +41,8 @@ impl Default for XPCObject {
 }
 
 impl fmt::Display for XPCObject {
-    /// Use xpc_copy_description to get an easy snapshot of a dictionary
+    /// Use xpc_copy_description to show as a string, for
+    /// _xpc_type_dictionary contents are shown!
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let XPCObject(arc, _) = self;
 
@@ -81,10 +83,23 @@ impl From<f64> for XPCObject {
     }
 }
 
-impl From<mach_port_t> for XPCObject {
-    /// Create XPCObject via xpc_uint64_create
-    fn from(value: mach_port_t) -> Self {
-        unsafe { XPCObject::new(xpc_mach_send_create(value)) }
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum MachPortType {
+    Send,
+    Recv,
+}
+
+impl From<(MachPortType, mach_port_t)> for XPCObject {
+    /// Create XPCObject via xpc_mach_send_create or xpc_mach_recv_create
+    fn from((mpt, value): (MachPortType, mach_port_t)) -> Self {
+        let xpc_object = unsafe {
+            match mpt {
+                MachPortType::Send => xpc_mach_send_create(value),
+                MachPortType::Recv => xpc_mach_recv_create(value),
+            }
+        };
+
+        XPCObject::new(xpc_object)
     }
 }
 
@@ -104,6 +119,7 @@ impl From<&str> for XPCObject {
 }
 
 impl<O: Into<XPCObject>> From<Vec<O>> for XPCObject {
+    /// Create XPCObject via xpc_array_create
     fn from(value: Vec<O>) -> Self {
         let xpc_array = unsafe { xpc_array_create(null_mut(), 0) };
         for object in value {
@@ -127,6 +143,23 @@ impl From<XPCDictionary> for XPCObject {
     fn from(xpcd: XPCDictionary) -> Self {
         let XPCDictionary(hm) = xpcd;
         hm.into()
+    }
+}
+
+impl<R: AsRef<XPCObject>> From<R> for XPCObject {
+    /// Create XPCObject from another ref
+    fn from(other: R) -> Self {
+        let other_ref = other.as_ref();
+        let XPCObject(ref arc, ref xpc_type) = other_ref;
+        XPCObject(arc.clone(), xpc_type.clone())
+    }
+}
+
+impl From<RawFd> for XPCObject {
+    /// Use std::os::unix::prelude type for xpc_fd_create
+    fn from(value: RawFd) -> Self {
+        log::info!("Making FD from {}", value);
+        unsafe { XPCObject::new(xpc_fd_create(value)) }
     }
 }
 

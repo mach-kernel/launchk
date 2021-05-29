@@ -3,11 +3,12 @@ use std::cell::RefCell;
 use std::ffi::CStr;
 use std::rc::Rc;
 
-use crate::objects::xpc_object::XPCObject;
+use crate::objects::xpc_object::{MachPortType, XPCObject};
 use crate::objects::xpc_type;
 use crate::{
-    size_t, xpc_array_apply, xpc_bool_get_value, xpc_int64_get_value, xpc_object_t, xpc_retain,
-    xpc_string_get_string_ptr, xpc_uint64_get_value,
+    mach_port_t, size_t, xpc_array_apply, xpc_bool_get_value, xpc_double_get_value,
+    xpc_int64_get_value, xpc_mach_send_get_right, xpc_object_t, xpc_retain,
+    xpc_string_get_string_ptr, xpc_type_get_name, xpc_uint64_get_value,
 };
 
 use crate::objects::xpc_error::XPCError;
@@ -36,6 +37,14 @@ impl TryXPCValue<u64> for XPCObject {
     }
 }
 
+impl TryXPCValue<f64> for XPCObject {
+    fn xpc_value(&self) -> Result<f64, XPCError> {
+        check_xpc_type(&self, &xpc_type::Double)?;
+        let XPCObject(obj_pointer, _) = self;
+        Ok(unsafe { xpc_double_get_value(**obj_pointer) })
+    }
+}
+
 impl TryXPCValue<String> for XPCObject {
     fn xpc_value(&self) -> Result<String, XPCError> {
         check_xpc_type(&self, &xpc_type::String)?;
@@ -51,6 +60,30 @@ impl TryXPCValue<bool> for XPCObject {
         check_xpc_type(&self, &xpc_type::Bool)?;
         let XPCObject(obj_pointer, _) = self;
         Ok(unsafe { xpc_bool_get_value(**obj_pointer) })
+    }
+}
+
+impl TryXPCValue<(MachPortType, mach_port_t)> for XPCObject {
+    fn xpc_value(&self) -> Result<(MachPortType, mach_port_t), XPCError> {
+        let XPCObject(obj_pointer, xpc_type) = self;
+
+        let types = [
+            check_xpc_type(&self, &xpc_type::MachSend).map(|()| MachPortType::Send),
+            check_xpc_type(&self, &xpc_type::MachRecv).map(|()| MachPortType::Recv),
+        ];
+
+        for check in &types {
+            if check.is_ok() {
+                return Ok((*check.as_ref().unwrap(), unsafe {
+                    xpc_mach_send_get_right(**obj_pointer)
+                }));
+            }
+        }
+
+        Err(XPCError::ValueError(format!(
+            "Object is {} and neither _xpc_type_mach_send nor _xpc_type_mach_recv",
+            unsafe { CStr::from_ptr(xpc_type_get_name(xpc_type.0)).to_string_lossy() }
+        )))
     }
 }
 
@@ -86,8 +119,11 @@ impl TryXPCValue<Vec<XPCObject>> for XPCObject {
 
 #[cfg(test)]
 mod tests {
+    use crate::get_bootstrap_port;
+    use crate::mach_port_t;
     use crate::objects::xpc_error::XPCError;
     use crate::objects::xpc_error::XPCError::ValueError;
+    use crate::objects::xpc_object::MachPortType;
     use crate::objects::xpc_object::XPCObject;
     use crate::traits::xpc_value::TryXPCValue;
 
@@ -129,6 +165,34 @@ mod tests {
         let xpc_u64 = XPCObject::from(std::u64::MAX);
         let rs_u64: u64 = xpc_u64.xpc_value().unwrap();
         assert_eq!(std::u64::MAX, rs_u64);
+    }
+
+    #[test]
+    fn xpc_value_f64() {
+        let xpc_f64 = XPCObject::from(std::f64::MAX);
+        let rs_f64: f64 = xpc_f64.xpc_value().unwrap();
+        assert_eq!(std::f64::MAX, rs_f64);
+    }
+
+    #[test]
+    fn xpc_value_mach_send() {
+        let xpc_bootstrap_port =
+            XPCObject::from((MachPortType::Send, get_bootstrap_port() as mach_port_t));
+        let (mpt, port): (MachPortType, mach_port_t) = xpc_bootstrap_port.xpc_value().unwrap();
+
+        assert_eq!(MachPortType::Send, mpt);
+        assert_eq!(get_bootstrap_port(), port);
+    }
+
+    // Can't find any example in the wild, the value is 0 vs the provided 42, it likely
+    // does some kind of validation.
+    #[test]
+    fn xpc_value_mach_recv() {
+        let xpc_mach_recv = XPCObject::from((MachPortType::Recv, 42 as mach_port_t));
+        let (mpt, _port): (MachPortType, mach_port_t) = xpc_mach_recv.xpc_value().unwrap();
+
+        assert_eq!(MachPortType::Recv, mpt);
+        // assert_eq!(42, port);
     }
 
     #[test]

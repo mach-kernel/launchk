@@ -26,6 +26,11 @@ pub enum OmniboxCommand {
         fn(DomainType, Option<SessionType>) -> Vec<OmniboxCommand>,
     ),
     FocusServiceList,
+    CSRInfo,
+    DumpState,
+    DumpJetsamPropertiesCategory,
+    ProcInfo,
+    Help,
     Quit,
 }
 
@@ -35,7 +40,7 @@ impl fmt::Display for OmniboxCommand {
     }
 }
 
-pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 7] = [
+pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 12] = [
     (
         "load",
         "▶️  Load highlighted job",
@@ -45,7 +50,6 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 7] = [
         "unload",
         "⏏️  Unload highlighted job",
         OmniboxCommand::UnloadRequest,
-        // OmniboxCommand::DomainSessionPrompt(false, |dt, _| vec![OmniboxCommand::Unload(dt, None)]),
     ),
     (
         "enable",
@@ -55,7 +59,7 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 7] = [
     (
         "disable",
         "⏏️  Disable highlighted job (prevents load)",
-        OmniboxCommand::DisableRequest
+        OmniboxCommand::DisableRequest,
     ),
     (
         "edit",
@@ -67,5 +71,22 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 7] = [
         "🔄  Reload highlighted job",
         OmniboxCommand::Reload,
     ),
+    ("csrinfo", "ℹ️  See all CSR flags", OmniboxCommand::CSRInfo),
+    (
+        "dumpstate",
+        "ℹ️  launchctl dumpstate",
+        OmniboxCommand::DumpState,
+    ),
+    (
+        "dumpjpcategory",
+        "ℹ️  launchctl dumpjpcategory",
+        OmniboxCommand::DumpJetsamPropertiesCategory,
+    ),
+    (
+        "procinfo",
+        "ℹ️  launchctl procinfo for highlighted process",
+        OmniboxCommand::ProcInfo,
+    ),
+    ("help", "🤔  Show all commands", OmniboxCommand::Help),
     ("exit", "🚪 see ya!", OmniboxCommand::Quit),
 ];

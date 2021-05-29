@@ -1,9 +1,15 @@
 use crate::launchd::message::{
-    DISABLE_NAMES, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, UNLOAD_PATHS,
+    DISABLE_NAMES, DUMPJPCATEGORY, DUMPSTATE, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, PROCINFO,
+    UNLOAD_PATHS,
 };
-use std::collections::HashSet;
+use std::convert::TryFrom;
+use std::{collections::HashSet, os::unix::prelude::RawFd};
 
-use xpc_sys::traits::xpc_pipeable::XPCPipeable;
+use xpc_sys::{
+    objects::xpc_shmem::XPCShmem,
+    traits::{xpc_pipeable::XPCPipeable, xpc_value::TryXPCValue},
+    MAP_SHARED,
+};
 
 use crate::launchd::entry_status::ENTRY_STATUS_CACHE;
 use std::iter::FromIterator;
@@ -124,5 +130,41 @@ pub fn disable<S: Into<String>>(
         .entry("name", label_string.clone())
         .entry("names", vec![label_string])
         .with_handle_or_default(None)
+        .pipe_routine_with_error_handling()
+}
+
+/// Create a shared shmem region for the XPC routine to write
+/// dumpstate contents into, and return the bytes written and
+/// shmem region
+pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
+    let shmem = XPCShmem::new_task_self(
+        0x1400000,
+        i32::try_from(MAP_SHARED).expect("Must conv flags"),
+    )?;
+
+    log::info!("Made shmem {:?}", shmem);
+
+    let response = XPCDictionary::new()
+        .extend(&DUMPSTATE)
+        .entry("shmem", shmem.xpc_object.clone())
+        .pipe_routine_with_error_handling()?;
+
+    let bytes_written: u64 = response.get(&["bytes-written"])?.xpc_value()?;
+
+    Ok((usize::try_from(bytes_written).unwrap(), shmem))
+}
+
+pub fn dumpjpcategory(fd: RawFd) -> Result<XPCDictionary, XPCError> {
+    XPCDictionary::new()
+        .extend(&DUMPJPCATEGORY)
+        .entry("fd", fd)
+        .pipe_routine_with_error_handling()
+}
+
+pub fn procinfo(pid: i64, fd: RawFd) -> Result<XPCDictionary, XPCError> {
+    XPCDictionary::new()
+        .extend(&PROCINFO)
+        .entry("fd", fd)
+        .entry("pid", pid)
         .pipe_routine_with_error_handling()
 }

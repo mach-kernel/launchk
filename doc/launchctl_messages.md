@@ -352,3 +352,186 @@ Using a `gui/` domain target:
 1: System
 2: User
 8: Login (GUI)?
+
+#### `launchctl dumpstate`
+
+```
+(lldb) p printf("%s",(char*)  xpc_copy_description($rsi))
+<dictionary: 0x100504420> { count = 5, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0x9477db3970fa9c35>: 3
+	"handle" => <uint64: 0x9477db3970faac35>: 0
+	"shmem" => <shmem: 0x1005045e0>: 20971520 bytes (5121 pages)
+	"routine" => <uint64: 0x9477db3970ce8c35>: 834
+	"type" => <uint64: 0x9477db3970fabc35>: 1
+(int) $0 = 328
+```
+
+Get the shmem key from the dictionary, map the shmem region, then continue so it can be filled, then it can be read from: 
+
+```
+expr void * $my_shmem = ((void *) xpc_dictionary_get_value($rsi, "shmem"));
+expr void * $my_region = 0; 
+expr size_t $my_shsize = (size_t) xpc_shmem_map($my_shmem, &$my_region);
+c
+(lldb) mem read $my_region $my_region+100
+0x106580000: 63 6f 6d 2e 61 70 70 6c 65 2e 78 70 63 2e 6c 61  com.apple.xpc.la
+0x106580010: 75 6e 63 68 64 2e 64 6f 6d 61 69 6e 2e 73 79 73  unchd.domain.sys
+0x106580020: 74 65 6d 20 3d 20 7b 0a 09 74 79 70 65 20 3d 20  tem = {..type =
+0x106580030: 73 79 73 74 65 6d 0a 09 68 61 6e 64 6c 65 20 3d  system..handle =
+0x106580040: 20 30 0a 09 61 63 74 69 76 65 20 63 6f 75 6e 74   0..active count
+0x106580050: 20 3d 20 35 37 35 0a 09 6f 6e 2d 64 65 6d 61 6e   = 575..on-deman
+0x106580060: 64 20 63 6f                                      d co
+```
+
+#### `launchctl procinfo 7578`
+
+This makes a whole _bunch_ of XPC calls! First it enumerates some ports:
+
+```
+2021-05-18 20:44:57.098359-0400 launchctl[7578:42112] [All] launchctl procinfo: launchctl procinfo 7475
+program path = /usr/local/Cellar/redis/6.2.1/bin/redis-server
+mach info = {
+(lldb) p printf("%s",(char*)  xpc_copy_description($rsi))
+<dictionary: 0x1006041b0> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xc03dd40d963a742d>: 3
+	"handle" => <uint64: 0xc03dd40d963a442d>: 0
+	"routine" => <uint64: 0xc03dd40d9609242d>: 822
+	"process" => <int64: 0xc03dd40d97e3e43d>: 7578
+	"name" => <uint64: 0xc03dd40d96ea342d>: 3335
+	"type" => <uint64: 0xc03dd40d963a542d>: 1
+(int) $6 = 360
+```
+
+```
+}	task-kernel port = 0xd07 (unknown)
+(lldb) p printf("%s",(char*)  xpc_copy_description($rsi))
+<dictionary: 0x100305420> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xc03dd40d963a742d>: 3
+	"handle" => <uint64: 0xc03dd40d963a442d>: 0
+	"routine" => <uint64: 0xc03dd40d9609242d>: 822
+	"process" => <int64: 0xc03dd40d97e3e43d>: 7578
+	"name" => <uint64: 0xc03dd40d971a742d>: 4611
+	"type" => <uint64: 0xc03dd40d963a542d>: 1
+(int) $7 = 360
+```
+
+```
+}	task-host port = 0x1203 (unknown)
+Process 7578 stopped
+* thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 1.3
+    frame #0: 0x00007fff2005e841 libxpc.dylib`xpc_pipe_routine_with_flags
+(lldb) p printf("%s",(char*)  xpc_copy_description($rsi))
+<dictionary: 0x100204410> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xc03dd40d963a742d>: 3
+	"handle" => <uint64: 0xc03dd40d963a442d>: 0
+	"routine" => <uint64: 0xc03dd40d9609242d>: 822
+	"process" => <int64: 0xc03dd40d97e3e43d>: 7578
+	"name" => <uint64: 0xc03dd40d975a742d>: 5635
+	"type" => <uint64: 0xc03dd40d963a542d>: 1
+```
+
+```
+}	task-name port = 0x1603 (unknown)
+(lldb) p printf("%s",(char*)  xpc_copy_description($rsi))
+<dictionary: 0x1004049b0> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xc03dd40d963a742d>: 3
+	"handle" => <uint64: 0xc03dd40d963a442d>: 0
+	"routine" => <uint64: 0xc03dd40d9609242d>: 822
+	"process" => <int64: 0xc03dd40d97e3e43d>: 7578
+	"name" => <uint64: 0xc03dd40d977a742d>: 5123
+	"type" => <uint64: 0xc03dd40d963a542d>: 1
+(int) $9 = 360
+```
+
+```
+}	task-bootstrap port = 0x1403 (unknown)
+(lldb) p printf("%s",(char*)  xpc_copy_description($rsi))
+<dictionary: 0x100305420> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xc03dd40d963a742d>: 3
+	"handle" => <uint64: 0xc03dd40d963a442d>: 0
+	"routine" => <uint64: 0xc03dd40d9609242d>: 822
+	"process" => <int64: 0xc03dd40d97e3e43d>: 7578
+	"name" => <uint64: 0xc03dd40d975a342d>: 5639
+	"type" => <uint64: 0xc03dd40d963a542d>: 1
+```
+
+```
+}	task-(null) port = 0x1607 (unknown)
+(lldb) p printf("%s",(char*)  xpc_copy_description($rsi))
+<dictionary: 0x1004040c0> { count = 6, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xc03dd40d963a742d>: 3
+	"handle" => <uint64: 0xc03dd40d963a442d>: 0
+	"routine" => <uint64: 0xc03dd40d9609242d>: 822
+	"process" => <int64: 0xc03dd40d97e3e43d>: 7578
+	"name" => <uint64: 0xc03dd40d975af42d>: 5643
+	"type" => <uint64: 0xc03dd40d963a542d>: 1
+```
+
+Now for our old shmem / stdout friend:
+
+```
+argument count = 3
+argument vector = {
+	[0] = /usr/local/opt/redis/bin/redis-server 127.0.0.1:6379
+	[1] = XPC_FLAGS=1
+	[2] = LOGNAME=mach
+}
+environment vector = {
+	USER => mach
+	HOME => /Users/mach
+	SHELL => /bin/zsh
+	TMPDIR => /var/folders/sl/4tlmgdgj60j2wgykq7q10pdw0000gn/T/
+}
+bsd proc info = {
+	pid = 7475
+	unique pid = 7475
+	ppid = 1
+	pgid = 7475
+	status = stopped
+	flags = 64-bit
+	uid = 501
+	svuid = 501
+	ruid = 501
+	gid = 20
+	svgid = 20
+	rgid = 20
+	comm name = redis-server
+	long name = redis-server
+	controlling tty devnode = 0xffffffff
+	controlling tty pgid = 0
+}
+audit info
+	session id = 100006
+	uid = 501
+	success mask = 0x3000
+	failure mask = 0x3000
+	flags = has_graphic_access,has_tty,has_console_access,has_authenticated
+sandboxed = no
+container = (no container)
+
+responsible pid = 7475
+responsible unique pid = 7475
+responsible path = /usr/local/Cellar/redis/6.2.1/bin/redis-server
+
+pressured exit info = {
+	dirty state tracked = 0
+	dirty = 0
+	pressured-exit capable = 0
+}
+
+jetsam priority = 3: background
+jetsam memory limit = -1
+jetsam state = (normal memory state)
+
+entitlements = (no entitlements)
+
+code signing info = (none)
+
+(lldb) p printf("%s",(char*)  xpc_copy_description($rsi))
+<dictionary: 0x1006041b0> { count = 4, transaction: 0, voucher = 0x0, contents =
+	"subsystem" => <uint64: 0xc03dd40d963a642d>: 2
+	"fd" => <fd: 0x100604850> { type = (invalid descriptor), path = /dev/ttys003 }
+	"routine" => <uint64: 0xc03dd40d9616042d>: 708
+	"pid" => <int64: 0xc03dd40d97e9743d>: 7475
+(int) $14 = 302
+```
