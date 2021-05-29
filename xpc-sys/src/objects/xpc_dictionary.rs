@@ -4,13 +4,14 @@ use std::convert::{TryFrom, TryInto};
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr::{null, null_mut};
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::DictionaryError;
 use crate::objects::xpc_object::XPCObject;
+use crate::rs_strerror;
 use crate::{objects, xpc_retain};
-use crate::{xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t};
+use crate::{xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t, errno};
 
 use block::ConcreteBlock;
 
@@ -82,31 +83,33 @@ impl TryFrom<&XPCObject> for XPCDictionary {
             ));
         }
 
-        let map: Rc<RefCell<HashMap<String, XPCObject>>> = Rc::new(RefCell::new(HashMap::new()));
-        let map_rc_clone = map.clone();
+        let map: Arc<RefCell<HashMap<String, XPCObject>>> = Arc::new(RefCell::new(HashMap::new()));
+        let map_block_clone = map.clone();
 
+        // https://developer.apple.com/documentation/xpc/1505404-xpc_dictionary_apply?language=objc
         let block = ConcreteBlock::new(move |key: *const c_char, value: xpc_object_t| {
             // Prevent xpc_release() collection on block exit
             unsafe { xpc_retain(value) };
-
             let str_key = unsafe { CStr::from_ptr(key).to_string_lossy().to_string() };
-            map_rc_clone.borrow_mut().insert(str_key, value.into());
+            map_block_clone.borrow_mut().insert(str_key, value.into());
+
+            // Must return true
+            true
         });
         let block = block.copy();
-
         let ok = unsafe { xpc_dictionary_apply(object.as_ptr(), &*block as *const _ as *mut _) };
 
         // Explicitly drop the block so map is the only live reference
         // so we can collect it below
-        std::mem::drop(block);
+        drop(block);
 
         if ok {
-            match Rc::try_unwrap(map) {
+            match Arc::try_unwrap(map) {
                 Ok(cell) => Ok(XPCDictionary(cell.into_inner())),
-                Err(_) => Err(DictionaryError("Unable to unwrap Rc".to_string())),
+                Err(_) => Err(DictionaryError("Unable to unwrap Arc".to_string())),
             }
         } else {
-            Err(DictionaryError("xpc_dictionary_apply failed".to_string()))
+            Err(DictionaryError(format!("xpc_dictionary_apply failed: {}", rs_strerror(unsafe { errno }))))
         }
     }
 }
