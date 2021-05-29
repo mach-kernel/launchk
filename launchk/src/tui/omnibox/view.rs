@@ -276,7 +276,7 @@ impl OmniboxView {
             return;
         }
         let (cmd, desc, ..) = suggestion.unwrap();
-        let cmd_string = cmd.to_string().replace(&state.command_filter, "");
+        let cmd_string = cmd.to_string().replacen(&state.command_filter, "", 1);
 
         printer.with_style(Style::from(Color::Light(BaseColor::Black)), |p| {
             p.print(XY::new(0, 0), cmd_string.as_str())

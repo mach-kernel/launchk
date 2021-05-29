@@ -6,7 +6,7 @@ A [Cursive](https://github.com/gyscos/cursive) TUI that makes XPC queries & help
 
 Should work on macOS 10.10+ according to the availability sec. [in the docs](https://developer.apple.com/documentation/xpc?language=objc).
 
-<img src="https://i.imgur.com/JYzEkx1.gif" width="600">
+<img src="https://user-images.githubusercontent.com/396039/120085936-6700a180-c0aa-11eb-8606-31dc6a3cbe99.gif" width="600">
 
 #### Features
 
@@ -16,16 +16,19 @@ Should work on macOS 10.10+ according to the availability sec. [in the docs](htt
   - Global (/Library)
   - User (~/) 
 - fsnotify detection for new plists added to above directories
-- load
-- unload
-- dumpstate (opens in `$PAGER`)
-- dumpjpcategory (opens in `$PAGER`)
-- procinfo (opens in `$PAGER`, does not require root!)
-- `:edit` -> Open plist in `$EDITOR`, defaulting to `vim`. Supports binary plists -> shown as XML for edit, then marshalled back into binary format on save.
+- `load`
+- `unload`
+- `dumpstate` (opens in `$PAGER`)
+- `dumpjpcategory` (opens in `$PAGER`)
+- `procinfo` (opens in `$PAGER`, does not require root!)
+- `edit` plist in `$EDITOR` with support for binary plists
+- `csrinfo` show all CSR flags and their values
 
 #### xpc-sys
 
-While building launchk all of the XPC convenience glue was placed in `xpc-sys`. [See its docs here](xpc-sys/README.md).
+While building launchk, XPC convenience glue was placed in `xpc-sys`. 
+
+[[See its README here]](xpc-sys/README.md)
 
 ### Credits
 
@@ -37,6 +40,9 @@ A big thanks to these open source projects and general resources:
 - [plist](https://crates.io/crates/plist) Parsing & validation for XML and binary plists  
 - [notify](https://docs.rs/notify/4.0.16/notify/) fsnotify  
 - [bitflags](https://docs.rs/bitflags/1.2.1/bitflags/)  
+- [libc](https://crates.io/crates/libc)
+- [lazy_static](https://crates.io/crates/lazy_static)
+- [xcrun](https://crates.io/crates/xcrun)
 - [Apple Developer XPC services](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingXPCServices.html)  
 - [Apple Developer XPC API reference](https://developer.apple.com/documentation/xpc?language=objc)  
 - [MOXIL / launjctl](http://newosxbook.com/articles/jlaunchctl.html)  
