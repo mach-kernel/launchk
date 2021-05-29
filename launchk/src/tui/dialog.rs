@@ -154,7 +154,7 @@ pub fn show_csr_info() -> CbSinkMessage {
                 .title("CSR Info")
                 .content(TextView::new(csr_flags.join("\n")))
                 .dismiss_button("OK")
-                .padding(Margins::trbl(2, 2, 2, 2)),
+                .padding(Margins::trbl(4, 4, 4, 4)),
         )
     })
 }
@@ -171,7 +171,7 @@ pub fn show_help() -> CbSinkMessage {
                 .title("Help")
                 .content(TextView::new(commands.join("\n")))
                 .dismiss_button("OK")
-                .padding(Margins::trbl(2, 2, 2, 2)),
+                .padding(Margins::trbl(4, 4, 4, 4)),
         )
     })
 }

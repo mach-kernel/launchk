@@ -10,8 +10,10 @@ use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::DictionaryError;
 use crate::objects::xpc_object::XPCObject;
 use crate::rs_strerror;
+use crate::{
+    errno, xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t,
+};
 use crate::{objects, xpc_retain};
-use crate::{xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t, errno};
 
 use block::ConcreteBlock;
 
@@ -109,7 +111,10 @@ impl TryFrom<&XPCObject> for XPCDictionary {
                 Err(_) => Err(DictionaryError("Unable to unwrap Arc".to_string())),
             }
         } else {
-            Err(DictionaryError(format!("xpc_dictionary_apply failed: {}", rs_strerror(unsafe { errno }))))
+            Err(DictionaryError(format!(
+                "xpc_dictionary_apply failed: {}",
+                rs_strerror(unsafe { errno })
+            )))
         }
     }
 }

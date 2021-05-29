@@ -57,24 +57,35 @@ impl ColumnSizer {
         // I have 'sized' my user defined columns around how much
         // space I need to just display the font, and the rest by
         // blindly dividing space, only apply padding to UDCs
-
-        if self.user_sizes.contains_key(&i) {
+        let size = if self.user_sizes.contains_key(&i) {
             size + self.padding.get()
         } else {
             size
+        };
+
+        if size > 1 {
+            size
+        } else {
+            1
         }
     }
 
     /// Call when x changes to recompute dynamic_column_size and padding
     pub fn update_x(&self, x: usize) {
-        let mut remaining = x - self.user_sizes_total;
+        let mut remaining = if x > self.user_sizes_total {
+            x - self.user_sizes_total
+        } else {
+            0
+        };
 
         let mut dcs = remaining / self.num_dynamic_columns;
         if dcs > 35 {
             dcs = 35;
         }
 
-        remaining = remaining - (self.num_dynamic_columns * dcs);
+        if remaining > (self.num_dynamic_columns * dcs) {
+            remaining = remaining - (self.num_dynamic_columns * dcs);
+        }
 
         self.dynamic_column_size.set(dcs);
         self.padding

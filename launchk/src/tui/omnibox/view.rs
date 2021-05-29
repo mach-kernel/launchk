@@ -294,13 +294,16 @@ impl OmniboxView {
             ..
         } = &*read;
 
-        let jtf_ofs = if *mode != OmniboxMode::JobTypeFilter {
+        let mut jtf_ofs = if *mode != OmniboxMode::JobTypeFilter {
             "[sguadl]".len()
         } else {
             "[system global user agent daemon loaded]".len()
         };
 
-        let mut jtf_ofs = self.last_size.borrow().x - jtf_ofs;
+        if jtf_ofs < self.last_size.borrow().x {
+            jtf_ofs = self.last_size.borrow().x - jtf_ofs;
+        }
+
         printer.print(XY::new(jtf_ofs, 0), "[");
         jtf_ofs += 1;
 
