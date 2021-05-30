@@ -58,7 +58,8 @@ pub trait QueryBuilder {
 impl QueryBuilder for XPCDictionary {
     fn entry<S: Into<String>, O: Into<XPCObject>>(mut self, key: S, value: O) -> XPCDictionary {
         let Self(hm) = &mut self;
-        hm.insert(key.into(), value.into());
+        let xpc_object: XPCObject = value.into();
+        hm.insert(key.into(), xpc_object.into());
         self
     }
 

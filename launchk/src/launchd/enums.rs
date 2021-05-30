@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
 use std::fmt;
+use std::sync::Arc;
 use xpc_sys::objects::xpc_error::XPCError;
 use xpc_sys::objects::xpc_object::XPCObject;
 use xpc_sys::objects::xpc_type;
@@ -57,11 +58,11 @@ impl From<String> for SessionType {
     }
 }
 
-impl TryFrom<XPCObject> for SessionType {
+impl TryFrom<Arc<XPCObject>> for SessionType {
     type Error = XPCError;
 
-    fn try_from(value: XPCObject) -> Result<Self, Self::Error> {
-        check_xpc_type(&value, &xpc_type::String)?;
+    fn try_from(value: Arc<XPCObject>) -> Result<Self, Self::Error> {
+        check_xpc_type(&*value, &xpc_type::String)?;
         let string: String = value.xpc_value().unwrap();
         Ok(string.into())
     }
