@@ -3,7 +3,7 @@ use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::PipeError;
 use crate::objects::xpc_object::XPCObject;
 use crate::{
-    get_xpc_bootstrap_pipe, rs_strerror, rs_xpc_strerror, xpc_object_t, xpc_pipe_routine,
+    get_xpc_bootstrap_pipe, rs_xpc_strerror, xpc_object_t, xpc_pipe_routine,
     xpc_pipe_routine_with_flags,
 };
 
@@ -14,7 +14,12 @@ use std::ptr::null_mut;
 pub type XPCPipeResult = Result<XPCObject, XPCError>;
 
 pub trait XPCPipeable {
+    /// Try to safely call xpc_pipe_routine, returning an XPCObject if successful,
+    /// otherwise a string with xpc_strerror
     fn pipe_routine(&self) -> XPCPipeResult;
+
+    /// Try to safely call xpc_pipe_routine_with_flags, returning an XPCObject
+    /// if successful, otherwise a string with xpc_strerror
     fn pipe_routine_with_flags(&self, flags: u64) -> XPCPipeResult;
 
     /// Pipe routine expecting XPC dictionary reply, with checking of "error" and "errors" keys
@@ -53,27 +58,27 @@ pub trait XPCPipeable {
         if errno == 0 {
             Ok(ptr.into())
         } else {
-            Err(PipeError(rs_strerror(errno)))
+            Err(PipeError(rs_xpc_strerror(errno)))
         }
     }
 }
 
 impl XPCPipeable for XPCObject {
     fn pipe_routine(&self) -> XPCPipeResult {
-        let XPCObject(arc, _) = self;
+        let XPCObject(ptr, _) = self;
         let mut reply: xpc_object_t = null_mut();
 
-        let err = unsafe { xpc_pipe_routine(get_xpc_bootstrap_pipe(), **arc, &mut reply) };
+        let err = unsafe { xpc_pipe_routine(get_xpc_bootstrap_pipe(), *ptr, &mut reply) };
 
         Self::handle_pipe_routine(reply, err)
     }
 
     fn pipe_routine_with_flags(&self, flags: u64) -> XPCPipeResult {
-        let XPCObject(arc, _) = self;
+        let XPCObject(ptr, _) = self;
         let mut reply: xpc_object_t = null_mut();
 
         let err = unsafe {
-            xpc_pipe_routine_with_flags(get_xpc_bootstrap_pipe(), **arc, &mut reply, flags)
+            xpc_pipe_routine_with_flags(get_xpc_bootstrap_pipe(), *ptr, &mut reply, flags)
         };
 
         Self::handle_pipe_routine(reply, err)

@@ -25,7 +25,7 @@ impl TryXPCValue<i64> for XPCObject {
     fn xpc_value(&self) -> Result<i64, XPCError> {
         check_xpc_type(&self, &xpc_type::Int64)?;
         let XPCObject(obj_pointer, _) = self;
-        Ok(unsafe { xpc_int64_get_value(**obj_pointer) })
+        Ok(unsafe { xpc_int64_get_value(*obj_pointer) })
     }
 }
 
@@ -33,7 +33,7 @@ impl TryXPCValue<u64> for XPCObject {
     fn xpc_value(&self) -> Result<u64, XPCError> {
         check_xpc_type(&self, &xpc_type::UInt64)?;
         let XPCObject(obj_pointer, _) = self;
-        Ok(unsafe { xpc_uint64_get_value(**obj_pointer) })
+        Ok(unsafe { xpc_uint64_get_value(*obj_pointer) })
     }
 }
 
@@ -41,7 +41,7 @@ impl TryXPCValue<f64> for XPCObject {
     fn xpc_value(&self) -> Result<f64, XPCError> {
         check_xpc_type(&self, &xpc_type::Double)?;
         let XPCObject(obj_pointer, _) = self;
-        Ok(unsafe { xpc_double_get_value(**obj_pointer) })
+        Ok(unsafe { xpc_double_get_value(*obj_pointer) })
     }
 }
 
@@ -49,7 +49,7 @@ impl TryXPCValue<String> for XPCObject {
     fn xpc_value(&self) -> Result<String, XPCError> {
         check_xpc_type(&self, &xpc_type::String)?;
         let XPCObject(obj_pointer, _) = self;
-        let cstr = unsafe { CStr::from_ptr(xpc_string_get_string_ptr(**obj_pointer)) };
+        let cstr = unsafe { CStr::from_ptr(xpc_string_get_string_ptr(*obj_pointer)) };
 
         Ok(cstr.to_string_lossy().to_string())
     }
@@ -59,7 +59,7 @@ impl TryXPCValue<bool> for XPCObject {
     fn xpc_value(&self) -> Result<bool, XPCError> {
         check_xpc_type(&self, &xpc_type::Bool)?;
         let XPCObject(obj_pointer, _) = self;
-        Ok(unsafe { xpc_bool_get_value(**obj_pointer) })
+        Ok(unsafe { xpc_bool_get_value(*obj_pointer) })
     }
 }
 
@@ -75,7 +75,7 @@ impl TryXPCValue<(MachPortType, mach_port_t)> for XPCObject {
         for check in &types {
             if check.is_ok() {
                 return Ok((*check.as_ref().unwrap(), unsafe {
-                    xpc_mach_send_get_right(**obj_pointer)
+                    xpc_mach_send_get_right(*obj_pointer)
                 }));
             }
         }
@@ -90,7 +90,7 @@ impl TryXPCValue<(MachPortType, mach_port_t)> for XPCObject {
 impl TryXPCValue<Vec<XPCObject>> for XPCObject {
     fn xpc_value(&self) -> Result<Vec<XPCObject>, XPCError> {
         check_xpc_type(&self, &xpc_type::Array)?;
-        let XPCObject(arc, _) = self;
+        let XPCObject(ptr, _) = self;
 
         let vec: Rc<RefCell<Vec<XPCObject>>> = Rc::new(RefCell::new(vec![]));
         let vec_rc_clone = vec.clone();
@@ -102,7 +102,7 @@ impl TryXPCValue<Vec<XPCObject>> for XPCObject {
 
         let block = block.copy();
 
-        let ok = unsafe { xpc_array_apply(**arc, &*block as *const _ as *mut _) };
+        let ok = unsafe { xpc_array_apply(*ptr, &*block as *const _ as *mut _) };
 
         drop(block);
 
@@ -176,12 +176,13 @@ mod tests {
 
     #[test]
     fn xpc_value_mach_send() {
-        let xpc_bootstrap_port =
-            XPCObject::from((MachPortType::Send, get_bootstrap_port() as mach_port_t));
+        let bootstrap_port: mach_port_t = unsafe { get_bootstrap_port() };
+
+        let xpc_bootstrap_port = XPCObject::from((MachPortType::Send, bootstrap_port));
         let (mpt, port): (MachPortType, mach_port_t) = xpc_bootstrap_port.xpc_value().unwrap();
 
         assert_eq!(MachPortType::Send, mpt);
-        assert_eq!(get_bootstrap_port(), port);
+        assert_eq!(bootstrap_port, port);
     }
 
     // Can't find any example in the wild, the value is 0 vs the provided 42, it likely

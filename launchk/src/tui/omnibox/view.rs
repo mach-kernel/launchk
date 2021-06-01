@@ -166,6 +166,17 @@ impl OmniboxView {
                 cf.truncate(cf.len() - 1);
                 Some(state.with_new(None, None, Some(cf), None))
             }
+            // Hit enter to shortcut to complete + submit
+            (Event::Key(Key::Enter), OmniboxMode::CommandFilter) if suggested_command.is_some() => {
+                let (name, _, cmd) = suggested_command.unwrap();
+
+                Some(state.with_new(
+                    Some(OmniboxMode::CommandConfirm(cmd)),
+                    None,
+                    Some(name.to_string()),
+                    None,
+                ))
+            }
             // Complete suggestion
             (Event::Key(Key::Tab), OmniboxMode::CommandFilter) if suggested_command.is_some() => {
                 let (cmd, _, _) = suggested_command.unwrap();

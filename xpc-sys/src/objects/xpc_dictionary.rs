@@ -17,8 +17,10 @@ use crate::{objects, xpc_retain};
 
 use block::ConcreteBlock;
 
+/// A wrapper around Rust HashMap<String, Arc<XPCObject>> that can
+/// be Into<XPCObject>
 #[derive(Debug, Clone)]
-pub struct XPCDictionary(pub HashMap<String, XPCObject>);
+pub struct XPCDictionary(pub HashMap<String, Arc<XPCObject>>);
 
 impl XPCDictionary {
     pub fn new() -> Self {
@@ -26,7 +28,7 @@ impl XPCDictionary {
     }
 
     /// Get value from XPCDictionary with support for nesting
-    pub fn get<I, S>(&self, items: I) -> Result<XPCObject, XPCError>
+    pub fn get<I, S>(&self, items: I) -> Result<Arc<XPCObject>, XPCError>
     where
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
@@ -67,8 +69,8 @@ impl XPCDictionary {
     }
 }
 
-impl From<HashMap<String, XPCObject>> for XPCDictionary {
-    fn from(dict: HashMap<String, XPCObject>) -> XPCDictionary {
+impl From<HashMap<String, Arc<XPCObject>>> for XPCDictionary {
+    fn from(dict: HashMap<String, Arc<XPCObject>>) -> XPCDictionary {
         XPCDictionary(dict)
     }
 }
@@ -76,6 +78,7 @@ impl From<HashMap<String, XPCObject>> for XPCDictionary {
 impl TryFrom<&XPCObject> for XPCDictionary {
     type Error = XPCError;
 
+    /// Copy data from XPC dictionary into a Rust HashMap
     fn try_from(object: &XPCObject) -> Result<XPCDictionary, XPCError> {
         let XPCObject(_, object_type) = *object;
 
@@ -85,7 +88,8 @@ impl TryFrom<&XPCObject> for XPCDictionary {
             ));
         }
 
-        let map: Arc<RefCell<HashMap<String, XPCObject>>> = Arc::new(RefCell::new(HashMap::new()));
+        let map: Arc<RefCell<HashMap<String, Arc<XPCObject>>>> =
+            Arc::new(RefCell::new(HashMap::new()));
         let map_block_clone = map.clone();
 
         // https://developer.apple.com/documentation/xpc/1505404-xpc_dictionary_apply?language=objc
@@ -93,7 +97,11 @@ impl TryFrom<&XPCObject> for XPCDictionary {
             // Prevent xpc_release() collection on block exit
             unsafe { xpc_retain(value) };
             let str_key = unsafe { CStr::from_ptr(key).to_string_lossy().to_string() };
-            map_block_clone.borrow_mut().insert(str_key, value.into());
+
+            let xpc_object: XPCObject = value.into();
+            map_block_clone
+                .borrow_mut()
+                .insert(str_key, xpc_object.into());
 
             // Must return true
             true
@@ -119,6 +127,14 @@ impl TryFrom<&XPCObject> for XPCDictionary {
     }
 }
 
+impl TryFrom<Arc<XPCObject>> for XPCDictionary {
+    type Error = XPCError;
+
+    fn try_from(value: Arc<XPCObject>) -> Result<XPCDictionary, XPCError> {
+        (&*value).try_into()
+    }
+}
+
 impl TryFrom<XPCObject> for XPCDictionary {
     type Error = XPCError;
 
@@ -138,21 +154,24 @@ impl TryFrom<xpc_object_t> for XPCDictionary {
     }
 }
 
-impl<S> From<HashMap<S, XPCObject>> for XPCObject
+impl<S> From<HashMap<S, Arc<XPCObject>>> for XPCObject
 where
     S: Into<String>,
 {
     /// Creates a XPC dictionary
     ///
-    /// Values must be XPCObject but can encapsulate any
+    /// Values must be Arc<XPCObject> but can encapsulate any
     /// valid xpc_object_t
-    fn from(message: HashMap<S, XPCObject>) -> Self {
+    fn from(message: HashMap<S, Arc<XPCObject>>) -> Self {
         let dict = unsafe { xpc_dictionary_create(null(), null_mut(), 0) };
+
+        log::trace!("XPCDictionary to object {:p}", dict);
 
         for (k, v) in message {
             unsafe {
                 let as_str: String = k.into();
                 let cstr = CString::new(as_str).unwrap();
+                log::trace!("Dictionary {:p} add {:?}: {:p}", dict, cstr, v.as_ptr());
                 xpc_dictionary_set_value(dict, cstr.as_ptr(), v.as_ptr());
             }
         }
@@ -177,6 +196,7 @@ mod tests {
     use std::convert::TryInto;
     use std::ffi::{CStr, CString};
     use std::ptr::{null, null_mut};
+    use std::sync::Arc;
 
     #[test]
     fn raw_to_hashmap() {
@@ -196,9 +216,9 @@ mod tests {
 
     #[test]
     fn hashmap_to_raw() {
-        let mut hm: HashMap<&str, XPCObject> = HashMap::new();
+        let mut hm: HashMap<&str, Arc<XPCObject>> = HashMap::new();
         let value = "foo";
-        hm.insert("test", XPCObject::from(value));
+        hm.insert("test", XPCObject::from(value).into());
 
         let xpc_object = XPCObject::from(hm);
         let cstr = unsafe {

@@ -71,8 +71,7 @@ lazy_static! {
     pub static ref Shmem: XPCType = unsafe { (&_xpc_type_shmem as *const _xpc_type_s).into() };
 }
 
-/// Runtime type check for XPC object. I do not know if possible/advantageous to represent
-/// HashMap<&str, XPCObject<T>> if T were heterogeneous? Box<dyn XPCObject>?
+/// Runtime type check for XPC object.
 pub fn check_xpc_type(object: &XPCObject, xpc_type: &XPCType) -> Result<(), XPCError> {
     let XPCObject(_, obj_type) = object;
     if *obj_type == *xpc_type {

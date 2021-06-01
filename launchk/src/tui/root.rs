@@ -54,7 +54,7 @@ async fn poll_omnibox(cb_sink: Sender<CbSinkMessage>, rx: Receiver<OmniboxEvent>
     loop {
         let recv = rx.recv().expect("Must receive event");
 
-        log::info!("[root_layout/poll_omnibox]: RECV {:?}", recv);
+        log::info!("poll_omnibox: RECV {:?}", recv);
 
         cb_sink
             .send(Box::new(|siv| {
@@ -196,7 +196,7 @@ impl ViewWrapper for RootLayout {
     wrap_impl!(self.layout: LinearLayout);
 
     fn wrap_on_event(&mut self, event: Event) -> EventResult {
-        log::debug!("[root/event]: {:?}", event);
+        log::trace!("on_event: {:?}", event);
 
         let ev = match event {
             Event::Char('/')

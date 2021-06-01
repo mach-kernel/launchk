@@ -11,6 +11,10 @@ lazy_static! {
 
 /// Show $PAGER (or less), write buf, and clear Cursive after exiting
 pub fn show_pager(cbsink: &Sender<CbSinkMessage>, buf: &[u8]) -> Result<(), String> {
+    cbsink
+        .send(Box::new(Cursive::clear))
+        .expect("Must clear before");
+
     let mut pager = Command::new(*PAGER)
         .stdin(Stdio::piped())
         .spawn()
@@ -26,7 +30,9 @@ pub fn show_pager(cbsink: &Sender<CbSinkMessage>, buf: &[u8]) -> Result<(), Stri
 
     let res = pager.wait().map_err(|e| e.to_string())?;
 
-    cbsink.send(Box::new(Cursive::clear)).expect("Must clear");
+    cbsink
+        .send(Box::new(Cursive::clear))
+        .expect("Must clear after");
 
     if res.success() {
         Ok(())
