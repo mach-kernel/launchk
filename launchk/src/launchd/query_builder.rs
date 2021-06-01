@@ -26,7 +26,9 @@ pub trait QueryBuilder {
     {
         self.entry(
             "domain-port",
-            (MachPortType::Send, get_bootstrap_port() as mach_port_t),
+            (MachPortType::Send, unsafe {
+                get_bootstrap_port() as mach_port_t
+            }),
         )
     }
 

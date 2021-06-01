@@ -87,6 +87,7 @@ impl From<f64> for XPCObject {
     }
 }
 
+/// Enum used for selecting between _xpc_type_mach_send and _xpc_type_mach_recv
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum MachPortType {
     Send,

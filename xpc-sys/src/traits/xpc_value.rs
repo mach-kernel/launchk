@@ -176,12 +176,13 @@ mod tests {
 
     #[test]
     fn xpc_value_mach_send() {
-        let xpc_bootstrap_port =
-            XPCObject::from((MachPortType::Send, get_bootstrap_port() as mach_port_t));
+        let bootstrap_port: mach_port_t = unsafe { get_bootstrap_port() };
+
+        let xpc_bootstrap_port = XPCObject::from((MachPortType::Send, bootstrap_port));
         let (mpt, port): (MachPortType, mach_port_t) = xpc_bootstrap_port.xpc_value().unwrap();
 
         assert_eq!(MachPortType::Send, mpt);
-        assert_eq!(get_bootstrap_port(), port);
+        assert_eq!(bootstrap_port, port);
     }
 
     // Can't find any example in the wild, the value is 0 vs the provided 42, it likely

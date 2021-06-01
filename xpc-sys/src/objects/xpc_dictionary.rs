@@ -17,6 +17,8 @@ use crate::{objects, xpc_retain};
 
 use block::ConcreteBlock;
 
+/// A wrapper around Rust HashMap<String, Arc<XPCObject>> that can
+/// be Into<XPCObject>
 #[derive(Debug, Clone)]
 pub struct XPCDictionary(pub HashMap<String, Arc<XPCObject>>);
 
@@ -76,6 +78,7 @@ impl From<HashMap<String, Arc<XPCObject>>> for XPCDictionary {
 impl TryFrom<&XPCObject> for XPCDictionary {
     type Error = XPCError;
 
+    /// Copy data from XPC dictionary into a Rust HashMap
     fn try_from(object: &XPCObject) -> Result<XPCDictionary, XPCError> {
         let XPCObject(_, object_type) = *object;
 

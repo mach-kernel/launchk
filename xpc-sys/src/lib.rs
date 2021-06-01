@@ -73,19 +73,6 @@ pub struct xpc_global_data {
     pub xpc_bootstrap_pipe: xpc_pipe_t,
 }
 
-/// Attempt to yield existing bootstrap_port if not MACH_PORT_NULL
-pub fn get_bootstrap_port() -> mach_port_t {
-    unsafe {
-        if bootstrap_port == MACH_PORT_NULL {
-            log::debug!("Bootstrap port is null! Querying for port");
-            lookup_bootstrap_port()
-        } else {
-            log::debug!("Found bootstrap port {}", bootstrap_port);
-            bootstrap_port
-        }
-    }
-}
-
 pub fn rs_xpc_strerror(err: i32) -> String {
     unsafe {
         CStr::from_ptr(xpc_strerror(err))
@@ -96,6 +83,17 @@ pub fn rs_xpc_strerror(err: i32) -> String {
 
 pub fn rs_strerror(err: i32) -> String {
     unsafe { CStr::from_ptr(strerror(err)).to_string_lossy().to_string() }
+}
+
+/// Attempt to yield existing bootstrap_port if not MACH_PORT_NULL
+pub unsafe fn get_bootstrap_port() -> mach_port_t {
+    if bootstrap_port == MACH_PORT_NULL {
+        log::debug!("Bootstrap port is null! Querying for port");
+        lookup_bootstrap_port()
+    } else {
+        log::debug!("Found bootstrap port {}", bootstrap_port);
+        bootstrap_port
+    }
 }
 
 /// Look up bootstrap port for mach_task_self

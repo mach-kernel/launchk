@@ -34,7 +34,9 @@ let mut message: HashMap<&str, XPCObject> = HashMap::new();
 
 message.insert(
     "domain-port",
-    XPCObject::from((MachPortType::Send, get_bootstrap_port() as mach_port_t)),
+    XPCObject::from((MachPortType::Send, unsafe {
+        get_bootstrap_port() as mach_port_t
+    })),
 );
 ```
 
@@ -183,7 +185,7 @@ let rs_vec: Vec<XPCObject> = xpc_array.xpc_value().unwrap();
 
 #### XPC Shmem
 
-Make XPC shared memory objects by providing a size and vm_allocate/mmap flags. [`vm_allocate`](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/ManagingMemory/Articles/MemoryAlloc.html) is used under the hood:
+Make XPC shared memory objects by providing a size and vm_allocate/mmap flags. [`vm_allocate`](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/ManagingMemory/Articles/MemoryAlloc.html) is used to create the memory region, and `vm_deallocate` when `XPCShmem` is dropped.
 
 ```rust
 let shmem = XPCShmem::new_task_self(
