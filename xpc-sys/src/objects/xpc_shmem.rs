@@ -7,6 +7,7 @@ use crate::{
 use std::ffi::c_void;
 use std::os::raw::c_int;
 use std::ptr::null_mut;
+use std::sync::Arc;
 
 /// Wrapper around vm_allocate() vm_deallocate() with an XPCObject
 /// member of XPC type _xpc_type_shmem
@@ -15,7 +16,7 @@ pub struct XPCShmem {
     pub task: mach_port_t,
     pub size: vm_size_t,
     pub region: *mut c_void,
-    pub xpc_object: XPCObject,
+    pub xpc_object: Arc<XPCObject>,
 }
 
 unsafe impl Send for XPCShmem {}
@@ -35,11 +36,14 @@ impl XPCShmem {
         if err > 0 {
             Err(XPCError::IOError(rs_strerror(err)))
         } else {
+            let xpc_object: XPCObject =
+                unsafe { xpc_shmem_create(region as *mut c_void, size as u64).into() };
+
             Ok(XPCShmem {
                 task,
                 size,
                 region,
-                xpc_object: unsafe { xpc_shmem_create(region as *mut c_void, size as u64).into() },
+                xpc_object: xpc_object.into(),
             })
         }
     }
@@ -52,12 +56,16 @@ impl XPCShmem {
 impl Drop for XPCShmem {
     fn drop(&mut self) {
         let XPCShmem {
-            size, task, region, ..
+            size,
+            task,
+            region,
+            xpc_object,
         } = self;
-        if *region == null_mut() {
-            return;
-        }
-
+        log::info!(
+            "XPCShmem drop (region: {:p}, object {:p})",
+            region,
+            xpc_object.0
+        );
         unsafe { vm_deallocate(*task, *region as vm_address_t, *size) };
     }
 }

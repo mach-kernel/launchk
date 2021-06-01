@@ -55,9 +55,15 @@ fn deserialize_as_wrong_type() {
 
 #### Object lifecycle
 
-XPCObject wraps `xpc_object_t` in an `Arc`. `Drop` will invoke `xpc_release()` on objects being dropped with no other [strong refs](https://doc.rust-lang.org/std/sync/struct.Arc.html#method.strong_count).
+XPCObject wraps a `xpc_object_t`:
 
-**NOTE**: When using Objective-C blocks with the [block crate](https://crates.io/crates/block) (e.g. looping over an array), make sure to invoke `xpc_retain()` on any object you wish to keep after the closure is dropped, or else the XPC objects in the closure will be dropped as well! See the `XPCDictionary` implementation for more details. xpc-sys handles this for you for its conversions.
+```rust
+pub struct XPCObject(pub xpc_object_t, pub XPCType);
+```
+
+When it is dropped, [`xpc_release`](https://developer.apple.com/documentation/xpc/1505851-xpc_release) is called.
+
+**NOTE**: When using Objective-C blocks with the [block crate](https://crates.io/crates/block) (e.g. looping over an array), make sure to invoke `xpc_retain()` on any object you wish to keep after the block is dropped, or else the XPC objects in the block will be dropped as well! See the `XPCDictionary` implementation for more details. xpc-sys handles this for you for its conversions.
 
 [Top](#xpc-sys)
 

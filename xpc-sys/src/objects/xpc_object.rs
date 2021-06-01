@@ -176,11 +176,7 @@ impl From<RawFd> for XPCObject {
 impl Drop for XPCObject {
     fn drop(&mut self) {
         let XPCObject(ptr, _) = self;
-
-        if *ptr == null_mut() {
-            return;
-        }
-
+        log::info!("XPCObject drop {:p}", ptr);
         unsafe { xpc_release(*ptr) }
     }
 }

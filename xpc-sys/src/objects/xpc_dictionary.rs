@@ -85,7 +85,8 @@ impl TryFrom<&XPCObject> for XPCDictionary {
             ));
         }
 
-        let map: Arc<RefCell<HashMap<String, Arc<XPCObject>>>> = Arc::new(RefCell::new(HashMap::new()));
+        let map: Arc<RefCell<HashMap<String, Arc<XPCObject>>>> =
+            Arc::new(RefCell::new(HashMap::new()));
         let map_block_clone = map.clone();
 
         // https://developer.apple.com/documentation/xpc/1505404-xpc_dictionary_apply?language=objc
@@ -95,7 +96,9 @@ impl TryFrom<&XPCObject> for XPCDictionary {
             let str_key = unsafe { CStr::from_ptr(key).to_string_lossy().to_string() };
 
             let xpc_object: XPCObject = value.into();
-            map_block_clone.borrow_mut().insert(str_key, xpc_object.into());
+            map_block_clone
+                .borrow_mut()
+                .insert(str_key, xpc_object.into());
 
             // Must return true
             true
@@ -159,10 +162,13 @@ where
     fn from(message: HashMap<S, Arc<XPCObject>>) -> Self {
         let dict = unsafe { xpc_dictionary_create(null(), null_mut(), 0) };
 
+        log::trace!("XPCDictionary to object {:p}", dict);
+
         for (k, v) in message {
             unsafe {
                 let as_str: String = k.into();
                 let cstr = CString::new(as_str).unwrap();
+                log::trace!("Dictionary {:p} add {:?}: {:p}", dict, cstr, v.as_ptr());
                 xpc_dictionary_set_value(dict, cstr.as_ptr(), v.as_ptr());
             }
         }
