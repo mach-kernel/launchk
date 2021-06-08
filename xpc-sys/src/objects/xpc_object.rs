@@ -2,7 +2,7 @@ use crate::objects::xpc_type::XPCType;
 use crate::{
     mach_port_t, xpc_array_append_value, xpc_array_create, xpc_bool_create, xpc_copy_description,
     xpc_double_create, xpc_fd_create, xpc_int64_create, xpc_mach_recv_create, xpc_mach_send_create,
-    xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
+    xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create, xpc_retain
 };
 use std::ffi::{CStr, CString};
 use std::os::unix::prelude::RawFd;
@@ -34,6 +34,8 @@ impl XPCObject {
     }
 
     fn new_raw(value: xpc_object_t) -> Self {
+        // XPC objects must live as long as the XPCObject struct
+        unsafe { xpc_retain(value) };
         Self(value, value.into())
     }
 }
@@ -62,7 +64,7 @@ impl fmt::Display for XPCObject {
 
 impl From<xpc_object_t> for XPCObject {
     fn from(value: xpc_object_t) -> Self {
-        XPCObject(value, value.into())
+        XPCObject::new_raw(value)
     }
 }
 

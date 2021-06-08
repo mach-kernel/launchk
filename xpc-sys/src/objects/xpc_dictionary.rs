@@ -94,8 +94,6 @@ impl TryFrom<&XPCObject> for XPCDictionary {
 
         // https://developer.apple.com/documentation/xpc/1505404-xpc_dictionary_apply?language=objc
         let block = ConcreteBlock::new(move |key: *const c_char, value: xpc_object_t| {
-            // Prevent xpc_release() collection on block exit
-            unsafe { xpc_retain(value) };
             let str_key = unsafe { CStr::from_ptr(key).to_string_lossy().to_string() };
 
             let xpc_object: XPCObject = value.into();

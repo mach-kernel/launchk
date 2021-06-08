@@ -2,7 +2,7 @@ use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_object::XPCObject;
 use crate::{
     mach_port_t, mach_task_self_, rs_strerror, vm_address_t, vm_allocate, vm_deallocate, vm_size_t,
-    xpc_shmem_create,
+    xpc_shmem_create, xpc_retain
 };
 use std::ffi::c_void;
 use std::os::raw::c_int;
