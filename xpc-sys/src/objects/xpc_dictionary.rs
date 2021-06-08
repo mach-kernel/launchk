@@ -6,6 +6,7 @@ use std::os::raw::c_char;
 use std::ptr::{null, null_mut};
 use std::sync::Arc;
 
+use crate::objects;
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::DictionaryError;
 use crate::objects::xpc_object::XPCObject;
@@ -13,7 +14,6 @@ use crate::rs_strerror;
 use crate::{
     errno, xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t,
 };
-use crate::{objects, xpc_retain};
 
 use block::ConcreteBlock;
 

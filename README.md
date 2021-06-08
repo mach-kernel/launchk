@@ -37,10 +37,10 @@ While building launchk, XPC convenience glue was placed in `xpc-sys`.
 A big thanks to these open source projects and general resources:
 
 - [block](https://crates.io/crates/block) Obj-C block support, necessary for any XPC function taking `xpc_*_applier_t`  
-- [Cursive](https://github.com/gyscos/cursive) TUI  
-- [tokio](https://github.com/tokio-rs/tokio) ASIO  
-- [plist](https://crates.io/crates/plist) Parsing & validation for XML and binary plists  
-- [notify](https://docs.rs/notify/4.0.16/notify/) fsnotify  
+- [Cursive](https://github.com/gyscos/cursive)
+- [tokio](https://github.com/tokio-rs/tokio)
+- [plist](https://crates.io/crates/plist)
+- [notify](https://docs.rs/notify/4.0.16/notify/)
 - [bitflags](https://docs.rs/bitflags/1.2.1/bitflags/)  
 - [libc](https://crates.io/crates/libc)
 - [lazy_static](https://crates.io/crates/lazy_static)

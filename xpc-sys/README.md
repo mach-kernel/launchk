@@ -219,10 +219,10 @@ bytes.read_to_string(buf);
 A big thanks to these open source projects and general resources:
 
 - [block](https://crates.io/crates/block) Obj-C block support, necessary for any XPC function taking `xpc_*_applier_t`  
-- [Cursive](https://github.com/gyscos/cursive) TUI  
-- [tokio](https://github.com/tokio-rs/tokio) ASIO  
-- [plist](https://crates.io/crates/plist) Parsing & validation for XML and binary plists  
-- [notify](https://docs.rs/notify/4.0.16/notify/) fsnotify  
+- [Cursive](https://github.com/gyscos/cursive)
+- [tokio](https://github.com/tokio-rs/tokio)
+- [plist](https://crates.io/crates/plist)
+- [notify](https://docs.rs/notify/4.0.16/notify/)
 - [bitflags](https://docs.rs/bitflags/1.2.1/bitflags/)  
 - [libc](https://crates.io/crates/libc)
 - [lazy_static](https://crates.io/crates/lazy_static)
@@ -235,6 +235,6 @@ A big thanks to these open source projects and general resources:
 - [Audit tokens explained (e.g. ASID)](https://knight.sc/reverse%20engineering/2020/03/20/audit-tokens-explained.html)  
 - [objc.io XPC guide](https://www.objc.io/issues/14-mac/xpc/)  
 - The various source links found in comments, from Chrome's sandbox and other headers with definitions for private API functions.
-- Last but not least, this is Apple's launchd after all, right :>)? I did not know systemd was inspired by launchd until I read [this HN comment](https://news.ycombinator.com/item?id=2565780), which sent me down this eventual rabbit hole :)  
+- Last but not least, this is Apple's launchd after all, right :>)? I did not know systemd was inspired by launchd until I read [this HN comment](https://news.ycombinator.com/item?id=2565780), which sent me down this eventual rabbit hole :)
 
 Everything else (C) David Stancu & Contributors 2021
