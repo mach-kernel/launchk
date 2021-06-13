@@ -36,22 +36,18 @@ impl XPCObject {
 
     /// Read ref count (base + 0x0C). The count is incremented and
     /// decremented with calls to xpc_release and xpc_retain.
-    pub fn read_refs(&self) -> c_int {
+    pub unsafe fn read_refs(&self) -> c_int {
         let XPCObject(ptr, _) = self;
         let refs: *const c_int = *ptr as *const _;
-        unsafe {
-            *refs.offset(3)
-        }
+        *refs.offset(3)
     }
 
     /// Read xref count (base + 0x08). The count is incremented and
     /// decremented with calls to xpc_release and xpc_retain.
-    pub fn read_xrefs(&self) -> c_int {
+    pub unsafe fn read_xrefs(&self) -> c_int {
         let XPCObject(ptr, _) = self;
         let xrefs: *const c_int = *ptr as *const _;
-        unsafe {
-            *xrefs.offset(2)
-        }
+        *xrefs.offset(2)
     }
 }
 
