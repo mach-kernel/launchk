@@ -4,7 +4,7 @@ use crate::objects::xpc_error::XPCError::PipeError;
 use crate::objects::xpc_object::XPCObject;
 use crate::{
     get_xpc_bootstrap_pipe, rs_xpc_strerror, xpc_object_t, xpc_pipe_routine,
-    xpc_pipe_routine_with_flags,
+    xpc_pipe_routine_with_flags, xpc_retain
 };
 
 use crate::traits::xpc_value::TryXPCValue;
@@ -65,20 +65,17 @@ pub trait XPCPipeable {
 
 impl XPCPipeable for XPCObject {
     fn pipe_routine(&self) -> XPCPipeResult {
-        let XPCObject(ptr, _) = self;
         let mut reply: xpc_object_t = null_mut();
-
-        let err = unsafe { xpc_pipe_routine(get_xpc_bootstrap_pipe(), *ptr, &mut reply) };
+        let err = unsafe { xpc_pipe_routine(get_xpc_bootstrap_pipe(), self.as_ptr(), &mut reply) };
 
         Self::handle_pipe_routine(reply, err)
     }
 
     fn pipe_routine_with_flags(&self, flags: u64) -> XPCPipeResult {
-        let XPCObject(ptr, _) = self;
         let mut reply: xpc_object_t = null_mut();
 
         let err = unsafe {
-            xpc_pipe_routine_with_flags(get_xpc_bootstrap_pipe(), *ptr, &mut reply, flags)
+            xpc_pipe_routine_with_flags(get_xpc_bootstrap_pipe(), self.as_ptr(), &mut reply, flags)
         };
 
         Self::handle_pipe_routine(reply, err)

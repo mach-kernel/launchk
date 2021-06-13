@@ -81,9 +81,7 @@ impl TryFrom<&XPCObject> for XPCDictionary {
 
     /// Copy data from XPC dictionary into a Rust HashMap
     fn try_from(object: &XPCObject) -> Result<XPCDictionary, XPCError> {
-        let XPCObject(_, object_type) = *object;
-
-        if object_type != *objects::xpc_type::Dictionary {
+        if object.xpc_type() != *objects::xpc_type::Dictionary {
             return Err(DictionaryError(
                 "Only XPC_TYPE_DICTIONARY allowed".to_string(),
             ));

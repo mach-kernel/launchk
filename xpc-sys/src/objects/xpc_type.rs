@@ -24,8 +24,7 @@ impl From<xpc_object_t> for XPCType {
 
 impl From<XPCObject> for XPCType {
     fn from(value: XPCObject) -> XPCType {
-        let XPCObject(_, xpc_type) = value;
-        xpc_type
+        value.xpc_type()
     }
 }
 
@@ -73,8 +72,7 @@ lazy_static! {
 
 /// Runtime type check for XPC object.
 pub fn check_xpc_type(object: &XPCObject, xpc_type: &XPCType) -> Result<(), XPCError> {
-    let XPCObject(_, obj_type) = object;
-    if *obj_type == *xpc_type {
+    if object.xpc_type() == *xpc_type {
         return Ok(());
     }
 

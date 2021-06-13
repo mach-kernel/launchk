@@ -14,7 +14,7 @@ use crate::objects::xpc_dictionary::XPCDictionary;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XPCObject(pub xpc_object_t, pub XPCType);
+pub struct XPCObject(xpc_object_t, pub XPCType);
 
 unsafe impl Send for XPCObject {}
 unsafe impl Sync for XPCObject {}
@@ -29,6 +29,7 @@ impl XPCObject {
         *xpc_type
     }
 
+    /// Get underlying xpc_object_t pointer
     pub fn as_ptr(&self) -> xpc_object_t {
         let XPCObject(object_ptr, _) = self;
         *object_ptr

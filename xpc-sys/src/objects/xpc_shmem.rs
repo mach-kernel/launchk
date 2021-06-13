@@ -67,7 +67,7 @@ impl Drop for XPCShmem {
         log::info!(
             "XPCShmem drop (region: {:p}, object {:p})",
             region,
-            xpc_object.0
+            xpc_object.as_ptr()
         );
         unsafe { vm_deallocate(*task, *region as vm_address_t, *size) };
     }
