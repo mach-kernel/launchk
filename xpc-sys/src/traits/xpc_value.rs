@@ -8,12 +8,13 @@ use crate::objects::xpc_type;
 use crate::{
     mach_port_t, size_t, xpc_array_apply, xpc_bool_get_value, xpc_double_get_value,
     xpc_int64_get_value, xpc_mach_send_get_right, xpc_object_t, xpc_retain,
-    xpc_string_get_string_ptr, xpc_type_get_name, xpc_uint64_get_value,
+    xpc_string_get_string_ptr, xpc_type_get_name, xpc_uint64_get_value, xpc_copy, xpc_release
 };
 
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::ValueError;
 use crate::objects::xpc_type::check_xpc_type;
+use std::sync::Arc;
 
 /// Implement to get data out of xpc_type_t and into
 /// a Rust native data type
@@ -87,17 +88,18 @@ impl TryXPCValue<(MachPortType, mach_port_t)> for XPCObject {
     }
 }
 
-impl TryXPCValue<Vec<XPCObject>> for XPCObject {
-    fn xpc_value(&self) -> Result<Vec<XPCObject>, XPCError> {
+impl TryXPCValue<Vec<Arc<XPCObject>>> for XPCObject {
+    fn xpc_value(&self) -> Result<Vec<Arc<XPCObject>>, XPCError> {
         check_xpc_type(&self, &xpc_type::Array)?;
         let XPCObject(ptr, _) = self;
 
-        let vec: Rc<RefCell<Vec<XPCObject>>> = Rc::new(RefCell::new(vec![]));
+        let vec: Rc<RefCell<Vec<Arc<XPCObject>>>> = Rc::new(RefCell::new(vec![]));
         let vec_rc_clone = vec.clone();
 
         let block = ConcreteBlock::new(move |_: size_t, obj: xpc_object_t| {
             unsafe { xpc_retain(obj) };
-            vec_rc_clone.borrow_mut().push(obj.into());
+            let xpc_object: XPCObject = obj.into();
+            vec_rc_clone.borrow_mut().push(xpc_object.into());
         });
 
         let block = block.copy();

@@ -146,7 +146,7 @@ pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
 
     let response = XPCDictionary::new()
         .extend(&DUMPSTATE)
-        .entry("shmem", shmem.xpc_object.clone())
+        .entry("shmem", &shmem.xpc_object)
         .pipe_routine_with_error_handling()?;
 
     let bytes_written: u64 = response.get(&["bytes-written"])?.xpc_value()?;

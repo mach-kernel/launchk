@@ -12,7 +12,8 @@ use crate::objects::xpc_error::XPCError::DictionaryError;
 use crate::objects::xpc_object::XPCObject;
 use crate::rs_strerror;
 use crate::{
-    errno, xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t,
+    errno, xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t, xpc_release,
+    xpc_copy, xpc_retain
 };
 
 use block::ConcreteBlock;
@@ -94,6 +95,7 @@ impl TryFrom<&XPCObject> for XPCDictionary {
 
         // https://developer.apple.com/documentation/xpc/1505404-xpc_dictionary_apply?language=objc
         let block = ConcreteBlock::new(move |key: *const c_char, value: xpc_object_t| {
+            unsafe { xpc_retain(value) };
             let str_key = unsafe { CStr::from_ptr(key).to_string_lossy().to_string() };
 
             let xpc_object: XPCObject = value.into();
@@ -170,7 +172,7 @@ where
                 let as_str: String = k.into();
                 let cstr = CString::new(as_str).unwrap();
                 log::trace!("Dictionary {:p} add {:?}: {:p}", dict, cstr, v.as_ptr());
-                xpc_dictionary_set_value(dict, cstr.as_ptr(), v.as_ptr());
+                xpc_dictionary_set_value(dict, cstr.as_ptr(), xpc_copy(v.as_ptr()));
             }
         }
 

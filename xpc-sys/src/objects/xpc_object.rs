@@ -2,7 +2,7 @@ use crate::objects::xpc_type::XPCType;
 use crate::{
     mach_port_t, xpc_array_append_value, xpc_array_create, xpc_bool_create, xpc_copy_description,
     xpc_double_create, xpc_fd_create, xpc_int64_create, xpc_mach_recv_create, xpc_mach_send_create,
-    xpc_object_t, xpc_release, xpc_retain, xpc_string_create, xpc_uint64_create,
+    xpc_object_t, xpc_release, xpc_retain, xpc_string_create, xpc_uint64_create, xpc_copy
 };
 use std::ffi::{CStr, CString};
 use std::os::unix::prelude::RawFd;
@@ -19,8 +19,8 @@ unsafe impl Send for XPCObject {}
 unsafe impl Sync for XPCObject {}
 
 impl XPCObject {
-    pub fn new(value: xpc_object_t) -> Arc<Self> {
-        Arc::new(Self::new_raw(value))
+    fn new(value: xpc_object_t) -> Self {
+        Self(value, value.into())
     }
 
     pub fn xpc_type(&self) -> XPCType {
@@ -31,12 +31,6 @@ impl XPCObject {
     pub fn as_ptr(&self) -> xpc_object_t {
         let XPCObject(object_ptr, _) = self;
         *object_ptr
-    }
-
-    fn new_raw(value: xpc_object_t) -> Self {
-        // XPC objects must live as long as the XPCObject struct
-        unsafe { xpc_retain(value) };
-        Self(value, value.into())
     }
 }
 
@@ -64,28 +58,28 @@ impl fmt::Display for XPCObject {
 
 impl From<xpc_object_t> for XPCObject {
     fn from(value: xpc_object_t) -> Self {
-        XPCObject::new_raw(value)
+        XPCObject::new(value)
     }
 }
 
 impl From<i64> for XPCObject {
     /// Create XPCObject via xpc_int64_create
     fn from(value: i64) -> Self {
-        unsafe { XPCObject::new_raw(xpc_int64_create(value)) }
+        unsafe { XPCObject::new(xpc_int64_create(value)) }
     }
 }
 
 impl From<u64> for XPCObject {
     /// Create XPCObject via xpc_uint64_create
     fn from(value: u64) -> Self {
-        unsafe { XPCObject::new_raw(xpc_uint64_create(value)) }
+        unsafe { XPCObject::new(xpc_uint64_create(value)) }
     }
 }
 
 impl From<f64> for XPCObject {
     /// Create XPCObject via xpc_double_create
     fn from(value: f64) -> Self {
-        unsafe { XPCObject::new_raw(xpc_double_create(value)) }
+        unsafe { XPCObject::new(xpc_double_create(value)) }
     }
 }
 
@@ -106,14 +100,14 @@ impl From<(MachPortType, mach_port_t)> for XPCObject {
             }
         };
 
-        XPCObject::new_raw(xpc_object)
+        XPCObject::new(xpc_object)
     }
 }
 
 impl From<bool> for XPCObject {
     /// Create XPCObject via xpc_bool_create
     fn from(value: bool) -> Self {
-        unsafe { XPCObject::new_raw(xpc_bool_create(value)) }
+        unsafe { XPCObject::new(xpc_bool_create(value)) }
     }
 }
 
@@ -121,7 +115,7 @@ impl From<&str> for XPCObject {
     /// Create XPCObject via xpc_string_create
     fn from(slice: &str) -> Self {
         let cstr = CString::new(slice).unwrap();
-        unsafe { XPCObject::new_raw(xpc_string_create(cstr.as_ptr())) }
+        unsafe { XPCObject::new(xpc_string_create(cstr.as_ptr())) }
     }
 }
 
@@ -133,7 +127,7 @@ impl<O: Into<XPCObject>> From<Vec<O>> for XPCObject {
             unsafe { xpc_array_append_value(xpc_array, object.into().as_ptr()) }
         }
 
-        XPCObject::new_raw(xpc_array)
+        XPCObject::new(xpc_array)
     }
 }
 
@@ -141,7 +135,7 @@ impl From<String> for XPCObject {
     /// Create XPCObject via xpc_string_create
     fn from(value: String) -> Self {
         let cstr = CString::new(value).unwrap();
-        unsafe { XPCObject::new_raw(xpc_string_create(cstr.as_ptr())) }
+        unsafe { XPCObject::new(xpc_string_create(cstr.as_ptr())) }
     }
 }
 
@@ -154,29 +148,27 @@ impl From<XPCDictionary> for XPCObject {
 }
 
 impl<R: AsRef<XPCObject>> From<R> for XPCObject {
-    /// Create XPCObject from another ref
+    /// Use xpc_copy() to copy out of refs
+    /// https://developer.apple.com/documentation/xpc/1505584-xpc_copy?language=objc
     fn from(other: R) -> Self {
         let other_ref = other.as_ref();
-        let XPCObject(ref arc, ref xpc_type) = other_ref;
-        XPCObject(arc.clone(), xpc_type.clone())
+        let clone = unsafe { xpc_copy(other_ref.as_ptr()) };
+        clone.into()
     }
 }
 
 impl From<RawFd> for XPCObject {
-    /// Use std::os::unix::prelude type for xpc_fd_create
+    /// Box fd in an XPC object which "behaves like dup()", allowing
+    /// to close after wrapping.
     fn from(value: RawFd) -> Self {
         log::info!("Making FD from {}", value);
-        unsafe { XPCObject::new_raw(xpc_fd_create(value)) }
+        unsafe { XPCObject::new(xpc_fd_create(value)) }
     }
 }
 
-/// NOTE: If using with obj-c blocks crate (blocks::ConcreteBlock),
-/// make sure to invoke xpc_retain() to avoid the Obj-C runtime from
-/// releasing your xpc_object_t after the block leaves scope. This
-/// drop trait will then cause a segfault!
-///
-/// TODO: Is there a way to check if an xpc_release() was already invoked?
 impl Drop for XPCObject {
+    /// Release XPC object when dropped
+    /// https://developer.apple.com/documentation/xpc/1505851-xpc_release
     fn drop(&mut self) {
         let XPCObject(ptr, _) = self;
         log::info!("XPCObject drop {:p}", ptr);
