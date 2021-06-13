@@ -12,8 +12,8 @@ use crate::objects::xpc_error::XPCError::DictionaryError;
 use crate::objects::xpc_object::XPCObject;
 use crate::rs_strerror;
 use crate::{
-    errno, xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t, xpc_release,
-    xpc_copy, xpc_retain
+    errno, xpc_copy, xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value,
+    xpc_object_t, xpc_retain,
 };
 
 use block::ConcreteBlock;

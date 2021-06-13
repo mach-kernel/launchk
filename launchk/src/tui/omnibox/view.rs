@@ -357,13 +357,16 @@ impl View for OmniboxView {
                     .send(OmniboxEvent::Command(OmniboxCommand::FocusServiceList))
                     .expect("Must focus");
                 Some(state.with_new(Some(OmniboxMode::Idle), None, Some("".to_string()), None))
-            },
+            }
             (Event::Char(':'), _) => {
                 Some(state.with_new(Some(OmniboxMode::CommandFilter), None, None, None))
             }
-            (Event::Char('/'), _) => {
-                Some(state.with_new(Some(OmniboxMode::LabelFilter), None, Some("".to_string()), None))
-            }
+            (Event::Char('/'), _) => Some(state.with_new(
+                Some(OmniboxMode::LabelFilter),
+                None,
+                Some("".to_string()),
+                None,
+            )),
             (e, OmniboxMode::Idle) => Self::handle_job_type_filter(&e, &*state),
             (e, _) => Self::handle_active(&e, &*state),
         };

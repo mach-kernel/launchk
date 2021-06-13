@@ -8,7 +8,7 @@ use crate::objects::xpc_type;
 use crate::{
     mach_port_t, size_t, xpc_array_apply, xpc_bool_get_value, xpc_double_get_value,
     xpc_int64_get_value, xpc_mach_send_get_right, xpc_object_t, xpc_retain,
-    xpc_string_get_string_ptr, xpc_type_get_name, xpc_uint64_get_value, xpc_copy, xpc_release
+    xpc_string_get_string_ptr, xpc_type_get_name, xpc_uint64_get_value,
 };
 
 use crate::objects::xpc_error::XPCError;
@@ -128,6 +128,7 @@ mod tests {
     use crate::objects::xpc_object::MachPortType;
     use crate::objects::xpc_object::XPCObject;
     use crate::traits::xpc_value::TryXPCValue;
+    use std::sync::Arc;
 
     #[test]
     fn xpc_to_rs_with_wrong_type() {
@@ -138,14 +139,6 @@ mod tests {
             as_u64.err().unwrap(),
             ValueError("Cannot get int64 as uint64".to_string())
         );
-    }
-
-    #[test]
-    fn xpc_value_vec() {
-        let xpc_array = XPCObject::from(vec![XPCObject::from("ohai")]);
-        let vec: Vec<XPCObject> = xpc_array.xpc_value().unwrap();
-        let ohai: String = vec.get(0).unwrap().xpc_value().unwrap();
-        assert_eq!(ohai, "ohai");
     }
 
     #[test]
@@ -201,7 +194,7 @@ mod tests {
     #[test]
     fn xpc_value_array() {
         let xpc_array = XPCObject::from(vec!["eins", "zwei", "polizei"]);
-        let rs_vec: Vec<XPCObject> = xpc_array.xpc_value().unwrap();
+        let rs_vec: Vec<Arc<XPCObject>> = xpc_array.xpc_value().unwrap();
 
         assert_eq!(
             rs_vec

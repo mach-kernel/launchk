@@ -8,7 +8,7 @@ use std::{
     ptr::null_mut,
 };
 
-use crate::{rs_strerror, errno};
+use crate::{errno, rs_strerror};
 
 /// A wrapper around a UNIX FIFO
 pub struct UnixFifo(pub CString);
