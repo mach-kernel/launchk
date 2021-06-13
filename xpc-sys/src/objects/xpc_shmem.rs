@@ -40,6 +40,12 @@ impl XPCShmem {
             let xpc_object: XPCObject =
                 unsafe { xpc_shmem_create(region as *mut c_void, size as u64).into() };
 
+            log::info!(
+                "XPCShmem new (region: {:p}, xpc_object_t {:p})",
+                region,
+                xpc_object.as_ptr()
+            );
+
             Ok(XPCShmem {
                 task,
                 size,
@@ -65,10 +71,15 @@ impl Drop for XPCShmem {
             xpc_object,
         } = self;
         log::info!(
-            "XPCShmem drop (region: {:p}, object {:p})",
+            "XPCShmem drop (region: {:p}, xpc_object_t {:p})",
             region,
             xpc_object.as_ptr()
         );
-        unsafe { vm_deallocate(*task, *region as vm_address_t, *size) };
+
+        let ok = unsafe { vm_deallocate(*task, *region as vm_address_t, *size) };
+
+        if ok != 0 {
+            panic!("shmem won't drop (vm_deallocate errno {})", ok);
+        }
     }
 }

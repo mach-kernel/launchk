@@ -142,8 +142,6 @@ pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
         i32::try_from(MAP_SHARED).expect("Must conv flags"),
     )?;
 
-    log::info!("Made shmem {:?}", shmem);
-
     let response = XPCDictionary::new()
         .extend(&DUMPSTATE)
         .entry("shmem", &shmem.xpc_object)

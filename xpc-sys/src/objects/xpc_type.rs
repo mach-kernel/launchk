@@ -8,10 +8,19 @@ use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::ValueError;
 use crate::objects::xpc_object::XPCObject;
 use std::ffi::CStr;
+use std::fmt;
+use std::ptr::null;
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct XPCType(pub xpc_type_t);
+
+impl XPCType {
+    pub fn as_ptr(&self) -> xpc_type_t {
+        let XPCType(t) = self;
+        *t
+    }
+}
 
 unsafe impl Send for XPCType {}
 unsafe impl Sync for XPCType {}
@@ -31,6 +40,22 @@ impl From<XPCObject> for XPCType {
 impl From<*const _xpc_type_s> for XPCType {
     fn from(value: *const _xpc_type_s) -> Self {
         XPCType(value)
+    }
+}
+
+impl fmt::Display for XPCType {
+    /// Use xpc_copy_description to show as a string, for
+    /// _xpc_type_dictionary contents are shown!
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let XPCType(t) = self;
+
+        if *t == null() {
+            return write!(f, "NULL");
+        }
+
+        write!(f, "{}", unsafe {
+            CStr::from_ptr(xpc_type_get_name(*t)).to_string_lossy()
+        })
     }
 }
 
@@ -71,24 +96,14 @@ lazy_static! {
 }
 
 /// Runtime type check for XPC object.
-pub fn check_xpc_type(object: &XPCObject, xpc_type: &XPCType) -> Result<(), XPCError> {
-    if object.xpc_type() == *xpc_type {
+pub fn check_xpc_type(object: &XPCObject, requested: &XPCType) -> Result<(), XPCError> {
+    if object.xpc_type() == *requested {
         return Ok(());
     }
 
-    let obj_str = unsafe {
-        let XPCType(ptr) = object.xpc_type();
-        CStr::from_ptr(xpc_type_get_name(ptr))
-            .to_string_lossy()
-            .to_string()
-    };
-
-    let req_str = unsafe {
-        let XPCType(ptr) = xpc_type;
-        CStr::from_ptr(xpc_type_get_name(*ptr))
-            .to_string_lossy()
-            .to_string()
-    };
-
-    Err(ValueError(format!("Cannot get {} as {}", obj_str, req_str)))
+    Err(ValueError(format!(
+        "Cannot get {} as {}",
+        object.xpc_type(),
+        requested
+    )))
 }

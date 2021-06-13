@@ -3,14 +3,17 @@ use libc::c_int;
 use crate::objects::xpc_type::XPCType;
 use crate::{
     mach_port_t, xpc_array_append_value, xpc_array_create, xpc_bool_create, xpc_copy,
-    xpc_copy_description, xpc_double_create, xpc_fd_create, xpc_int64_create, xpc_mach_recv_create,
-    xpc_mach_send_create, xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create, xpc_retain
+    xpc_copy_description, xpc_double_create, xpc_fd_create, xpc_get_type, xpc_int64_create,
+    xpc_mach_recv_create, xpc_mach_send_create, xpc_object_t, xpc_release, xpc_retain,
+    xpc_string_create, xpc_type_get_name, xpc_uint64_create,
 };
 use std::ffi::{CStr, CString};
 use std::os::unix::prelude::RawFd;
 use std::ptr::null_mut;
 
 use crate::objects::xpc_dictionary::XPCDictionary;
+use crate::objects::xpc_type;
+use crate::objects::xpc_type::check_xpc_type;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,7 +24,18 @@ unsafe impl Sync for XPCObject {}
 
 impl XPCObject {
     fn new(value: xpc_object_t) -> Self {
-        Self(value, value.into())
+        let obj = Self(value, value.into());
+
+        log::info!(
+            "XPCObject new ({:p}, {}, {})",
+            value,
+            obj.xpc_type(),
+            obj.get_refs()
+                .map(|(r, xr)| format!("refs {} xrefs {}", r, xr))
+                .unwrap_or("refs ???".to_string()),
+        );
+
+        obj
     }
 
     pub fn xpc_type(&self) -> XPCType {
@@ -35,19 +49,38 @@ impl XPCObject {
         *object_ptr
     }
 
+    /// Should (?) return a deep copy of the underlying object
+    /// https://developer.apple.com/documentation/xpc/1505584-xpc_copy
+    pub fn xpc_copy(&self) -> Self {
+        let clone = unsafe { xpc_copy(self.as_ptr()) };
+        Self::new(clone)
+    }
+
+    /// Attempt to safely get refcounts (segfault for others?)
+    fn get_refs(&self) -> Option<(c_int, c_int)> {
+        for t in &[*xpc_type::UInt64, *xpc_type::Int64, *xpc_type::Bool] {
+            check_xpc_type(self, t).err()?;
+        }
+
+        unsafe {
+            Some((
+                Self::read_refs(self.as_ptr()),
+                Self::read_xrefs(self.as_ptr()),
+            ))
+        }
+    }
+
     /// Read ref count (base + 0x0C). The count is incremented and
     /// decremented with calls to xpc_release and xpc_retain.
-    pub unsafe fn read_refs(&self) -> c_int {
-        let XPCObject(ptr, _) = self;
-        let refs: *const c_int = *ptr as *const _;
+    unsafe fn read_refs(xpc_object: xpc_object_t) -> c_int {
+        let refs: *const c_int = xpc_object as *const _;
         *refs.offset(3)
     }
 
     /// Read xref count (base + 0x08). The count is incremented and
     /// decremented with calls to xpc_release and xpc_retain.
-    pub unsafe fn read_xrefs(&self) -> c_int {
-        let XPCObject(ptr, _) = self;
-        let xrefs: *const c_int = *ptr as *const _;
+    unsafe fn read_xrefs(xpc_object: xpc_object_t) -> c_int {
+        let xrefs: *const c_int = xpc_object as *const _;
         *xrefs.offset(2)
     }
 }
@@ -166,12 +199,10 @@ impl From<XPCDictionary> for XPCObject {
 }
 
 impl<R: AsRef<XPCObject>> From<R> for XPCObject {
-    /// Use xpc_copy() to copy out of refs
+    /// Use xpc_copy() to copy out of refs.
     /// https://developer.apple.com/documentation/xpc/1505584-xpc_copy?language=objc
     fn from(other: R) -> Self {
-        let other_ref = other.as_ref();
-        let clone = unsafe { xpc_copy(other_ref.as_ptr()) };
-        clone.into()
+        other.as_ref().xpc_copy()
     }
 }
 
@@ -188,8 +219,16 @@ impl Drop for XPCObject {
     /// Release XPC object when dropped
     /// https://developer.apple.com/documentation/xpc/1505851-xpc_release
     fn drop(&mut self) {
-        let XPCObject(ptr, _) = self;
-        log::info!("XPCObject drop {:p}", ptr);
+        let XPCObject(ptr, _) = &self;
+        log::info!(
+            "XPCObject drop ({:p}, {}, {})",
+            *ptr,
+            &self.xpc_type(),
+            &self
+                .get_refs()
+                .map(|(r, xr)| format!("refs {} xrefs {}", r, xr))
+                .unwrap_or("refs ???".to_string()),
+        );
         unsafe { xpc_release(*ptr) }
     }
 }

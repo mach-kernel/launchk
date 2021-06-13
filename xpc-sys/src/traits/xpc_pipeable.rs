@@ -4,7 +4,7 @@ use crate::objects::xpc_error::XPCError::PipeError;
 use crate::objects::xpc_object::XPCObject;
 use crate::{
     get_xpc_bootstrap_pipe, rs_xpc_strerror, xpc_object_t, xpc_pipe_routine,
-    xpc_pipe_routine_with_flags, xpc_retain
+    xpc_pipe_routine_with_flags, xpc_retain,
 };
 
 use crate::traits::xpc_value::TryXPCValue;
