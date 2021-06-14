@@ -89,9 +89,9 @@ impl TryXPCValue<Vec<Arc<XPCObject>>> for XPCObject {
         let vec_rc_clone = vec.clone();
 
         let block = ConcreteBlock::new(move |_: size_t, obj: xpc_object_t| {
-            unsafe { xpc_retain(obj) };
-            let xpc_object: XPCObject = obj.into();
+            let xpc_object: XPCObject = XPCObject::xpc_copy(obj);
             vec_rc_clone.borrow_mut().push(xpc_object.into());
+            true
         });
 
         let block = block.copy();

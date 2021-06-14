@@ -51,8 +51,8 @@ impl XPCObject {
 
     /// Should (?) return a deep copy of the underlying object
     /// https://developer.apple.com/documentation/xpc/1505584-xpc_copy
-    pub fn xpc_copy(&self) -> Self {
-        let clone = unsafe { xpc_copy(self.as_ptr()) };
+    pub fn xpc_copy(xpc_object: xpc_object_t) -> Self {
+        let clone = unsafe { xpc_copy(xpc_object) };
         Self::new(clone)
     }
 
@@ -202,7 +202,7 @@ impl<R: AsRef<XPCObject>> From<R> for XPCObject {
     /// Use xpc_copy() to copy out of refs.
     /// https://developer.apple.com/documentation/xpc/1505584-xpc_copy?language=objc
     fn from(other: R) -> Self {
-        other.as_ref().xpc_copy()
+        Self::xpc_copy(other.as_ref().as_ptr())
     }
 }
 
