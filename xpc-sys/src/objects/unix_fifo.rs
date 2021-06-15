@@ -15,6 +15,7 @@ pub struct UnixFifo(pub CString);
 
 impl UnixFifo {
     /// Create a new FIFO, make sure mode_t is 0oXXX!
+    #[must_use]
     pub fn new(mode: mode_t) -> Result<Self, String> {
         let fifo_name = unsafe { CStr::from_ptr(tmpnam(null_mut())) };
         let err = unsafe { mkfifo(fifo_name.as_ptr(), mode) };
@@ -27,6 +28,7 @@ impl UnixFifo {
     }
 
     /// Open O_RDONLY, read until EOF, close fd, return buffer.
+    #[must_use]
     pub fn block_and_read_bytes(&self) -> Result<Vec<u8>, String> {
         let Self(fifo_name) = self;
 
@@ -42,6 +44,7 @@ impl UnixFifo {
     }
 
     /// Open O_WRONLY, call fn, close fd, yield result
+    #[must_use]
     pub fn with_writer<T>(&self, f: impl Fn(RawFd) -> T) -> Result<T, String> {
         let Self(fifo_name) = self;
         let fifo_fd_write = unsafe { open(fifo_name.as_ptr(), O_WRONLY) };
@@ -52,6 +55,7 @@ impl UnixFifo {
     }
 
     /// Wrap libc close()
+    #[must_use]
     pub fn close(fd: RawFd) -> Result<(), String> {
         let err = unsafe { libc::close(fd) };
 
