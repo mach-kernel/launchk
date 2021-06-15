@@ -5,7 +5,6 @@ use crate::launchd::message::{
 use std::convert::TryFrom;
 use std::{collections::HashSet, os::unix::prelude::RawFd};
 
-use xpc_sys::xpc_retain;
 use xpc_sys::{
     objects::xpc_shmem::XPCShmem,
     traits::{xpc_pipeable::XPCPipeable, xpc_value::TryXPCValue},
@@ -143,18 +142,9 @@ pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
         i32::try_from(MAP_SHARED).expect("Must conv flags"),
     )?;
 
-    // segfault otherwise, the XPC dictionary gets dropped after
-    // pipe_routine_with_error_handling, so we need to make sure
-    // we retain shmem
-    unsafe {
-        xpc_retain(shmem.xpc_object.as_ptr());
-    }
-
-    log::info!("Made shmem {:?}", shmem);
-
     let response = XPCDictionary::new()
         .extend(&DUMPSTATE)
-        .entry("shmem", shmem.xpc_object.clone())
+        .entry("shmem", &shmem.xpc_object)
         .pipe_routine_with_error_handling()?;
 
     let bytes_written: u64 = response.get(&["bytes-written"])?.xpc_value()?;

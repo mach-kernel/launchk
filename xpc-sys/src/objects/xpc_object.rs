@@ -1,26 +1,40 @@
+use libc::c_int;
+
 use crate::objects::xpc_type::XPCType;
 use crate::{
-    mach_port_t, xpc_array_append_value, xpc_array_create, xpc_bool_create, xpc_copy_description,
-    xpc_double_create, xpc_fd_create, xpc_int64_create, xpc_mach_recv_create, xpc_mach_send_create,
-    xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
+    mach_port_t, xpc_array_append_value, xpc_array_create, xpc_bool_create, xpc_copy,
+    xpc_copy_description, xpc_double_create, xpc_fd_create, xpc_int64_create, xpc_mach_recv_create,
+    xpc_mach_send_create, xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
 };
 use std::ffi::{CStr, CString};
 use std::os::unix::prelude::RawFd;
 use std::ptr::null_mut;
-use std::sync::Arc;
 
 use crate::objects::xpc_dictionary::XPCDictionary;
+use crate::objects::xpc_type;
+use crate::objects::xpc_type::check_xpc_type;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct XPCObject(pub xpc_object_t, pub XPCType);
+pub struct XPCObject(xpc_object_t, pub XPCType);
 
 unsafe impl Send for XPCObject {}
 unsafe impl Sync for XPCObject {}
 
 impl XPCObject {
-    pub fn new(value: xpc_object_t) -> Arc<Self> {
-        Arc::new(Self::new_raw(value))
+    fn new(value: xpc_object_t) -> Self {
+        let obj = Self(value, value.into());
+
+        log::info!(
+            "XPCObject new ({:p}, {}, {})",
+            value,
+            obj.xpc_type(),
+            obj.get_refs()
+                .map(|(r, xr)| format!("refs {} xrefs {}", r, xr))
+                .unwrap_or("refs ???".to_string()),
+        );
+
+        obj
     }
 
     pub fn xpc_type(&self) -> XPCType {
@@ -28,13 +42,45 @@ impl XPCObject {
         *xpc_type
     }
 
+    /// Get underlying xpc_object_t pointer
     pub fn as_ptr(&self) -> xpc_object_t {
         let XPCObject(object_ptr, _) = self;
         *object_ptr
     }
 
-    fn new_raw(value: xpc_object_t) -> Self {
-        Self(value, value.into())
+    /// Should (?) return a deep copy of the underlying object
+    /// https://developer.apple.com/documentation/xpc/1505584-xpc_copy
+    pub fn xpc_copy(xpc_object: xpc_object_t) -> Self {
+        let clone = unsafe { xpc_copy(xpc_object) };
+        Self::new(clone)
+    }
+
+    /// Attempt to safely get refcounts (segfault for others?)
+    fn get_refs(&self) -> Option<(c_int, c_int)> {
+        for t in &[*xpc_type::UInt64, *xpc_type::Int64, *xpc_type::Bool] {
+            check_xpc_type(self, t).err()?;
+        }
+
+        unsafe {
+            Some((
+                Self::read_refs(self.as_ptr()),
+                Self::read_xrefs(self.as_ptr()),
+            ))
+        }
+    }
+
+    /// Read ref count (base + 0x0C). The count is incremented and
+    /// decremented with calls to xpc_release and xpc_retain.
+    unsafe fn read_refs(xpc_object: xpc_object_t) -> c_int {
+        let refs: *const c_int = xpc_object as *const _;
+        *refs.offset(3)
+    }
+
+    /// Read xref count (base + 0x08). The count is incremented and
+    /// decremented with calls to xpc_release and xpc_retain.
+    unsafe fn read_xrefs(xpc_object: xpc_object_t) -> c_int {
+        let xrefs: *const c_int = xpc_object as *const _;
+        *xrefs.offset(2)
     }
 }
 
@@ -62,28 +108,28 @@ impl fmt::Display for XPCObject {
 
 impl From<xpc_object_t> for XPCObject {
     fn from(value: xpc_object_t) -> Self {
-        XPCObject(value, value.into())
+        XPCObject::new(value)
     }
 }
 
 impl From<i64> for XPCObject {
     /// Create XPCObject via xpc_int64_create
     fn from(value: i64) -> Self {
-        unsafe { XPCObject::new_raw(xpc_int64_create(value)) }
+        unsafe { XPCObject::new(xpc_int64_create(value)) }
     }
 }
 
 impl From<u64> for XPCObject {
     /// Create XPCObject via xpc_uint64_create
     fn from(value: u64) -> Self {
-        unsafe { XPCObject::new_raw(xpc_uint64_create(value)) }
+        unsafe { XPCObject::new(xpc_uint64_create(value)) }
     }
 }
 
 impl From<f64> for XPCObject {
     /// Create XPCObject via xpc_double_create
     fn from(value: f64) -> Self {
-        unsafe { XPCObject::new_raw(xpc_double_create(value)) }
+        unsafe { XPCObject::new(xpc_double_create(value)) }
     }
 }
 
@@ -104,14 +150,14 @@ impl From<(MachPortType, mach_port_t)> for XPCObject {
             }
         };
 
-        XPCObject::new_raw(xpc_object)
+        XPCObject::new(xpc_object)
     }
 }
 
 impl From<bool> for XPCObject {
     /// Create XPCObject via xpc_bool_create
     fn from(value: bool) -> Self {
-        unsafe { XPCObject::new_raw(xpc_bool_create(value)) }
+        unsafe { XPCObject::new(xpc_bool_create(value)) }
     }
 }
 
@@ -119,7 +165,7 @@ impl From<&str> for XPCObject {
     /// Create XPCObject via xpc_string_create
     fn from(slice: &str) -> Self {
         let cstr = CString::new(slice).unwrap();
-        unsafe { XPCObject::new_raw(xpc_string_create(cstr.as_ptr())) }
+        unsafe { XPCObject::new(xpc_string_create(cstr.as_ptr())) }
     }
 }
 
@@ -131,7 +177,7 @@ impl<O: Into<XPCObject>> From<Vec<O>> for XPCObject {
             unsafe { xpc_array_append_value(xpc_array, object.into().as_ptr()) }
         }
 
-        XPCObject::new_raw(xpc_array)
+        XPCObject::new(xpc_array)
     }
 }
 
@@ -139,7 +185,7 @@ impl From<String> for XPCObject {
     /// Create XPCObject via xpc_string_create
     fn from(value: String) -> Self {
         let cstr = CString::new(value).unwrap();
-        unsafe { XPCObject::new_raw(xpc_string_create(cstr.as_ptr())) }
+        unsafe { XPCObject::new(xpc_string_create(cstr.as_ptr())) }
     }
 }
 
@@ -152,32 +198,65 @@ impl From<XPCDictionary> for XPCObject {
 }
 
 impl<R: AsRef<XPCObject>> From<R> for XPCObject {
-    /// Create XPCObject from another ref
+    /// Use xpc_copy() to copy out of refs.
+    /// https://developer.apple.com/documentation/xpc/1505584-xpc_copy?language=objc
     fn from(other: R) -> Self {
-        let other_ref = other.as_ref();
-        let XPCObject(ref arc, ref xpc_type) = other_ref;
-        XPCObject(arc.clone(), xpc_type.clone())
+        Self::xpc_copy(other.as_ref().as_ptr())
     }
 }
 
 impl From<RawFd> for XPCObject {
-    /// Use std::os::unix::prelude type for xpc_fd_create
+    /// Box fd in an XPC object which "behaves like dup()", allowing
+    /// to close after wrapping.
     fn from(value: RawFd) -> Self {
         log::info!("Making FD from {}", value);
-        unsafe { XPCObject::new_raw(xpc_fd_create(value)) }
+        unsafe { XPCObject::new(xpc_fd_create(value)) }
     }
 }
 
-/// NOTE: If using with obj-c blocks crate (blocks::ConcreteBlock),
-/// make sure to invoke xpc_retain() to avoid the Obj-C runtime from
-/// releasing your xpc_object_t after the block leaves scope. This
-/// drop trait will then cause a segfault!
-///
-/// TODO: Is there a way to check if an xpc_release() was already invoked?
 impl Drop for XPCObject {
+    /// Release XPC object when dropped
+    /// https://developer.apple.com/documentation/xpc/1505851-xpc_release
     fn drop(&mut self) {
-        let XPCObject(ptr, _) = self;
-        log::info!("XPCObject drop {:p}", ptr);
+        let XPCObject(ptr, _) = &self;
+        log::info!(
+            "XPCObject drop ({:p}, {}, {})",
+            *ptr,
+            &self.xpc_type(),
+            &self
+                .get_refs()
+                .map(|(r, xr)| format!("refs {} xrefs {}", r, xr))
+                .unwrap_or("refs ???".to_string()),
+        );
         unsafe { xpc_release(*ptr) }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::os::unix::prelude::RawFd;
+
+    use libc::mach_port_t;
+
+    use crate::get_bootstrap_port;
+    use crate::objects::xpc_dictionary::XPCDictionary;
+
+    use super::MachPortType;
+    use super::XPCObject;
+
+    // Mostly for docs, int, uint, bool segfault here
+    #[test]
+    fn safely_get_refs() {
+        let bootstrap_port: mach_port_t = unsafe { get_bootstrap_port() };
+
+        for obj in &[
+            XPCObject::from(5.24 as f64),
+            XPCObject::from("foo"),
+            XPCObject::from(XPCDictionary::new()),
+            XPCObject::from(1 as RawFd),
+            XPCObject::from((MachPortType::Send, bootstrap_port)),
+        ] {
+            assert!(obj.get_refs().is_some())
+        }
     }
 }

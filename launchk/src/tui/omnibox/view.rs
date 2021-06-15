@@ -25,7 +25,7 @@ pub enum OmniboxEvent {
 
 #[derive(Debug, Clone)]
 pub enum OmniboxError {
-    StandardError,
+    ReferenceError,
     CommandError(String),
 }
 
@@ -141,13 +141,6 @@ impl OmniboxView {
         };
 
         match (event, mode) {
-            // Toggle back to query from bitmask filters
-            (Event::Char(':'), OmniboxMode::JobTypeFilter) => {
-                Some(state.with_new(Some(OmniboxMode::CommandFilter), None, None, None))
-            }
-            (Event::Char('/'), OmniboxMode::JobTypeFilter) => {
-                Some(state.with_new(Some(OmniboxMode::LabelFilter), None, None, None))
-            }
             (ev, OmniboxMode::JobTypeFilter) => Self::handle_job_type_filter(ev, state),
             // User -> string filters
             (Event::Char(_), OmniboxMode::LabelFilter)
@@ -213,25 +206,6 @@ impl OmniboxView {
         };
 
         Some(state.with_new(Some(OmniboxMode::JobTypeFilter), None, None, Some(jtf)))
-    }
-
-    /// Leave idle state
-    fn handle_idle(event: &Event, state: &OmniboxState) -> Option<OmniboxState> {
-        match event {
-            Event::Char('/') => Some(state.with_new(
-                Some(OmniboxMode::LabelFilter),
-                Some("".to_string()),
-                None,
-                None,
-            )),
-            Event::Char(':') => Some(state.with_new(
-                Some(OmniboxMode::CommandFilter),
-                None,
-                Some("".to_string()),
-                None,
-            )),
-            _ => Self::handle_job_type_filter(event, state),
-        }
     }
 
     fn draw_command_header(&self, printer: &Printer<'_, '_>) {
@@ -384,7 +358,16 @@ impl View for OmniboxView {
                     .expect("Must focus");
                 Some(state.with_new(Some(OmniboxMode::Idle), None, Some("".to_string()), None))
             }
-            (e, OmniboxMode::Idle) => Self::handle_idle(&e, &*state),
+            (Event::Char(':'), _) => {
+                Some(state.with_new(Some(OmniboxMode::CommandFilter), None, None, None))
+            }
+            (Event::Char('/'), _) => Some(state.with_new(
+                Some(OmniboxMode::LabelFilter),
+                None,
+                Some("".to_string()),
+                None,
+            )),
+            (e, OmniboxMode::Idle) => Self::handle_job_type_filter(&e, &*state),
             (e, _) => Self::handle_active(&e, &*state),
         };
 
@@ -396,7 +379,7 @@ impl View for OmniboxView {
 
         self.tx
             .send(OmniboxEvent::StateUpdate(new_state.clone()))
-            .expect("Must broadcast state");
+            .expect("Must send state");
 
         drop(state);
         let mut write = self.state.write().expect("Must write state");

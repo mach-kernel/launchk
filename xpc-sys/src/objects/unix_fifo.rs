@@ -8,9 +8,9 @@ use std::{
     ptr::null_mut,
 };
 
-use crate::rs_strerror;
+use crate::{errno, rs_strerror};
 
-/// A simple wrapper around a UNIX FIFO
+/// A wrapper around a UNIX FIFO
 pub struct UnixFifo(pub CString);
 
 impl UnixFifo {
@@ -26,28 +26,40 @@ impl UnixFifo {
         }
     }
 
-    /// Open the FIFO as O_RDONLY, read until EOF, clean up fd before returning the buffer.
-    pub fn block_and_read_bytes(&self) -> Vec<u8> {
+    /// Open O_RDONLY, read until EOF, close fd, return buffer.
+    pub fn block_and_read_bytes(&self) -> Result<Vec<u8>, String> {
         let Self(fifo_name) = self;
 
         let fifo_fd_read = unsafe { open(fifo_name.as_ptr(), O_RDONLY) };
+        log::info!("opened read fifo {}", fifo_fd_read);
         let mut file = unsafe { File::from_raw_fd(fifo_fd_read) };
 
         let mut buf: Vec<u8> = Vec::new();
         file.read_to_end(&mut buf).expect("Must read bytes");
 
-        unsafe { libc::close(fifo_fd_read) };
-
-        buf
+        Self::close(fifo_fd_read)?;
+        Ok(buf)
     }
 
-    /// Open O_WRONLY, pass to fn and clean up before returning.
-    pub fn with_writer<T>(&self, f: impl Fn(RawFd) -> T) -> T {
+    /// Open O_WRONLY, call fn, close fd, yield result
+    pub fn with_writer<T>(&self, f: impl Fn(RawFd) -> T) -> Result<T, String> {
         let Self(fifo_name) = self;
         let fifo_fd_write = unsafe { open(fifo_name.as_ptr(), O_WRONLY) };
-        let response = f(fifo_fd_write);
-        unsafe { libc::close(fifo_fd_write) };
-        response
+        log::info!("opened write fifo {}", fifo_fd_write);
+        let result = f(fifo_fd_write);
+        Self::close(fifo_fd_write)?;
+        Ok(result)
+    }
+
+    /// Wrap libc close()
+    pub fn close(fd: RawFd) -> Result<(), String> {
+        let err = unsafe { libc::close(fd) };
+
+        if err == 0 {
+            Ok(())
+        } else {
+            Err(rs_strerror(unsafe { errno }))
+        }
     }
 }
 
@@ -55,6 +67,6 @@ impl Drop for UnixFifo {
     fn drop(&mut self) {
         let Self(fifo_name) = self;
 
-        remove_file(&fifo_name.to_string_lossy().to_string()).expect("Must tear down FIFO");
+        remove_file(&fifo_name.to_string_lossy().to_string()).expect("Must rm FIFO");
     }
 }

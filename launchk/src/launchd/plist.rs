@@ -271,12 +271,14 @@ pub fn edit_and_replace(plist_meta: &LaunchdPlist) -> Result<(), String> {
         == PLIST_MAGIC;
 
     // plist -> validate with crate -> temp file
-    let plist = plist::Value::from_file(&plist_meta.plist_path).map_err(|e| e.to_string())?;
+    let og_plist = plist::Value::from_file(&plist_meta.plist_path).map_err(|e| e.to_string())?;
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Must get ts");
     let temp_path = Path::new(*TMP_DIR).join(format!("{}", now.as_secs()));
-    plist.to_file_xml(&temp_path).map_err(|e| e.to_string())?;
+    og_plist
+        .to_file_xml(&temp_path)
+        .map_err(|e| e.to_string())?;
 
     // Start $EDITOR
     let exit = Command::new(*EDITOR)
@@ -291,6 +293,11 @@ pub fn edit_and_replace(plist_meta: &LaunchdPlist) -> Result<(), String> {
     // temp file -> validate with crate -> original
     let plist =
         plist::Value::from_file(&temp_path).map_err(|e| format!("Changes not saved: {}", e))?;
+
+    if og_plist == plist {
+        return Err("No changes made".to_string());
+    }
+
     let writer = if is_binary {
         plist::Value::to_file_binary
     } else {

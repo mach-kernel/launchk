@@ -327,10 +327,14 @@ impl ServiceListView {
                 let fd_read_thread = std::thread::spawn(move || fifo_clone.block_and_read_bytes());
 
                 fifo.with_writer(|fd_write| procinfo(status.pid, fd_write))
+                    .map_err(|e| OmniboxError::CommandError(e))?
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
 
                 // Join reader thread (and close fd)
-                let procinfo_data = fd_read_thread.join().expect("Must read procinfo data");
+                let procinfo_data = fd_read_thread
+                    .join()
+                    .expect("Must join read thread")
+                    .map_err(|e| OmniboxError::CommandError(e))?;
 
                 show_pager(&self.cb_sink, &procinfo_data)
                     .map_err(|e| OmniboxError::CommandError(e))?;

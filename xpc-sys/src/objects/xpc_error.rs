@@ -11,7 +11,6 @@ pub enum XPCError {
     ValueError(String),
     QueryError(String),
     IOError(String),
-    StandardError,
     NotFound,
 }
 

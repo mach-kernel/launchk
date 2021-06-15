@@ -306,10 +306,14 @@ impl OmniboxSubscriber for RootLayout {
                 let fd_read_thread = std::thread::spawn(move || fifo_clone.block_and_read_bytes());
 
                 fifo.with_writer(|fd_write| dumpjpcategory(fd_write as RawFd))
+                    .map_err(|e| OmniboxError::CommandError(e))?
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
 
                 // Join reader thread (and close fd)
-                let jetsam_data = fd_read_thread.join().expect("Must read jetsam data");
+                let jetsam_data = fd_read_thread
+                    .join()
+                    .expect("Must join read thread")
+                    .map_err(|e| OmniboxError::CommandError(e))?;
 
                 show_pager(&self.cbsink_channel, &jetsam_data)
                     .map_err(|e| OmniboxError::CommandError(e))?;

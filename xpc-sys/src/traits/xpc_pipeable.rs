@@ -65,20 +65,17 @@ pub trait XPCPipeable {
 
 impl XPCPipeable for XPCObject {
     fn pipe_routine(&self) -> XPCPipeResult {
-        let XPCObject(ptr, _) = self;
         let mut reply: xpc_object_t = null_mut();
-
-        let err = unsafe { xpc_pipe_routine(get_xpc_bootstrap_pipe(), *ptr, &mut reply) };
+        let err = unsafe { xpc_pipe_routine(get_xpc_bootstrap_pipe(), self.as_ptr(), &mut reply) };
 
         Self::handle_pipe_routine(reply, err)
     }
 
     fn pipe_routine_with_flags(&self, flags: u64) -> XPCPipeResult {
-        let XPCObject(ptr, _) = self;
         let mut reply: xpc_object_t = null_mut();
 
         let err = unsafe {
-            xpc_pipe_routine_with_flags(get_xpc_bootstrap_pipe(), *ptr, &mut reply, flags)
+            xpc_pipe_routine_with_flags(get_xpc_bootstrap_pipe(), self.as_ptr(), &mut reply, flags)
         };
 
         Self::handle_pipe_routine(reply, err)
