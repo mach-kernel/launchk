@@ -7,8 +7,8 @@ use crate::objects::xpc_object::{MachPortType, XPCObject};
 use crate::objects::xpc_type;
 use crate::{
     mach_port_t, size_t, xpc_array_apply, xpc_bool_get_value, xpc_double_get_value,
-    xpc_int64_get_value, xpc_mach_send_get_right, xpc_object_t, xpc_retain,
-    xpc_string_get_string_ptr, xpc_type_get_name, xpc_uint64_get_value,
+    xpc_int64_get_value, xpc_mach_send_get_right, xpc_object_t, xpc_string_get_string_ptr,
+    xpc_type_get_name, xpc_uint64_get_value,
 };
 
 use crate::objects::xpc_error::XPCError;
@@ -23,6 +23,7 @@ pub trait TryXPCValue<Out> {
 }
 
 impl TryXPCValue<i64> for XPCObject {
+    #[must_use]
     fn xpc_value(&self) -> Result<i64, XPCError> {
         check_xpc_type(&self, &xpc_type::Int64)?;
         Ok(unsafe { xpc_int64_get_value(self.as_ptr()) })
@@ -30,6 +31,7 @@ impl TryXPCValue<i64> for XPCObject {
 }
 
 impl TryXPCValue<u64> for XPCObject {
+    #[must_use]
     fn xpc_value(&self) -> Result<u64, XPCError> {
         check_xpc_type(&self, &xpc_type::UInt64)?;
         Ok(unsafe { xpc_uint64_get_value(self.as_ptr()) })
@@ -37,6 +39,7 @@ impl TryXPCValue<u64> for XPCObject {
 }
 
 impl TryXPCValue<f64> for XPCObject {
+    #[must_use]
     fn xpc_value(&self) -> Result<f64, XPCError> {
         check_xpc_type(&self, &xpc_type::Double)?;
         Ok(unsafe { xpc_double_get_value(self.as_ptr()) })
@@ -44,6 +47,7 @@ impl TryXPCValue<f64> for XPCObject {
 }
 
 impl TryXPCValue<String> for XPCObject {
+    #[must_use]
     fn xpc_value(&self) -> Result<String, XPCError> {
         check_xpc_type(&self, &xpc_type::String)?;
         let cstr = unsafe { CStr::from_ptr(xpc_string_get_string_ptr(self.as_ptr())) };
@@ -53,6 +57,7 @@ impl TryXPCValue<String> for XPCObject {
 }
 
 impl TryXPCValue<bool> for XPCObject {
+    #[must_use]
     fn xpc_value(&self) -> Result<bool, XPCError> {
         check_xpc_type(&self, &xpc_type::Bool)?;
         Ok(unsafe { xpc_bool_get_value(self.as_ptr()) })
@@ -60,6 +65,7 @@ impl TryXPCValue<bool> for XPCObject {
 }
 
 impl TryXPCValue<(MachPortType, mach_port_t)> for XPCObject {
+    #[must_use]
     fn xpc_value(&self) -> Result<(MachPortType, mach_port_t), XPCError> {
         let types = [
             check_xpc_type(&self, &xpc_type::MachSend).map(|()| MachPortType::Send),
@@ -82,6 +88,7 @@ impl TryXPCValue<(MachPortType, mach_port_t)> for XPCObject {
 }
 
 impl TryXPCValue<Vec<Arc<XPCObject>>> for XPCObject {
+    #[must_use]
     fn xpc_value(&self) -> Result<Vec<Arc<XPCObject>>, XPCError> {
         check_xpc_type(&self, &xpc_type::Array)?;
 

@@ -12,8 +12,7 @@ use crate::objects::xpc_error::XPCError::DictionaryError;
 use crate::objects::xpc_object::XPCObject;
 use crate::rs_strerror;
 use crate::{
-    errno, xpc_copy, xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value,
-    xpc_object_t, xpc_retain,
+    errno, xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t,
 };
 
 use block::ConcreteBlock;
@@ -29,6 +28,7 @@ impl XPCDictionary {
     }
 
     /// Get value from XPCDictionary with support for nesting
+    #[must_use]
     pub fn get<I, S>(&self, items: I) -> Result<Arc<XPCObject>, XPCError>
     where
         I: IntoIterator<Item = S>,
@@ -42,7 +42,7 @@ impl XPCDictionary {
 
         let first = hm
             .get(first.as_ref())
-            .ok_or(XPCError::StandardError)
+            .ok_or(XPCError::ValueError("Key missing".to_string()))
             .map(|o| o.clone());
 
         iter.fold(first, |o, k: S| {
@@ -61,6 +61,7 @@ impl XPCDictionary {
     }
 
     /// Retrieve a dictionary
+    #[must_use]
     pub fn get_as_dictionary<I, S>(&self, items: I) -> Result<XPCDictionary, XPCError>
     where
         I: IntoIterator<Item = S>,
@@ -80,6 +81,7 @@ impl TryFrom<&XPCObject> for XPCDictionary {
     type Error = XPCError;
 
     /// Copy data from XPC dictionary into a Rust HashMap
+    #[must_use]
     fn try_from(object: &XPCObject) -> Result<XPCDictionary, XPCError> {
         if object.xpc_type() != *objects::xpc_type::Dictionary {
             return Err(DictionaryError(
@@ -127,6 +129,7 @@ impl TryFrom<&XPCObject> for XPCDictionary {
 impl TryFrom<Arc<XPCObject>> for XPCDictionary {
     type Error = XPCError;
 
+    #[must_use]
     fn try_from(value: Arc<XPCObject>) -> Result<XPCDictionary, XPCError> {
         (&*value).try_into()
     }
@@ -135,6 +138,7 @@ impl TryFrom<Arc<XPCObject>> for XPCDictionary {
 impl TryFrom<XPCObject> for XPCDictionary {
     type Error = XPCError;
 
+    #[must_use]
     fn try_from(value: XPCObject) -> Result<XPCDictionary, XPCError> {
         (&value).try_into()
     }
@@ -145,6 +149,7 @@ impl TryFrom<xpc_object_t> for XPCDictionary {
 
     /// Creates a XPC dictionary from an xpc_object_t pointer. Errors are generally
     /// related to passing in objects other than XPC_TYPE_DICTIONARY
+    #[must_use]
     fn try_from(value: xpc_object_t) -> Result<XPCDictionary, XPCError> {
         let obj: XPCObject = value.into();
         obj.try_into()
@@ -218,12 +223,10 @@ mod tests {
         hm.insert("test", XPCObject::from(value).into());
 
         let xpc_object = XPCObject::from(hm);
-        let cstr = unsafe {
-            CStr::from_ptr(xpc_dictionary_get_string(
-                xpc_object.as_ptr(),
-                CString::new("test").unwrap().as_ptr(),
-            ))
-        };
+        let key = CString::new("test").unwrap();
+
+        let cstr =
+            unsafe { CStr::from_ptr(xpc_dictionary_get_string(xpc_object.as_ptr(), key.as_ptr())) };
 
         assert_eq!(cstr.to_str().unwrap(), value);
     }

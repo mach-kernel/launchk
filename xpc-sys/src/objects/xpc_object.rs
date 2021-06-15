@@ -3,9 +3,8 @@ use libc::c_int;
 use crate::objects::xpc_type::XPCType;
 use crate::{
     mach_port_t, xpc_array_append_value, xpc_array_create, xpc_bool_create, xpc_copy,
-    xpc_copy_description, xpc_double_create, xpc_fd_create, xpc_get_type, xpc_int64_create,
-    xpc_mach_recv_create, xpc_mach_send_create, xpc_object_t, xpc_release, xpc_retain,
-    xpc_string_create, xpc_type_get_name, xpc_uint64_create,
+    xpc_copy_description, xpc_double_create, xpc_fd_create, xpc_int64_create, xpc_mach_recv_create,
+    xpc_mach_send_create, xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
 };
 use std::ffi::{CStr, CString};
 use std::os::unix::prelude::RawFd;
@@ -230,5 +229,34 @@ impl Drop for XPCObject {
                 .unwrap_or("refs ???".to_string()),
         );
         unsafe { xpc_release(*ptr) }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::os::unix::prelude::RawFd;
+
+    use libc::mach_port_t;
+
+    use crate::get_bootstrap_port;
+    use crate::objects::xpc_dictionary::XPCDictionary;
+
+    use super::MachPortType;
+    use super::XPCObject;
+
+    // Mostly for docs, int, uint, bool segfault here
+    #[test]
+    fn safely_get_refs() {
+        let bootstrap_port: mach_port_t = unsafe { get_bootstrap_port() };
+
+        for obj in &[
+            XPCObject::from(5.24 as f64),
+            XPCObject::from("foo"),
+            XPCObject::from(XPCDictionary::new()),
+            XPCObject::from(1 as RawFd),
+            XPCObject::from((MachPortType::Send, bootstrap_port)),
+        ] {
+            assert!(obj.get_refs().is_some())
+        }
     }
 }

@@ -25,7 +25,7 @@ pub enum OmniboxEvent {
 
 #[derive(Debug, Clone)]
 pub enum OmniboxError {
-    StandardError,
+    ReferenceError,
     CommandError(String),
 }
 

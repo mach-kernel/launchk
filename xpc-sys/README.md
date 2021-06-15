@@ -233,8 +233,9 @@ A big thanks to these open source projects and general resources:
 - [geosnow - A Long Evening With macOS' sandbox](https://geosn0w.github.io/A-Long-Evening-With-macOS%27s-Sandbox/)  
 - [Bits of launchd - @5aelo](https://saelo.github.io/presentations/bits_of_launchd.pdf)  
 - [Audit tokens explained (e.g. ASID)](https://knight.sc/reverse%20engineering/2020/03/20/audit-tokens-explained.html)  
-- [objc.io XPC guide](https://www.objc.io/issues/14-mac/xpc/)  
+- [objc.io XPC guide](https://www.objc.io/issues/14-mac/xpc/)
+- [Fortinet XPC RE article](https://www.fortinet.com/blog/threat-research/a-look-into-xpc-internals--reverse-engineering-the-xpc-objects)
 - The various source links found in comments, from Chrome's sandbox and other headers with definitions for private API functions.
-- Last but not least, this is Apple's launchd after all, right :>)? I did not know systemd was inspired by launchd until I read [this HN comment](https://news.ycombinator.com/item?id=2565780), which sent me down this eventual rabbit hole :)
+- After all, it is Apple's launchd :>)
 
 Everything else (C) David Stancu & Contributors 2021

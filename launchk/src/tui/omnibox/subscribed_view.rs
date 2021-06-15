@@ -59,7 +59,7 @@ pub trait OmniboxSubscriber: View {
 impl<T: OmniboxSubscriber> OmniboxSubscriber for ResizedView<T> {
     fn on_omnibox(&mut self, cmd: OmniboxEvent) -> OmniboxResult {
         self.with_view_mut(|v| v.on_omnibox(cmd))
-            .unwrap_or(Err(OmniboxError::StandardError))
+            .unwrap_or(Err(OmniboxError::ReferenceError))
     }
 }
 

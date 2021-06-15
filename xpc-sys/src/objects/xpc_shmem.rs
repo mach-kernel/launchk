@@ -23,6 +23,7 @@ unsafe impl Send for XPCShmem {}
 
 impl XPCShmem {
     /// Allocate a region of memory of vm_size_t & flags, then wrap in a XPC Object
+    #[must_use]
     pub fn new(task: mach_port_t, size: vm_size_t, flags: c_int) -> Result<XPCShmem, XPCError> {
         let mut region: *mut c_void = null_mut();
         let err = unsafe {
@@ -57,6 +58,7 @@ impl XPCShmem {
 
     /// new() with _mach_task_self
     /// https://web.mit.edu/darwin/src/modules/xnu/osfmk/man/mach_task_self.html
+    #[must_use]
     pub fn new_task_self(size: vm_size_t, flags: c_int) -> Result<XPCShmem, XPCError> {
         unsafe { Self::new(mach_task_self_, size, flags) }
     }
