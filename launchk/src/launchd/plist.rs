@@ -1,5 +1,6 @@
 use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::env;
 use std::fmt;
 use std::fs;
 use std::path::Path;
@@ -20,8 +21,10 @@ pub static PLIST_MAP_INIT: Once = Once::new();
 lazy_static! {
     pub static ref LABEL_TO_ENTRY_CONFIG: RwLock<HashMap<String, LaunchdPlist>> =
         RwLock::new(HashMap::new());
-    static ref EDITOR: &'static str = option_env!("EDITOR").unwrap_or("vim");
-    static ref TMP_DIR: &'static str = option_env!("TMPDIR").unwrap_or("/tmp");
+    static ref EDITOR: String = env::var("EDITOR").unwrap_or("vim".to_string());
+    static ref TMP_DIR: String = env::var("TMPDIR").unwrap_or("/tmp".to_string());
+    static ref USER_LAUNCH_AGENTS: String =
+        env::var("HOME").expect("Must read $HOME") + "/Library/LaunchAgents";
 }
 
 /*
@@ -94,7 +97,6 @@ impl LaunchdPlist {
     }
 }
 
-pub const USER_LAUNCH_AGENTS: &str = concat!(env!("HOME"), "/Library/LaunchAgents");
 pub const GLOBAL_LAUNCH_AGENTS: &str = "/Library/LaunchAgents";
 pub const SYSTEM_LAUNCH_AGENTS: &str = "/System/Library/LaunchAgents";
 
@@ -107,7 +109,7 @@ async fn fsnotify_subscriber() {
 
     // Register plist paths
     let watchers = [
-        watcher.watch(Path::new(USER_LAUNCH_AGENTS), RecursiveMode::Recursive),
+        watcher.watch(Path::new(&*USER_LAUNCH_AGENTS), RecursiveMode::Recursive),
         watcher.watch(Path::new(GLOBAL_LAUNCH_AGENTS), RecursiveMode::Recursive),
         watcher.watch(Path::new(SYSTEM_LAUNCH_AGENTS), RecursiveMode::Recursive),
         watcher.watch(Path::new(ADMIN_LAUNCH_DAEMONS), RecursiveMode::Recursive),
@@ -160,7 +162,7 @@ fn build_label_map_entry(plist_path: DirEntry) -> Option<(String, LaunchdPlist)>
         LaunchdEntryType::Agent
     };
 
-    let entry_location = if path_string.starts_with(USER_LAUNCH_AGENTS) {
+    let entry_location = if path_string.starts_with(&*USER_LAUNCH_AGENTS) {
         LaunchdEntryLocation::User
     } else if path_string.starts_with(GLOBAL_LAUNCH_AGENTS)
         || path_string.starts_with(ADMIN_LAUNCH_DAEMONS)
@@ -225,7 +227,7 @@ fn insert_plists(plists: impl Iterator<Item = DirEntry>) {
 /// a way to do dumpstate, dumpjpcategory without parsing the string
 pub fn init_plist_map(runtime_handle: &Handle) {
     let dirs = [
-        USER_LAUNCH_AGENTS,
+        &USER_LAUNCH_AGENTS,
         GLOBAL_LAUNCH_AGENTS,
         SYSTEM_LAUNCH_AGENTS,
         ADMIN_LAUNCH_DAEMONS,
@@ -275,19 +277,19 @@ pub fn edit_and_replace(plist_meta: &LaunchdPlist) -> Result<(), String> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Must get ts");
-    let temp_path = Path::new(*TMP_DIR).join(format!("{}", now.as_secs()));
+    let temp_path = Path::new(&*TMP_DIR).join(format!("{}", now.as_secs()));
     og_plist
         .to_file_xml(&temp_path)
         .map_err(|e| e.to_string())?;
 
     // Start $EDITOR
-    let exit = Command::new(*EDITOR)
+    let exit = Command::new(&*EDITOR)
         .arg(&temp_path)
         .status()
-        .map_err(|e| format!("{} failed: {}", *EDITOR, e.to_string()))?;
+        .map_err(|e| format!("{} failed: {}", &*EDITOR, e.to_string()))?;
 
     if !exit.success() {
-        return Err(format!("{} did not exit successfully", *EDITOR));
+        return Err(format!("{} did not exit successfully", &*EDITOR));
     }
 
     // temp file -> validate with crate -> original

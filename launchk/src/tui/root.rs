@@ -28,10 +28,6 @@ use crate::{
 };
 use crate::{launchd::query::dumpstate, tui::dialog};
 
-lazy_static! {
-    static ref PAGER: &'static str = option_env!("PAGER").unwrap_or("less");
-}
-
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 
 pub struct RootLayout {
