@@ -1,10 +1,10 @@
+use std::env;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::sync::mpsc::Sender;
-use std::env;
 
-use cursive::Cursive;
 use super::root::CbSinkMessage;
+use cursive::Cursive;
 
 lazy_static! {
     static ref PAGER: String = env::var("PAGER").unwrap_or("less".to_string());

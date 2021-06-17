@@ -1,10 +1,10 @@
 use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::env;
 use std::fmt;
 use std::fs;
 use std::path::Path;
 use std::sync::{Once, RwLock};
-use std::env;
 
 use crate::launchd::job_type_filter::JobTypeFilter;
 use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
@@ -23,7 +23,8 @@ lazy_static! {
         RwLock::new(HashMap::new());
     static ref EDITOR: String = env::var("EDITOR").unwrap_or("vim".to_string());
     static ref TMP_DIR: String = env::var("TMPDIR").unwrap_or("/tmp".to_string());
-    static ref USER_LAUNCH_AGENTS: String = env::var("HOME").expect("Must read $HOME") + "/Library/LaunchAgents";
+    static ref USER_LAUNCH_AGENTS: String =
+        env::var("HOME").expect("Must read $HOME") + "/Library/LaunchAgents";
 }
 
 /*
