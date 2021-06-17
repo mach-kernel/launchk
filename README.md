@@ -8,6 +8,15 @@ Should work on macOS 10.10+ according to the availability sec. [in the docs](htt
 
 <img src="https://user-images.githubusercontent.com/396039/120085936-6700a180-c0aa-11eb-8606-31dc6a3cbe99.gif" width="600">
 
+#### Install
+
+Binaries are available via brew tap:
+
+```
+brew tap mach-kernel/pkgs
+brew install mach-kernel/pkgs/launchk
+```
+
 #### Features
 
 Use `:` to enter command mode, `/` to enter filtering mode, and any of `sguadl` for filtering by [system, global, user, agent, daemon, loaded]. `Ctrl-U` to clear, `Tab` to complete, `Enter` to submit. 
