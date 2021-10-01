@@ -1,4 +1,4 @@
-use crate::launchd::enums::{DomainType, SessionType};
+use xpc_sys::enums::{DomainType, SessionType};
 use std::fmt;
 
 #[derive(Debug, Clone, Eq, PartialEq)]

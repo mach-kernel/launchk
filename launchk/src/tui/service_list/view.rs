@@ -13,8 +13,8 @@ use cursive::{Cursive, View, XY};
 use tokio::runtime::Handle;
 use tokio::time::interval;
 use xpc_sys::objects::unix_fifo::UnixFifo;
+use xpc_sys::enums::{DomainType, SessionType};
 
-use crate::launchd::enums::{DomainType, SessionType};
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};
 use crate::launchd::query::procinfo;

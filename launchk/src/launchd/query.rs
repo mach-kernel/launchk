@@ -15,9 +15,9 @@ use crate::launchd::entry_status::ENTRY_STATUS_CACHE;
 use std::iter::FromIterator;
 use xpc_sys::objects::xpc_dictionary::XPCDictionary;
 use xpc_sys::objects::xpc_error::XPCError;
+use xpc_sys::traits::query_builder::QueryBuilder;
 
-use crate::launchd::enums::{DomainType, SessionType};
-use crate::launchd::query_builder::QueryBuilder;
+use xpc_sys::enums::{DomainType, SessionType};
 
 pub fn find_in_all<S: Into<String>>(label: S) -> Result<(DomainType, XPCDictionary), XPCError> {
     let label_string = label.into();
