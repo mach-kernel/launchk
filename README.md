@@ -22,11 +22,10 @@ brew install mach-kernel/pkgs/launchk
 Use `:` to enter command mode, `/` to enter filtering mode, and any of `sguadl` for filtering by [system, global, user, agent, daemon, loaded]. `Ctrl-U` to clear, `Tab` to complete, `Enter` to submit. 
 
 - Poll XPC for jobs and display changes as they happen
-- Filter by `LaunchAgents` and `LaunchDaemons` in scopes:
+- Filter by `LaunchAgents` and `LaunchDaemons` in scopes (fsnotify watched):
   - System (/System/Library/)
   - Global (/Library)
   - User (~/) 
-- fsnotify detection for new plists added to above directories
 - `load`
 - `unload`
 - `dumpstate` (opens in `$PAGER`)

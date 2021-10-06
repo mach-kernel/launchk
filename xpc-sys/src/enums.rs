@@ -1,11 +1,12 @@
 use std::convert::TryFrom;
 use std::fmt;
 use std::sync::Arc;
-use xpc_sys::objects::xpc_error::XPCError;
-use xpc_sys::objects::xpc_object::XPCObject;
-use xpc_sys::objects::xpc_type;
-use xpc_sys::objects::xpc_type::check_xpc_type;
-use xpc_sys::traits::xpc_value::TryXPCValue;
+
+use crate::objects::xpc_error::XPCError;
+use crate::objects::xpc_object::XPCObject;
+use crate::objects::xpc_type;
+use crate::objects::xpc_type::check_xpc_type;
+use crate::traits::xpc_value::TryXPCValue;
 
 /// LimitLoadToSessionType key in XPC response
 /// https://developer.apple.com/library/archive/technotes/tn2083/_index.html

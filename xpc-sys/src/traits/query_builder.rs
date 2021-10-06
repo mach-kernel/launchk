@@ -1,8 +1,8 @@
-use crate::launchd::enums::{DomainType, SessionType};
-use xpc_sys::objects::xpc_dictionary::XPCDictionary;
-use xpc_sys::objects::xpc_object::MachPortType;
-use xpc_sys::objects::xpc_object::XPCObject;
-use xpc_sys::{get_bootstrap_port, mach_port_t};
+use crate::enums::{DomainType, SessionType};
+use crate::objects::xpc_dictionary::XPCDictionary;
+use crate::objects::xpc_object::MachPortType;
+use crate::objects::xpc_object::XPCObject;
+use crate::{get_bootstrap_port, mach_port_t};
 
 /// Builder methods for XPCDictionary to make querying easier
 pub trait QueryBuilder {

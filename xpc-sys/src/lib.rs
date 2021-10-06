@@ -18,6 +18,7 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 pub mod csr;
 pub mod objects;
 pub mod traits;
+pub mod enums;
 //
 
 pub type xpc_pipe_t = *mut c_void;
