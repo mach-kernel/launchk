@@ -7,7 +7,8 @@ use std::path::Path;
 use std::sync::{Once, RwLock};
 
 use crate::launchd::job_type_filter::JobTypeFilter;
-use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
+use notify::RecursiveMode;
+use notify_debouncer_mini::{new_debouncer,DebounceEventResult};
 use std::fs::{DirEntry, File, ReadDir};
 use std::io::Read;
 use std::iter::FilterMap;
@@ -104,16 +105,18 @@ pub const ADMIN_LAUNCH_DAEMONS: &str = "/Library/LaunchDaemons";
 pub const GLOBAL_LAUNCH_DAEMONS: &str = "/System/Library/LaunchDaemons";
 
 async fn fsnotify_subscriber() {
-    let (tx, rx): (Sender<DebouncedEvent>, Receiver<DebouncedEvent>) = channel();
-    let mut watcher = watcher(tx, Duration::from_secs(5)).expect("Must make fsnotify watcher");
+    let (tx, rx): (Sender<DebounceEventResult>, Receiver<DebounceEventResult>) = channel();
+    let mut debouncer = new_debouncer(Duration::from_secs(5), None, tx).unwrap();
+
+    // let mut watcher = watcher(tx, Duration::from_secs(5)).expect("Must make fsnotify watcher");
 
     // Register plist paths
     let watchers = [
-        watcher.watch(Path::new(&*USER_LAUNCH_AGENTS), RecursiveMode::Recursive),
-        watcher.watch(Path::new(GLOBAL_LAUNCH_AGENTS), RecursiveMode::Recursive),
-        watcher.watch(Path::new(SYSTEM_LAUNCH_AGENTS), RecursiveMode::Recursive),
-        watcher.watch(Path::new(ADMIN_LAUNCH_DAEMONS), RecursiveMode::Recursive),
-        watcher.watch(Path::new(GLOBAL_LAUNCH_DAEMONS), RecursiveMode::Recursive),
+        debouncer.watcher().watch(Path::new(&*USER_LAUNCH_AGENTS), RecursiveMode::Recursive),
+        debouncer.watcher().watch(Path::new(GLOBAL_LAUNCH_AGENTS), RecursiveMode::Recursive),
+        debouncer.watcher().watch(Path::new(SYSTEM_LAUNCH_AGENTS), RecursiveMode::Recursive),
+        debouncer.watcher().watch(Path::new(ADMIN_LAUNCH_DAEMONS), RecursiveMode::Recursive),
+        debouncer.watcher().watch(Path::new(GLOBAL_LAUNCH_DAEMONS), RecursiveMode::Recursive),
     ];
 
     for sub in watchers.iter() {
@@ -128,19 +131,21 @@ async fn fsnotify_subscriber() {
 
         let event = event.unwrap();
 
-        let reload_plists = match event {
-            DebouncedEvent::Create(pb) => fs::read_dir(pb),
-            DebouncedEvent::Write(pb) => fs::read_dir(pb),
-            DebouncedEvent::Remove(pb) => fs::read_dir(pb),
-            DebouncedEvent::Rename(_, new) => fs::read_dir(new),
-            _ => continue,
-        };
+        log::info!("fsnotify event {:?}", event);
 
-        if reload_plists.is_err() {
-            continue;
-        }
+        // let reload_plists = match event {
+        //     DebouncedEvent::Create(pb) => fs::read_dir(pb),
+        //     DebouncedEvent::Write(pb) => fs::read_dir(pb),
+        //     DebouncedEvent::Remove(pb) => fs::read_dir(pb),
+        //     DebouncedEvent::Rename(_, new) => fs::read_dir(new),
+        //     _ => continue,
+        // };
 
-        insert_plists(readdir_filter_plists(reload_plists.unwrap()));
+        // if reload_plists.is_err() {
+        //     continue;
+        // }
+
+        // insert_plists(readdir_filter_plists(reload_plists.unwrap()));
     }
 }
 

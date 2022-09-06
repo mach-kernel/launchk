@@ -9,6 +9,8 @@ use std::time::Duration;
 use cursive::direction::Direction;
 use cursive::view::ViewWrapper;
 use cursive::{Cursive, View, XY};
+use cursive::event::EventResult;
+use cursive::view::CannotFocus;
 
 use tokio::runtime::Handle;
 use tokio::time::interval;
@@ -357,8 +359,8 @@ impl ViewWrapper for ServiceListView {
         }
     }
 
-    fn wrap_take_focus(&mut self, _: Direction) -> bool {
-        true
+    fn wrap_take_focus(&mut self, _: Direction) -> Result<EventResult, CannotFocus> {
+        Ok(EventResult::Consumed(None))
     }
 }
 

@@ -11,7 +11,6 @@ extern crate plist;
 
 use cursive::view::Resizable;
 use cursive::views::{NamedView, Panel};
-use cursive::Cursive;
 use std::process::exit;
 
 use crate::launchd::plist::{init_plist_map, PLIST_MAP_INIT};
@@ -31,7 +30,7 @@ fn main() {
     // Cache launchd job plist paths, spawn fsnotify to keep up with changes
     PLIST_MAP_INIT.call_once(|| init_plist_map(runtime.handle()));
 
-    let mut siv: Cursive = cursive::default();
+    let mut siv = cursive::default();
     siv.load_toml(include_str!("tui/style.toml"))
         .expect("Must load styles");
 

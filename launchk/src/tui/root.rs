@@ -102,7 +102,7 @@ impl RootLayout {
 
         self.layout
             .set_focus_index(RootLayoutChildren::ServiceList as usize)
-            .unwrap_or(());
+            .unwrap();
     }
 
     /// Cursive uses a different crate for its channels (?), so this is some glue
