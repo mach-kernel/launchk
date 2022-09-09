@@ -8,10 +8,10 @@ use cursive::{
 };
 
 use crate::launchd::entry_status::{get_entry_status, LaunchdEntryStatus};
+use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::command::OMNIBOX_COMMANDS;
 use crate::tui::omnibox::view::OmniboxEvent;
 use crate::tui::root::CbSinkMessage;
-use crate::tui::omnibox::command::OmniboxCommand;
 use xpc_sys::csr::{csr_check, CsrConfig};
 use xpc_sys::enums::{DomainType, SessionType};
 

@@ -7,15 +7,15 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use cursive::direction::Direction;
-use cursive::view::ViewWrapper;
-use cursive::{Cursive, View, XY};
 use cursive::event::EventResult;
 use cursive::view::CannotFocus;
+use cursive::view::ViewWrapper;
+use cursive::{Cursive, View, XY};
 
 use tokio::runtime::Handle;
 use tokio::time::interval;
-use xpc_sys::objects::unix_fifo::UnixFifo;
 use xpc_sys::enums::{DomainType, SessionType};
+use xpc_sys::objects::unix_fifo::UnixFifo;
 
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};

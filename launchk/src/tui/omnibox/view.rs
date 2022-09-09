@@ -9,8 +9,8 @@ use tokio::time::interval;
 use cursive::direction::Direction;
 use cursive::event::{Event, EventResult, Key};
 use cursive::theme::{BaseColor, Color, Effect, Style};
-use cursive::{Printer, Vec2, View, XY};
 use cursive::view::CannotFocus;
+use cursive::{Printer, Vec2, View, XY};
 
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::tui::omnibox::command::OmniboxCommand;

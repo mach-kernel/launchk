@@ -1,5 +1,5 @@
-use xpc_sys::enums::{DomainType, SessionType};
 use std::fmt;
+use xpc_sys::enums::{DomainType, SessionType};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum OmniboxCommand {
