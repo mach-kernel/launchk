@@ -28,6 +28,7 @@ pub enum OmniboxEvent {
 pub enum OmniboxError {
     ReferenceError,
     CommandError(String),
+    Many(Vec<OmniboxError>),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

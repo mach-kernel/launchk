@@ -235,10 +235,15 @@ impl OmniboxSubscriber for RootLayout {
     fn on_omnibox(&mut self, cmd: OmniboxEvent) -> OmniboxResult {
         match cmd {
             OmniboxEvent::Command(OmniboxCommand::Chain(cmds)) => {
-                cmds.iter()
-                    .try_for_each(|c| self.omnibox_tx.send(OmniboxEvent::Command(c.clone())))
-                    .expect("Must send commands");
-                Ok(None)
+               let errors: Vec<OmniboxError> = cmds.iter()
+                    .filter_map(|c| self.on_omnibox(OmniboxEvent::Command(c.clone())).err())
+                    .collect();
+
+                if errors.is_empty() {
+                    Ok(None)
+                } else {
+                    Err(OmniboxError::Many(errors))
+                }
             }
             OmniboxEvent::Command(OmniboxCommand::Quit) => {
                 self.cbsink_channel
