@@ -235,7 +235,8 @@ impl OmniboxSubscriber for RootLayout {
     fn on_omnibox(&mut self, cmd: OmniboxEvent) -> OmniboxResult {
         match cmd {
             OmniboxEvent::Command(OmniboxCommand::Chain(cmds)) => {
-               let errors: Vec<OmniboxError> = cmds.iter()
+                let errors: Vec<OmniboxError> = cmds
+                    .iter()
                     .filter_map(|c| self.on_omnibox(OmniboxEvent::Command(c.clone())).err())
                     .collect();
 

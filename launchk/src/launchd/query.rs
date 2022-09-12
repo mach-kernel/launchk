@@ -5,11 +5,7 @@ use crate::launchd::message::{
 use std::convert::TryFrom;
 use std::{collections::HashSet, os::unix::prelude::RawFd};
 
-use xpc_sys::{
-    objects::xpc_shmem::XPCShmem,
-    traits::{xpc_pipeable::XPCPipeable, xpc_value::TryXPCValue},
-    MAP_SHARED,
-};
+use xpc_sys::{objects::xpc_shmem::XPCShmem, traits::{xpc_pipeable::XPCPipeable, xpc_value::TryXPCValue}, MAP_SHARED, rs_geteuid};
 
 use crate::launchd::entry_status::ENTRY_STATUS_CACHE;
 use std::iter::FromIterator;
@@ -48,17 +44,36 @@ pub fn list(domain_type: DomainType, name: Option<String>) -> Result<XPCDictiona
 
 /// Query for jobs across all domain types
 pub fn list_all() -> HashSet<String> {
-    let everything = (DomainType::System as u64..DomainType::RequestorDomain as u64)
-        .filter_map(|t| {
-            let svc_for_type = list(t.into(), None)
-                .and_then(|d| d.get_as_dictionary(&["services"]))
-                .map(|XPCDictionary(ref hm)| hm.keys().map(|k| k.clone()).collect());
+    let mut everything = vec![
+        DomainType::System,
+        DomainType::RequestorUserDomain,
+        DomainType::RequestorDomain,
+    ];
 
+    if rs_geteuid() == 0 {
+        everything.push(DomainType::User);
+    }
+
+    let list = everything.iter()
+    .filter_map(|t| {
+        let svc_for_type = list(t.clone(), None)
+            .and_then(|d| d.get_as_dictionary(&["services"]))
+            .map(|XPCDictionary(ref hm)| hm.keys().map(|k| k.clone()).collect());
+
+        if svc_for_type.is_err() {
+            log::error!(
+                "[query/list_all]: poll error {}, domain, {}",
+                svc_for_type.err().unwrap(),
+                t
+            );
+            None
+        } else {
             svc_for_type.ok()
-        })
-        .flat_map(|k: Vec<String>| k.into_iter());
+        }
+    })
+    .flat_map(|k: Vec<String>| k.into_iter());
 
-    HashSet::from_iter(everything)
+    HashSet::from_iter(list)
 }
 
 pub fn load<S: Into<String>>(

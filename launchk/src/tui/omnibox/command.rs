@@ -63,7 +63,7 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 12] = [
     ),
     (
         "edit",
-        "✍️  Edit plist with $EDITOR, then reload job",
+        "✍️  Edit plist with $EDITOR then reload job",
         OmniboxCommand::Edit,
     ),
     (

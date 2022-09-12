@@ -1,4 +1,3 @@
-use std::borrow::{Borrow, BorrowMut};
 use std::collections::HashMap;
 use std::env;
 use std::fmt;
@@ -9,9 +8,8 @@ use std::sync::{Once, RwLock};
 use crate::launchd::job_type_filter::JobTypeFilter;
 use notify::RecursiveMode;
 use notify_debouncer_mini::{new_debouncer, DebounceEventResult};
-use std::fs::{DirEntry, File, ReadDir};
+use std::fs::File;
 use std::io::Read;
-use std::iter::FilterMap;
 use std::process::Command;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};

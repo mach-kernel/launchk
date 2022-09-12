@@ -173,6 +173,10 @@ pub unsafe fn rs_sysctlbyname(name: &str) -> Result<String, String> {
     }
 }
 
+pub fn rs_geteuid() -> uid_t {
+    unsafe { geteuid() }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

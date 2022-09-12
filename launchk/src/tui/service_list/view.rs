@@ -209,7 +209,7 @@ impl ServiceListView {
                     )),
                     (st, dt) => Ok(Some(OmniboxCommand::Chain(vec![
                         OmniboxCommand::Unload(dt.clone(), None),
-                        OmniboxCommand::Load(st, dt, None),
+                        OmniboxCommand::Load(st.clone(), dt.clone(), None),
                     ]))),
                 }
             }

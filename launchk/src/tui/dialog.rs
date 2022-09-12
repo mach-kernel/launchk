@@ -75,7 +75,7 @@ pub fn domain_session_prompt<S: Into<String>>(
 
         // Build domain type list
         let mut domain_type_layout = LinearLayout::vertical()
-            .child(TextView::new("Domain Type").effect(Effect::Bold))
+            .child(TextView::new("Domain Type").style(Effect::Bold))
             .child(DummyView);
 
         for d in DomainType::System as u64..DomainType::Unknown as u64 {
@@ -93,7 +93,7 @@ pub fn domain_session_prompt<S: Into<String>>(
 
         if !domain_only {
             session_type_layout = session_type_layout
-                .child(TextView::new("Session Type").effect(Effect::Bold))
+                .child(TextView::new("Session Type").style(Effect::Bold))
                 .child(DummyView);
 
             for s in SessionType::Aqua as u64..SessionType::Unknown as u64 {
