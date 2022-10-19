@@ -21,7 +21,6 @@ use crate::tui::omnibox::subscribed_view::{
 use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxView};
 use crate::tui::pager::show_pager;
 use crate::tui::service_list::view::ServiceListView;
-use crate::tui::sysinfo::SysInfo;
 use crate::{
     launchd::query::dumpjpcategory,
     tui::dialog::{show_csr_info, show_help},
@@ -82,7 +81,7 @@ impl RootLayout {
     }
 
     fn setup(&mut self, omnibox: OmniboxView) {
-        let sysinfo = Panel::new(SysInfo::default().layout).full_width();
+        let sysinfo = Panel::new(crate::tui::sysinfo::make_layout());
 
         let omnibox = Panel::new(NamedView::new("omnibox", omnibox))
             .full_width()
