@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -11,6 +12,7 @@ use cursive::event::EventResult;
 use cursive::view::CannotFocus;
 use cursive::view::ViewWrapper;
 use cursive::{Cursive, View, XY};
+use sudo::RunningAs;
 
 use tokio::runtime::Handle;
 use tokio::time::interval;
@@ -18,7 +20,7 @@ use xpc_sys::enums::{DomainType, SessionType};
 use xpc_sys::objects::unix_fifo::UnixFifo;
 
 use crate::launchd::job_type_filter::JobTypeFilter;
-use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};
+use crate::launchd::plist::{edit_and_replace, LaunchdEntryLocation, LABEL_TO_ENTRY_CONFIG};
 use crate::launchd::query::procinfo;
 use crate::launchd::query::{disable, enable, list_all, load, unload};
 use crate::launchd::{
@@ -177,21 +179,89 @@ impl ServiceListView {
             .ok_or_else(|| OmniboxError::CommandError("Cannot get highlighted row".to_string()))
     }
 
-    fn with_active_item_plist(&self) -> Result<(ServiceListItem, LaunchdPlist), OmniboxError> {
+    fn with_active_item_plist(
+        &self,
+    ) -> Result<(ServiceListItem, Option<LaunchdPlist>), OmniboxError> {
         let item = &*self.get_active_list_item()?;
-        let plist = item
-            .status
-            .plist
-            .as_ref()
-            .ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
+        let plist = item.status.plist.clone();
 
-        Ok((item.clone(), plist.clone()))
+        Ok((item.clone(), plist))
+    }
+
+    fn handle_plist_command(&self, cmd: OmniboxCommand) -> OmniboxResult {
+        let (ServiceListItem { name, status, .. }, plist) = self.with_active_item_plist()?;
+
+        let plist =
+            plist.ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
+
+        match cmd {
+            OmniboxCommand::Edit => {
+                edit_and_replace(&plist).map_err(OmniboxError::CommandError)?;
+
+                // Clear term
+                self.cb_sink
+                    .send(Box::new(Cursive::clear))
+                    .expect("Must clear");
+
+                Ok(Some(OmniboxCommand::Confirm(
+                    format!("Reload {}?", name),
+                    vec![OmniboxCommand::Reload],
+                )))
+            }
+            OmniboxCommand::Load(st, dt, _handle) => {
+                load(name, plist.plist_path, Some(dt), Some(st), None)
+                    .map(|_| None)
+                    .map_err(|e| OmniboxError::CommandError(e.to_string()))
+            }
+            OmniboxCommand::Unload(dt, _handle) => {
+                let LaunchdEntryStatus {
+                    limit_load_to_session_type,
+                    ..
+                } = status;
+
+                unload(
+                    name,
+                    plist.plist_path,
+                    Some(dt),
+                    Some(limit_load_to_session_type),
+                    None,
+                )
+                .map(|_| None)
+                .map_err(|e| OmniboxError::CommandError(e.to_string()))
+            }
+            _ => Ok(None),
+        }
     }
 
     fn handle_command(&self, cmd: OmniboxCommand) -> OmniboxResult {
+        let (ServiceListItem { name, status, .. }, plist) = self.with_active_item_plist()?;
+
+        let need_escalate = plist
+            .map(|LaunchdPlist { entry_location, .. }| {
+                (entry_location == LaunchdEntryLocation::System
+                    || entry_location == LaunchdEntryLocation::Global)
+            })
+            .unwrap_or(true);
+
+        match cmd {
+            OmniboxCommand::LoadRequest |
+            OmniboxCommand::UnloadRequest |
+            OmniboxCommand::DisableRequest |
+            OmniboxCommand::EnableRequest |
+            OmniboxCommand::ProcInfo |
+            OmniboxCommand::Edit => {
+                if (sudo::check() != RunningAs::Root) && need_escalate {
+                    return Ok(Some(OmniboxCommand::Confirm(
+                        "This requires root privileges. Sudo and restart?".to_string(),
+                        vec![OmniboxCommand::Quit, OmniboxCommand::Sudo],
+                    )));
+                }
+            }
+            _ => ()
+        };
+
         match cmd {
             OmniboxCommand::Reload => {
-                let (ServiceListItem { name, status, .. }, ..) = self.with_active_item_plist()?;
                 let LaunchdEntryStatus {
                     limit_load_to_session_type,
                     domain,
@@ -213,22 +283,18 @@ impl ServiceListView {
                     ]))),
                 }
             }
-            OmniboxCommand::LoadRequest => {
-                let (ServiceListItem { name, .. }, ..) = self.with_active_item_plist()?;
-                Ok(Some(OmniboxCommand::DomainSessionPrompt(
-                    name.clone(),
-                    false,
-                    |dt, st| {
-                        vec![OmniboxCommand::Load(
-                            st.expect("Must be provided"),
-                            dt,
-                            None,
-                        )]
-                    },
-                )))
-            }
+            OmniboxCommand::LoadRequest => Ok(Some(OmniboxCommand::DomainSessionPrompt(
+                name.clone(),
+                false,
+                |dt, st| {
+                    vec![OmniboxCommand::Load(
+                        st.expect("Must be provided"),
+                        dt,
+                        None,
+                    )]
+                },
+            ))),
             OmniboxCommand::UnloadRequest => {
-                let (ServiceListItem { name, status, .. }, ..) = self.with_active_item_plist()?;
                 let LaunchdEntryStatus { domain, .. } = status;
 
                 match domain {
@@ -240,16 +306,12 @@ impl ServiceListView {
                     _ => Ok(Some(OmniboxCommand::Unload(domain, None))),
                 }
             }
-            OmniboxCommand::EnableRequest => {
-                let (ServiceListItem { name, .. }, ..) = self.with_active_item_plist()?;
-                Ok(Some(OmniboxCommand::DomainSessionPrompt(
-                    name.clone(),
-                    true,
-                    |dt, _| vec![OmniboxCommand::Enable(dt)],
-                )))
-            }
+            OmniboxCommand::EnableRequest => Ok(Some(OmniboxCommand::DomainSessionPrompt(
+                name.clone(),
+                true,
+                |dt, _| vec![OmniboxCommand::Enable(dt)],
+            ))),
             OmniboxCommand::DisableRequest => {
-                let (ServiceListItem { name, status, .. }, ..) = self.with_active_item_plist()?;
                 let LaunchdEntryStatus { domain, .. } = status;
 
                 match domain {
@@ -263,59 +325,13 @@ impl ServiceListView {
                     )]))),
                 }
             }
-            OmniboxCommand::Edit => {
-                let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
-                edit_and_replace(&plist).map_err(OmniboxError::CommandError)?;
-
-                // Clear term
-                self.cb_sink
-                    .send(Box::new(Cursive::clear))
-                    .expect("Must clear");
-
-                Ok(Some(OmniboxCommand::Confirm(
-                    format!("Reload {}?", name),
-                    vec![OmniboxCommand::Reload],
-                )))
-            }
-            OmniboxCommand::Load(st, dt, _handle) => {
-                let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
-                load(name, plist.plist_path, Some(dt), Some(st), None)
-                    .map(|_| None)
-                    .map_err(|e| OmniboxError::CommandError(e.to_string()))
-            }
-            OmniboxCommand::Unload(dt, _handle) => {
-                let (ServiceListItem { name, status, .. }, plist) =
-                    self.with_active_item_plist()?;
-                let LaunchdEntryStatus {
-                    limit_load_to_session_type,
-                    ..
-                } = status;
-
-                unload(
-                    name,
-                    plist.plist_path,
-                    Some(dt),
-                    Some(limit_load_to_session_type),
-                    None,
-                )
+            OmniboxCommand::Enable(dt) => enable(name, dt)
                 .map(|_| None)
-                .map_err(|e| OmniboxError::CommandError(e.to_string()))
-            }
-            OmniboxCommand::Enable(dt) => {
-                let (ServiceListItem { name, .. }, _) = self.with_active_item_plist()?;
-                enable(name, dt)
-                    .map(|_| None)
-                    .map_err(|e| OmniboxError::CommandError(e.to_string()))
-            }
-            OmniboxCommand::Disable(dt) => {
-                let (ServiceListItem { name, .. }, _) = self.with_active_item_plist()?;
-                disable(name, dt)
-                    .map(|_| None)
-                    .map_err(|e| OmniboxError::CommandError(e.to_string()))
-            }
+                .map_err(|e| OmniboxError::CommandError(e.to_string())),
+            OmniboxCommand::Disable(dt) => disable(name, dt)
+                .map(|_| None)
+                .map_err(|e| OmniboxError::CommandError(e.to_string())),
             OmniboxCommand::ProcInfo => {
-                let (ServiceListItem { name, status, .. }, _) = self.with_active_item_plist()?;
-
                 if status.pid == 0 {
                     return Err(OmniboxError::CommandError(format!("No PID for {}", name)));
                 }
@@ -342,6 +358,9 @@ impl ServiceListView {
                     .map_err(|e| OmniboxError::CommandError(e))?;
 
                 Ok(None)
+            }
+            OmniboxCommand::Edit | OmniboxCommand::Load(_, _, _) | OmniboxCommand::Unload(_, _) => {
+                self.handle_plist_command(cmd)
             }
             _ => Ok(None),
         }

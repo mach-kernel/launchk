@@ -42,7 +42,7 @@ pub fn show_prompt(
                 commands
                     .iter()
                     .try_for_each(|c| tx.send(OmniboxEvent::Command(c.clone())))
-                    .expect("Must sent commands");
+                    .expect("Must send commands");
 
                 s.pop_layer();
             })

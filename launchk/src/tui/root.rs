@@ -82,7 +82,7 @@ impl RootLayout {
     }
 
     fn setup(&mut self, omnibox: OmniboxView) {
-        let sysinfo = Panel::new(SysInfo::default()).full_width();
+        let sysinfo = Panel::new(SysInfo::default().layout).full_width();
 
         let omnibox = Panel::new(NamedView::new("omnibox", omnibox))
             .full_width()
@@ -252,6 +252,11 @@ impl OmniboxSubscriber for RootLayout {
                         s.quit();
                     }))
                     .expect("Must quit");
+                Ok(None)
+            }
+            OmniboxEvent::Command(OmniboxCommand::Sudo) => {
+                clearscreen::clear().map_err(|_| OmniboxError::CommandError("Cannot clear".to_string()))?;
+                sudo::escalate_if_needed().map_err(|_| OmniboxError::CommandError("Cannot sudo".to_string()))?;
                 Ok(None)
             }
             // Triggered when toggling to idle

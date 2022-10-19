@@ -51,8 +51,9 @@ impl fmt::Display for LaunchdEntryType {
 pub enum LaunchdEntryLocation {
     /// macOS system provided agent or daemon
     System,
-    /// "Administrator provided" agent or daemon
-    /// TODO: is 'global' appropriate?
+    /// Admin provided agent or daemon in /Library,
+    /// would name it admin...but the [sguadl] filter
+    /// needs uniques
     Global,
     /// User provided agent
     User,
@@ -96,11 +97,11 @@ impl LaunchdPlist {
     }
 }
 
-pub const GLOBAL_LAUNCH_AGENTS: &str = "/Library/LaunchAgents";
+pub const ADMIN_LAUNCH_AGENTS: &str = "/Library/LaunchAgents";
 pub const SYSTEM_LAUNCH_AGENTS: &str = "/System/Library/LaunchAgents";
 
 pub const ADMIN_LAUNCH_DAEMONS: &str = "/Library/LaunchDaemons";
-pub const GLOBAL_LAUNCH_DAEMONS: &str = "/System/Library/LaunchDaemons";
+pub const SYSTEM_LAUNCH_DAEMONS: &str = "/System/Library/LaunchDaemons";
 
 async fn fsnotify_subscriber() {
     let (tx, rx): (Sender<DebounceEventResult>, Receiver<DebounceEventResult>) = channel();
@@ -110,10 +111,10 @@ async fn fsnotify_subscriber() {
     // Register plist paths
     let watchers = [
         watcher.watch(Path::new(&*USER_LAUNCH_AGENTS), RecursiveMode::Recursive),
-        watcher.watch(Path::new(GLOBAL_LAUNCH_AGENTS), RecursiveMode::Recursive),
+        watcher.watch(Path::new(ADMIN_LAUNCH_AGENTS), RecursiveMode::Recursive),
         watcher.watch(Path::new(SYSTEM_LAUNCH_AGENTS), RecursiveMode::Recursive),
         watcher.watch(Path::new(ADMIN_LAUNCH_DAEMONS), RecursiveMode::Recursive),
-        watcher.watch(Path::new(GLOBAL_LAUNCH_DAEMONS), RecursiveMode::Recursive),
+        watcher.watch(Path::new(SYSTEM_LAUNCH_DAEMONS), RecursiveMode::Recursive),
     ];
 
     for sub in watchers.iter() {
@@ -146,7 +147,7 @@ fn build_label_map_entry(plist_path: PathBuf) -> Option<(String, LaunchdPlist)> 
         .and_then(|v| v.as_string());
 
     let entry_type = if path_string.starts_with(ADMIN_LAUNCH_DAEMONS)
-        || path_string.starts_with(GLOBAL_LAUNCH_DAEMONS)
+        || path_string.starts_with(SYSTEM_LAUNCH_DAEMONS)
     {
         LaunchdEntryType::Daemon
     } else {
@@ -155,7 +156,7 @@ fn build_label_map_entry(plist_path: PathBuf) -> Option<(String, LaunchdPlist)> 
 
     let entry_location = if path_string.starts_with(&*USER_LAUNCH_AGENTS) {
         LaunchdEntryLocation::User
-    } else if path_string.starts_with(GLOBAL_LAUNCH_AGENTS)
+    } else if path_string.starts_with(ADMIN_LAUNCH_AGENTS)
         || path_string.starts_with(ADMIN_LAUNCH_DAEMONS)
     {
         LaunchdEntryLocation::Global
@@ -211,10 +212,10 @@ fn insert_plists(plists: impl Iterator<Item = PathBuf>) {
 pub fn init_plist_map(runtime_handle: &Handle) {
     let dirs = [
         &USER_LAUNCH_AGENTS,
-        GLOBAL_LAUNCH_AGENTS,
+        ADMIN_LAUNCH_AGENTS,
         SYSTEM_LAUNCH_AGENTS,
         ADMIN_LAUNCH_DAEMONS,
-        GLOBAL_LAUNCH_DAEMONS,
+        SYSTEM_LAUNCH_DAEMONS,
     ];
 
     // Get all the plists from everywhere into one stream
