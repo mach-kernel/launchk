@@ -26,6 +26,7 @@ use crate::{
     tui::dialog::{show_csr_info, show_help},
 };
 use crate::{launchd::query::dumpstate, tui::dialog};
+use std::thread;
 
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
 
@@ -64,7 +65,7 @@ async fn poll_omnibox(cb_sink: Sender<CbSinkMessage>, rx: Receiver<OmniboxEvent>
 impl RootLayout {
     pub fn new(siv: &mut Cursive, runtime_handle: &Handle) -> Self {
         let (omnibox, omnibox_tx, omnibox_rx) = OmniboxView::new(runtime_handle);
-        let cbsink_channel = RootLayout::cbsink_channel(siv, runtime_handle);
+        let cbsink_channel = RootLayout::cbsink_channel(siv);
 
         runtime_handle.spawn(poll_omnibox(cbsink_channel.clone(), omnibox_rx));
 
@@ -105,11 +106,11 @@ impl RootLayout {
     }
 
     /// Cursive uses a different crate for its channels (?), so this is some glue
-    fn cbsink_channel(siv: &mut Cursive, handle: &Handle) -> Sender<CbSinkMessage> {
+    fn cbsink_channel(siv: &mut Cursive) -> Sender<CbSinkMessage> {
         let (tx, rx): (Sender<CbSinkMessage>, Receiver<CbSinkMessage>) = channel();
         let sink = siv.cb_sink().clone();
 
-        handle.spawn(async move {
+        thread::spawn(move || {
             loop {
                 if let Ok(cb_sink_msg) = rx.recv() {
                     sink.send(cb_sink_msg)
