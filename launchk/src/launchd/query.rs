@@ -3,7 +3,7 @@ use crate::launchd::message::{
     UNLOAD_PATHS,
 };
 use std::convert::TryFrom;
-use std::{collections::HashSet, os::unix::prelude::RawFd};
+use std::{collections::HashSet};
 
 use xpc_sys::{
     objects::xpc_shmem::XPCShmem,
@@ -173,11 +173,20 @@ pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
     Ok((usize::try_from(bytes_written).unwrap(), shmem))
 }
 
-pub fn dumpjpcategory(fd: RawFd) -> Result<XPCDictionary, XPCError> {
-    XPCDictionary::new()
+pub fn dumpjpcategory() -> Result<(usize, XPCShmem), XPCError> {
+    let shmem = XPCShmem::new_task_self(
+        0x1400000,
+        i32::try_from(MAP_SHARED).expect("Must conv flags"),
+    )?;
+
+    let response = XPCDictionary::new()
         .extend(&DUMPJPCATEGORY)
-        .entry("fd", fd)
-        .pipe_routine_with_error_handling()
+        .entry("shmem", &shmem.xpc_object)
+        .pipe_routine_with_error_handling()?;
+
+    let bytes_written: u64 = response.get(&["bytes-written"])?.xpc_value()?;
+
+    Ok((usize::try_from(bytes_written).unwrap(), shmem))
 }
 
 pub fn procinfo(pid: i64) -> Result<(usize, XPCShmem), XPCError> {

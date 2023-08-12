@@ -18,7 +18,7 @@ use sudo::RunningAs;
 use tokio::runtime::Handle;
 use tokio::time::interval;
 use xpc_sys::enums::{DomainType, SessionType};
-use xpc_sys::objects::unix_fifo::UnixFifo;
+
 
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::launchd::plist::{edit_and_replace, LaunchdEntryLocation, LABEL_TO_ENTRY_CONFIG};
@@ -239,8 +239,8 @@ impl ServiceListView {
 
         let need_escalate = plist
             .map(|LaunchdPlist { entry_location, .. }| {
-                (entry_location == LaunchdEntryLocation::System
-                    || entry_location == LaunchdEntryLocation::Global)
+                entry_location == LaunchdEntryLocation::System
+                    || entry_location == LaunchdEntryLocation::Global
             })
             .unwrap_or(true);
 

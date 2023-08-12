@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
-use std::os::unix::prelude::RawFd;
+
 use std::ptr::slice_from_raw_parts;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::Arc;
+
 
 use cursive::event::{Event, EventResult, Key};
 use cursive::traits::{Resizable, Scrollable};
@@ -12,7 +12,7 @@ use cursive::{Cursive, Vec2, View};
 
 use tokio::runtime::Handle;
 
-use xpc_sys::objects::unix_fifo::UnixFifo;
+
 
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::subscribed_view::{
@@ -304,26 +304,13 @@ impl OmniboxSubscriber for RootLayout {
                 Ok(None)
             }
             OmniboxEvent::Command(OmniboxCommand::DumpJetsamPropertiesCategory) => {
-                let fifo =
-                    Arc::new(UnixFifo::new(0o777).map_err(|e| OmniboxError::CommandError(e))?);
+                let (size, shmem) =
+                    dumpjpcategory().map_err(|e| OmniboxError::CommandError(e.to_string()))?;
 
-                let fifo_clone = fifo.clone();
-
-                // Spawn pipe reader
-                let fd_read_thread = std::thread::spawn(move || fifo_clone.block_and_read_bytes());
-
-                fifo.with_writer(|fd_write| dumpjpcategory(fd_write as RawFd))
-                    .map_err(|e| OmniboxError::CommandError(e))?
-                    .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
-
-                // Join reader thread (and close fd)
-                let jetsam_data = fd_read_thread
-                    .join()
-                    .expect("Must join read thread")
-                    .map_err(|e| OmniboxError::CommandError(e))?;
-
-                show_pager(&self.cbsink_channel, &jetsam_data)
-                    .map_err(|e| OmniboxError::CommandError(e))?;
+                show_pager(&self.cbsink_channel, unsafe {
+                    &*slice_from_raw_parts(shmem.region as *mut u8, size)
+                })
+                .map_err(|e| OmniboxError::CommandError(e))?;
 
                 Ok(None)
             }
