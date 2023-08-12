@@ -180,10 +180,19 @@ pub fn dumpjpcategory(fd: RawFd) -> Result<XPCDictionary, XPCError> {
         .pipe_routine_with_error_handling()
 }
 
-pub fn procinfo(pid: i64, fd: RawFd) -> Result<XPCDictionary, XPCError> {
-    XPCDictionary::new()
+pub fn procinfo(pid: i64) -> Result<(usize, XPCShmem), XPCError> {
+    let shmem = XPCShmem::new_task_self(
+        0x1400000,
+        i32::try_from(MAP_SHARED).expect("Must conv flags"),
+    )?;
+
+    let response = XPCDictionary::new()
         .extend(&PROCINFO)
-        .entry("fd", fd)
+        .entry("shmem", &shmem.xpc_object)
         .entry("pid", pid)
-        .pipe_routine_with_error_handling()
+        .pipe_routine_with_error_handling()?;
+
+    let bytes_written: u64 = response.get(&["bytes-written"])?.xpc_value()?;
+
+    Ok((usize::try_from(bytes_written).unwrap(), shmem))
 }

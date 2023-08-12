@@ -1,11 +1,11 @@
 use std::cell::Cell;
 
-use cursive::theme::{BaseColor, Color, Effect, Style};
-use cursive::{Printer, Vec2, View, XY};
 use cursive::theme::PaletteColor::HighlightText;
+use cursive::theme::{BaseColor, Color, Effect, Style};
 use cursive::utils::markup::StyledString;
 use cursive::view::ViewWrapper;
-use cursive::views::{DummyView, LinearLayout, TextView, PaddedView, ResizedView};
+use cursive::views::{DummyView, LinearLayout, PaddedView, ResizedView, TextView};
+use cursive::{Printer, Vec2, View, XY};
 use sudo::RunningAs;
 use xpc_sys::csr::{csr_check, CsrConfig};
 use xpc_sys::rs_sysctlbyname;
@@ -37,8 +37,6 @@ pub fn make_layout() -> LinearLayout {
     sip.append_plain(sip_data);
 
     layout.add_child(ResizedView::with_full_width(TextView::new(sip)));
-
-
 
     layout
 }

@@ -110,12 +110,10 @@ impl RootLayout {
         let (tx, rx): (Sender<CbSinkMessage>, Receiver<CbSinkMessage>) = channel();
         let sink = siv.cb_sink().clone();
 
-        thread::spawn(move || {
-            loop {
-                if let Ok(cb_sink_msg) = rx.recv() {
-                    sink.send(cb_sink_msg)
-                        .expect("Cannot forward CbSink message")
-                }
+        thread::spawn(move || loop {
+            if let Ok(cb_sink_msg) = rx.recv() {
+                sink.send(cb_sink_msg)
+                    .expect("Cannot forward CbSink message")
             }
         });
 
@@ -255,8 +253,10 @@ impl OmniboxSubscriber for RootLayout {
                 Ok(None)
             }
             OmniboxEvent::Command(OmniboxCommand::Sudo) => {
-                clearscreen::clear().map_err(|_| OmniboxError::CommandError("Cannot clear".to_string()))?;
-                sudo::escalate_if_needed().map_err(|_| OmniboxError::CommandError("Cannot sudo".to_string()))?;
+                clearscreen::clear()
+                    .map_err(|_| OmniboxError::CommandError("Cannot clear".to_string()))?;
+                sudo::escalate_if_needed()
+                    .map_err(|_| OmniboxError::CommandError("Cannot sudo".to_string()))?;
                 Ok(None)
             }
             // Triggered when toggling to idle

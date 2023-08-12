@@ -2,6 +2,7 @@ use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::HashSet;
+use std::ptr::slice_from_raw_parts;
 use std::rc::Rc;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, RwLock};
@@ -244,12 +245,12 @@ impl ServiceListView {
             .unwrap_or(true);
 
         match cmd {
-            OmniboxCommand::LoadRequest |
-            OmniboxCommand::UnloadRequest |
-            OmniboxCommand::DisableRequest |
-            OmniboxCommand::EnableRequest |
-            OmniboxCommand::ProcInfo |
-            OmniboxCommand::Edit => {
+            OmniboxCommand::LoadRequest
+            | OmniboxCommand::UnloadRequest
+            | OmniboxCommand::DisableRequest
+            | OmniboxCommand::EnableRequest
+            | OmniboxCommand::ProcInfo
+            | OmniboxCommand::Edit => {
                 if (sudo::check() != RunningAs::Root) && need_escalate {
                     return Ok(Some(OmniboxCommand::Confirm(
                         "This requires root privileges. Sudo and restart?".to_string(),
@@ -257,7 +258,7 @@ impl ServiceListView {
                     )));
                 }
             }
-            _ => ()
+            _ => (),
         };
 
         match cmd {
@@ -335,27 +336,13 @@ impl ServiceListView {
                 if status.pid == 0 {
                     return Err(OmniboxError::CommandError(format!("No PID for {}", name)));
                 }
+                let (size, shmem) =
+                    procinfo(status.pid).map_err(|e| OmniboxError::CommandError(e.to_string()))?;
 
-                let fifo =
-                    Arc::new(UnixFifo::new(0o777).map_err(|e| OmniboxError::CommandError(e))?);
-
-                let fifo_clone = fifo.clone();
-
-                // Spawn pipe reader
-                let fd_read_thread = std::thread::spawn(move || fifo_clone.block_and_read_bytes());
-
-                fifo.with_writer(|fd_write| procinfo(status.pid, fd_write))
-                    .map_err(|e| OmniboxError::CommandError(e))?
-                    .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
-
-                // Join reader thread (and close fd)
-                let procinfo_data = fd_read_thread
-                    .join()
-                    .expect("Must join read thread")
-                    .map_err(|e| OmniboxError::CommandError(e))?;
-
-                show_pager(&self.cb_sink, &procinfo_data)
-                    .map_err(|e| OmniboxError::CommandError(e))?;
+                show_pager(&self.cb_sink, unsafe {
+                    &*slice_from_raw_parts(shmem.region as *mut u8, size)
+                })
+                .map_err(|e| OmniboxError::CommandError(e))?;
 
                 Ok(None)
             }
