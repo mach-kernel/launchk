@@ -1,6 +1,6 @@
 [package]
 name = "launchk"
-version = "0.1.4"
+version = "0.2.0"
 authors = ["David Stancu <dstancu@nyu.edu>"]
 edition = "2018"
 
@@ -9,11 +9,15 @@ edition = "2018"
 [dependencies]
 xpc-sys = { path= "../xpc-sys" }
 lazy_static = "1.4.0"
-cursive = { version = "0.15.0", features = ["toml"] }
-tokio = { version = "1", features = ["full"] }
-futures = "0.3"
-plist = "1.1.0"
-bitflags = "1.2.1"
-notify = "4.0.16"
-log = "0.4.14"
-env_logger = "0.8.3"
+cursive = { version = "0.20.0", features = ["toml"] }
+tokio = { version = "1.31.0", features = ["full"] }
+futures = "0.3.28"
+plist = "1.5.0"
+bitflags = "2.4.0"
+notify = "6.0.1"
+log = "0.4.20"
+env_logger = "0.10.0"
+notify-debouncer-mini = { version = "*", default-features = false }
+sudo = "0.6.0"
+clearscreen = "2.0.1"
+git-version = "0.3.5"

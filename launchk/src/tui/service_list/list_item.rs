@@ -4,7 +4,7 @@ use crate::launchd::entry_status::LaunchdEntryStatus;
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::tui::table::table_list_view::TableListItem;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ServiceListItem {
     pub name: String,
     pub status: LaunchdEntryStatus,

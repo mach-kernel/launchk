@@ -1,9 +1,11 @@
-use xpc_sys::enums::{DomainType, SessionType};
 use std::fmt;
+use xpc_sys::enums::{DomainType, SessionType};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum OmniboxCommand {
     Chain(Vec<OmniboxCommand>),
+    // (message, on ok)
+    Confirm(String, Vec<OmniboxCommand>),
     // Try to see if we have session type & domain in entry_status,
     // to avoid having to prompt the user
     LoadRequest,
@@ -17,8 +19,6 @@ pub enum OmniboxCommand {
     Enable(DomainType),
     Disable(DomainType),
     Edit,
-    // (message, on ok)
-    Confirm(String, Vec<OmniboxCommand>),
     // (unit label, prompt for domain only?, action gen fn)
     DomainSessionPrompt(
         String,
@@ -30,6 +30,7 @@ pub enum OmniboxCommand {
     DumpState,
     DumpJetsamPropertiesCategory,
     ProcInfo,
+    Sudo,
     Help,
     Quit,
 }
@@ -63,7 +64,7 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 12] = [
     ),
     (
         "edit",
-        "✍️  Edit plist with $EDITOR, then reload job",
+        "✍️  Edit plist with $EDITOR then reload job",
         OmniboxCommand::Edit,
     ),
     (
@@ -88,5 +89,5 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 12] = [
         OmniboxCommand::ProcInfo,
     ),
     ("help", "🤔  Show all commands", OmniboxCommand::Help),
-    ("exit", "🚪 see ya!", OmniboxCommand::Quit),
+    ("exit", "🚪  see ya!", OmniboxCommand::Quit),
 ];

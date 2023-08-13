@@ -2,11 +2,12 @@ use crate::launchd::message::{
     DISABLE_NAMES, DUMPJPCATEGORY, DUMPSTATE, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, PROCINFO,
     UNLOAD_PATHS,
 };
+use std::collections::HashSet;
 use std::convert::TryFrom;
-use std::{collections::HashSet, os::unix::prelude::RawFd};
 
 use xpc_sys::{
     objects::xpc_shmem::XPCShmem,
+    rs_geteuid,
     traits::{xpc_pipeable::XPCPipeable, xpc_value::TryXPCValue},
     MAP_SHARED,
 };
@@ -48,17 +49,37 @@ pub fn list(domain_type: DomainType, name: Option<String>) -> Result<XPCDictiona
 
 /// Query for jobs across all domain types
 pub fn list_all() -> HashSet<String> {
-    let everything = (DomainType::System as u64..DomainType::RequestorDomain as u64)
+    let mut everything = vec![
+        DomainType::System,
+        DomainType::RequestorUserDomain,
+        DomainType::RequestorDomain,
+    ];
+
+    if rs_geteuid() == 0 {
+        everything.push(DomainType::User);
+    }
+
+    let list = everything
+        .iter()
         .filter_map(|t| {
-            let svc_for_type = list(t.into(), None)
+            let svc_for_type = list(t.clone(), None)
                 .and_then(|d| d.get_as_dictionary(&["services"]))
                 .map(|XPCDictionary(ref hm)| hm.keys().map(|k| k.clone()).collect());
 
-            svc_for_type.ok()
+            if svc_for_type.is_err() {
+                log::error!(
+                    "[query/list_all]: poll error {}, domain, {}",
+                    svc_for_type.err().unwrap(),
+                    t
+                );
+                None
+            } else {
+                svc_for_type.ok()
+            }
         })
         .flat_map(|k: Vec<String>| k.into_iter());
 
-    HashSet::from_iter(everything)
+    HashSet::from_iter(list)
 }
 
 pub fn load<S: Into<String>>(
@@ -152,17 +173,35 @@ pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
     Ok((usize::try_from(bytes_written).unwrap(), shmem))
 }
 
-pub fn dumpjpcategory(fd: RawFd) -> Result<XPCDictionary, XPCError> {
-    XPCDictionary::new()
+pub fn dumpjpcategory() -> Result<(usize, XPCShmem), XPCError> {
+    let shmem = XPCShmem::new_task_self(
+        0x1400000,
+        i32::try_from(MAP_SHARED).expect("Must conv flags"),
+    )?;
+
+    let response = XPCDictionary::new()
         .extend(&DUMPJPCATEGORY)
-        .entry("fd", fd)
-        .pipe_routine_with_error_handling()
+        .entry("shmem", &shmem.xpc_object)
+        .pipe_routine_with_error_handling()?;
+
+    let bytes_written: u64 = response.get(&["bytes-written"])?.xpc_value()?;
+
+    Ok((usize::try_from(bytes_written).unwrap(), shmem))
 }
 
-pub fn procinfo(pid: i64, fd: RawFd) -> Result<XPCDictionary, XPCError> {
-    XPCDictionary::new()
+pub fn procinfo(pid: i64) -> Result<(usize, XPCShmem), XPCError> {
+    let shmem = XPCShmem::new_task_self(
+        0x1400000,
+        i32::try_from(MAP_SHARED).expect("Must conv flags"),
+    )?;
+
+    let response = XPCDictionary::new()
         .extend(&PROCINFO)
-        .entry("fd", fd)
+        .entry("shmem", &shmem.xpc_object)
         .entry("pid", pid)
-        .pipe_routine_with_error_handling()
+        .pipe_routine_with_error_handling()?;
+
+    let bytes_written: u64 = response.get(&["bytes-written"])?.xpc_value()?;
+
+    Ok((usize::try_from(bytes_written).unwrap(), shmem))
 }

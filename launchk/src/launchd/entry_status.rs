@@ -16,7 +16,7 @@ lazy_static! {
         Mutex::new(HashMap::new());
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct LaunchdEntryStatus {
     pub plist: Option<LaunchdPlist>,
     pub limit_load_to_session_type: SessionType,

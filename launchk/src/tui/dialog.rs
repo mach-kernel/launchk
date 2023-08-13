@@ -8,10 +8,10 @@ use cursive::{
 };
 
 use crate::launchd::entry_status::{get_entry_status, LaunchdEntryStatus};
+use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::command::OMNIBOX_COMMANDS;
 use crate::tui::omnibox::view::OmniboxEvent;
 use crate::tui::root::CbSinkMessage;
-use crate::tui::omnibox::command::OmniboxCommand;
 use xpc_sys::csr::{csr_check, CsrConfig};
 use xpc_sys::enums::{DomainType, SessionType};
 
@@ -42,7 +42,7 @@ pub fn show_prompt(
                 commands
                     .iter()
                     .try_for_each(|c| tx.send(OmniboxEvent::Command(c.clone())))
-                    .expect("Must sent commands");
+                    .expect("Must send commands");
 
                 s.pop_layer();
             })
@@ -75,7 +75,7 @@ pub fn domain_session_prompt<S: Into<String>>(
 
         // Build domain type list
         let mut domain_type_layout = LinearLayout::vertical()
-            .child(TextView::new("Domain Type").effect(Effect::Bold))
+            .child(TextView::new("Domain Type").style(Effect::Bold))
             .child(DummyView);
 
         for d in DomainType::System as u64..DomainType::Unknown as u64 {
@@ -93,7 +93,7 @@ pub fn domain_session_prompt<S: Into<String>>(
 
         if !domain_only {
             session_type_layout = session_type_layout
-                .child(TextView::new("Session Type").effect(Effect::Bold))
+                .child(TextView::new("Session Type").style(Effect::Bold))
                 .child(DummyView);
 
             for s in SessionType::Aqua as u64..SessionType::Unknown as u64 {
@@ -160,7 +160,13 @@ pub fn show_csr_info() -> CbSinkMessage {
 pub fn show_help() -> CbSinkMessage {
     let commands = OMNIBOX_COMMANDS
         .iter()
-        .map(|(cmd, desc, _)| format!("{}: {}", cmd, desc))
+        .map(|(cmd, desc, _)| {
+            format!(
+                "{:<15}: {}",
+                cmd,
+                desc.chars().filter(|c| c.is_ascii()).collect::<String>()
+            )
+        })
         .collect::<Vec<String>>();
 
     Box::new(move |siv| {

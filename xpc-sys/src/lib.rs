@@ -16,17 +16,17 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 //
 pub mod csr;
+pub mod enums;
 pub mod objects;
 pub mod traits;
-pub mod enums;
 //
 
 pub type xpc_pipe_t = *mut c_void;
 
-/// Some extra private API definitions. Thanks:
-///
-/// https://developer.apple.com/documentation/kernel/mach
-/// https://chromium.googlesource.com/chromium/src.git/+/47.0.2507.2/sandbox/mac/xpc_private_stubs.sig
+// Some extra private API definitions. Thanks:
+//
+// https://developer.apple.com/documentation/kernel/mach
+// https://chromium.googlesource.com/chromium/src.git/+/47.0.2507.2/sandbox/mac/xpc_private_stubs.sig
 extern "C" {
     // Can decode i64 returned in "errors" for XPC responses
     pub fn xpc_strerror(err: c_int) -> *const c_char;
@@ -171,6 +171,10 @@ pub unsafe fn rs_sysctlbyname(name: &str) -> Result<String, String> {
     } else {
         Err(rs_strerror(err))
     }
+}
+
+pub fn rs_geteuid() -> uid_t {
+    unsafe { geteuid() }
 }
 
 #[cfg(test)]

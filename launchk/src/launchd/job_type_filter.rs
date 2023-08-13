@@ -2,7 +2,7 @@ use std::fmt;
 use std::fmt::Formatter;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Default, Eq, PartialEq, Hash)]
     /// Bitmask for filtering on the job type, which is a mix
     /// of scope (where it's located), and kind (agent v. daemon)
     pub struct JobTypeFilter: u32 {
@@ -54,5 +54,19 @@ impl fmt::Display for JobTypeFilter {
         }
 
         write!(f, "{}", display)
+    }
+}
+
+impl fmt::Debug for JobTypeFilter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match *self {
+            JobTypeFilter::SYSTEM => write!(f, "SYSTEM"),
+            JobTypeFilter::GLOBAL => write!(f, "GLOBAL"),
+            JobTypeFilter::USER => write!(f, "USER"),
+            JobTypeFilter::AGENT => write!(f, "AGENT"),
+            JobTypeFilter::DAEMON => write!(f, "DAEMON"),
+            JobTypeFilter::LOADED => write!(f, "LOADED"),
+            _ => Ok(()),
+        }
     }
 }

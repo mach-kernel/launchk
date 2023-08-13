@@ -9,6 +9,7 @@ use tokio::time::interval;
 use cursive::direction::Direction;
 use cursive::event::{Event, EventResult, Key};
 use cursive::theme::{BaseColor, Color, Effect, Style};
+use cursive::view::CannotFocus;
 use cursive::{Printer, Vec2, View, XY};
 
 use crate::launchd::job_type_filter::JobTypeFilter;
@@ -27,6 +28,7 @@ pub enum OmniboxEvent {
 pub enum OmniboxError {
     ReferenceError,
     CommandError(String),
+    Many(Vec<OmniboxError>),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -388,7 +390,7 @@ impl View for OmniboxView {
         EventResult::Consumed(None)
     }
 
-    fn take_focus(&mut self, _: Direction) -> bool {
-        true
+    fn take_focus(&mut self, _: Direction) -> Result<EventResult, CannotFocus> {
+        Ok(EventResult::Consumed(None))
     }
 }

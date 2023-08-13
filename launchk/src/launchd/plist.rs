@@ -1,16 +1,14 @@
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::env;
 use std::fmt;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Once, RwLock};
 
 use crate::launchd::job_type_filter::JobTypeFilter;
-use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
-use std::fs::{DirEntry, File, ReadDir};
+use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode, DebounceEventResult};
+use std::fs::File;
 use std::io::Read;
-use std::iter::FilterMap;
 use std::process::Command;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -34,7 +32,7 @@ od -xc binary.plist
 */
 static PLIST_MAGIC: &str = "bplist00";
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum LaunchdEntryType {
     /// Runs on behalf of currently logged in user
     Agent,
@@ -48,12 +46,13 @@ impl fmt::Display for LaunchdEntryType {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum LaunchdEntryLocation {
     /// macOS system provided agent or daemon
     System,
-    /// "Administrator provided" agent or daemon
-    /// TODO: is 'global' appropriate?
+    /// Admin provided agent or daemon in /Library,
+    /// would name it admin...but the [sguadl] filter
+    /// needs uniques
     Global,
     /// User provided agent
     User,
@@ -65,7 +64,7 @@ impl fmt::Display for LaunchdEntryLocation {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct LaunchdPlist {
     pub entry_type: LaunchdEntryType,
     pub entry_location: LaunchdEntryLocation,
@@ -97,23 +96,24 @@ impl LaunchdPlist {
     }
 }
 
-pub const GLOBAL_LAUNCH_AGENTS: &str = "/Library/LaunchAgents";
+pub const ADMIN_LAUNCH_AGENTS: &str = "/Library/LaunchAgents";
 pub const SYSTEM_LAUNCH_AGENTS: &str = "/System/Library/LaunchAgents";
 
 pub const ADMIN_LAUNCH_DAEMONS: &str = "/Library/LaunchDaemons";
-pub const GLOBAL_LAUNCH_DAEMONS: &str = "/System/Library/LaunchDaemons";
+pub const SYSTEM_LAUNCH_DAEMONS: &str = "/System/Library/LaunchDaemons";
 
 async fn fsnotify_subscriber() {
-    let (tx, rx): (Sender<DebouncedEvent>, Receiver<DebouncedEvent>) = channel();
-    let mut watcher = watcher(tx, Duration::from_secs(5)).expect("Must make fsnotify watcher");
+    let (tx, rx): (Sender<DebounceEventResult>, Receiver<DebounceEventResult>) = channel();
+    let mut debouncer = new_debouncer(Duration::from_secs(5), None, tx).unwrap();
+    let watcher = debouncer.watcher();
 
     // Register plist paths
     let watchers = [
         watcher.watch(Path::new(&*USER_LAUNCH_AGENTS), RecursiveMode::Recursive),
-        watcher.watch(Path::new(GLOBAL_LAUNCH_AGENTS), RecursiveMode::Recursive),
+        watcher.watch(Path::new(ADMIN_LAUNCH_AGENTS), RecursiveMode::Recursive),
         watcher.watch(Path::new(SYSTEM_LAUNCH_AGENTS), RecursiveMode::Recursive),
         watcher.watch(Path::new(ADMIN_LAUNCH_DAEMONS), RecursiveMode::Recursive),
-        watcher.watch(Path::new(GLOBAL_LAUNCH_DAEMONS), RecursiveMode::Recursive),
+        watcher.watch(Path::new(SYSTEM_LAUNCH_DAEMONS), RecursiveMode::Recursive),
     ];
 
     for sub in watchers.iter() {
@@ -121,41 +121,32 @@ async fn fsnotify_subscriber() {
     }
 
     loop {
-        let event = rx.recv();
-        if event.is_err() {
-            continue;
-        }
+        let events = rx
+            .recv()
+            .map(|dbr| dbr.ok())
+            .ok()
+            .flatten()
+            .unwrap_or(vec![]);
 
-        let event = event.unwrap();
+        let paths: Vec<PathBuf> = events
+            .iter()
+            .filter_map(|e| path_if_plist(&e.path))
+            .collect();
 
-        let reload_plists = match event {
-            DebouncedEvent::Create(pb) => fs::read_dir(pb),
-            DebouncedEvent::Write(pb) => fs::read_dir(pb),
-            DebouncedEvent::Remove(pb) => fs::read_dir(pb),
-            DebouncedEvent::Rename(_, new) => fs::read_dir(new),
-            _ => continue,
-        };
-
-        if reload_plists.is_err() {
-            continue;
-        }
-
-        insert_plists(readdir_filter_plists(reload_plists.unwrap()));
+        insert_plists(paths.into_iter());
     }
 }
 
-fn build_label_map_entry(plist_path: DirEntry) -> Option<(String, LaunchdPlist)> {
-    let path = plist_path.path();
-    let path_string = path.to_string_lossy().to_string();
-
-    let label = plist::Value::from_file(path.clone()).ok()?;
+fn build_label_map_entry(plist_path: PathBuf) -> Option<(String, LaunchdPlist)> {
+    let path_string = plist_path.to_string_lossy().to_string();
+    let label = plist::Value::from_file(&path_string).ok()?;
     let label = label
         .as_dictionary()
         .and_then(|d| d.get("Label"))
         .and_then(|v| v.as_string());
 
     let entry_type = if path_string.starts_with(ADMIN_LAUNCH_DAEMONS)
-        || path_string.starts_with(GLOBAL_LAUNCH_DAEMONS)
+        || path_string.starts_with(SYSTEM_LAUNCH_DAEMONS)
     {
         LaunchdEntryType::Daemon
     } else {
@@ -164,7 +155,7 @@ fn build_label_map_entry(plist_path: DirEntry) -> Option<(String, LaunchdPlist)>
 
     let entry_location = if path_string.starts_with(&*USER_LAUNCH_AGENTS) {
         LaunchdEntryLocation::User
-    } else if path_string.starts_with(GLOBAL_LAUNCH_AGENTS)
+    } else if path_string.starts_with(ADMIN_LAUNCH_AGENTS)
         || path_string.starts_with(ADMIN_LAUNCH_DAEMONS)
     {
         LaunchdEntryLocation::Global
@@ -178,7 +169,7 @@ fn build_label_map_entry(plist_path: DirEntry) -> Option<(String, LaunchdPlist)>
             entry_location,
             entry_type,
             plist_path: path_string,
-            readonly: path
+            readonly: plist_path
                 .metadata()
                 .map(|m| m.permissions().readonly())
                 .unwrap_or(true),
@@ -186,33 +177,25 @@ fn build_label_map_entry(plist_path: DirEntry) -> Option<(String, LaunchdPlist)>
     ))
 }
 
-fn readdir_filter_plists(
-    rd: ReadDir,
-) -> FilterMap<ReadDir, fn(futures::io::Result<DirEntry>) -> Option<DirEntry>> {
-    rd.filter_map(|e| {
-        if e.is_err() {
-            return None;
-        }
-
-        let path = e.borrow().as_ref().unwrap().path();
-
-        if path.is_dir()
-            || path
-                .extension()
-                .map(|ex| ex.to_string_lossy().ne("plist"))
-                .unwrap_or(true)
-        {
-            None
-        } else {
-            Some(e.unwrap())
-        }
-    })
+fn path_if_plist(path: &PathBuf) -> Option<PathBuf> {
+    if path.is_dir()
+        || path
+            .extension()
+            .map(|ex| ex.to_string_lossy().ne("plist"))
+            .unwrap_or(true)
+    {
+        None
+    } else {
+        Some(path.clone())
+    }
 }
 
-fn insert_plists(plists: impl Iterator<Item = DirEntry>) {
+fn insert_plists(plists: impl Iterator<Item = PathBuf>) {
     let mut label_map = LABEL_TO_ENTRY_CONFIG.write().expect("Must update");
 
     for plist_path in plists {
+        log::info!("Loading plist {:?}", plist_path);
+
         let entry = build_label_map_entry(plist_path);
         if entry.is_none() {
             continue;
@@ -228,17 +211,19 @@ fn insert_plists(plists: impl Iterator<Item = DirEntry>) {
 pub fn init_plist_map(runtime_handle: &Handle) {
     let dirs = [
         &USER_LAUNCH_AGENTS,
-        GLOBAL_LAUNCH_AGENTS,
+        ADMIN_LAUNCH_AGENTS,
         SYSTEM_LAUNCH_AGENTS,
         ADMIN_LAUNCH_DAEMONS,
-        GLOBAL_LAUNCH_DAEMONS,
+        SYSTEM_LAUNCH_DAEMONS,
     ];
 
     // Get all the plists from everywhere into one stream
     let plists = dirs
         .iter()
         .filter_map(|&dirname| fs::read_dir(Path::new(dirname)).ok())
-        .flat_map(readdir_filter_plists);
+        .flat_map(|rd| rd.map(|e| e.ok()))
+        .flatten()
+        .filter_map(|d| path_if_plist(&d.path()));
 
     insert_plists(plists);
 
