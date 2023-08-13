@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Once, RwLock};
 
 use crate::launchd::job_type_filter::JobTypeFilter;
-use notify_debouncer_mini::{new_debouncer, DebounceEventResult, notify::RecursiveMode};
+use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode, DebounceEventResult};
 use std::fs::File;
 use std::io::Read;
 use std::process::Command;

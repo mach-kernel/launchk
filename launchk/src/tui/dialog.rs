@@ -160,7 +160,13 @@ pub fn show_csr_info() -> CbSinkMessage {
 pub fn show_help() -> CbSinkMessage {
     let commands = OMNIBOX_COMMANDS
         .iter()
-        .map(|(cmd, desc, _)| format!("{:<15}: {}", cmd, desc.chars().filter(|c| c.is_ascii()).collect::<String>()))
+        .map(|(cmd, desc, _)| {
+            format!(
+                "{:<15}: {}",
+                cmd,
+                desc.chars().filter(|c| c.is_ascii()).collect::<String>()
+            )
+        })
         .collect::<Vec<String>>();
 
     Box::new(move |siv| {

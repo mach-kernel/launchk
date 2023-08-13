@@ -2,8 +2,8 @@ use crate::launchd::message::{
     DISABLE_NAMES, DUMPJPCATEGORY, DUMPSTATE, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, PROCINFO,
     UNLOAD_PATHS,
 };
+use std::collections::HashSet;
 use std::convert::TryFrom;
-use std::{collections::HashSet};
 
 use xpc_sys::{
     objects::xpc_shmem::XPCShmem,

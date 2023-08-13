@@ -62,11 +62,11 @@ impl fmt::Debug for JobTypeFilter {
         match *self {
             JobTypeFilter::SYSTEM => write!(f, "SYSTEM"),
             JobTypeFilter::GLOBAL => write!(f, "GLOBAL"),
-            JobTypeFilter::USER   => write!(f, "USER"),
-            JobTypeFilter::AGENT  => write!(f, "AGENT"),
+            JobTypeFilter::USER => write!(f, "USER"),
+            JobTypeFilter::AGENT => write!(f, "AGENT"),
             JobTypeFilter::DAEMON => write!(f, "DAEMON"),
             JobTypeFilter::LOADED => write!(f, "LOADED"),
-            _                     => Ok(())
+            _ => Ok(()),
         }
     }
 }

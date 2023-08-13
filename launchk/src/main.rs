@@ -9,6 +9,7 @@ extern crate bitflags;
 
 extern crate plist;
 
+use clearscreen;
 use cursive::view::Resizable;
 use cursive::views::{NamedView, Panel};
 use git_version::git_version;
@@ -50,5 +51,6 @@ fn main() {
     // Fix reset on exit
     // https://github.com/gyscos/cursive/issues/415
     drop(siv);
+    clearscreen::clear().expect("Clear");
     exit(0);
 }

@@ -1,4 +1,4 @@
-use std::{os::raw::c_int, fmt, fmt::Formatter};
+use std::{fmt, fmt::Formatter, os::raw::c_int};
 
 pub type csr_config_t = u32;
 
@@ -30,14 +30,18 @@ impl fmt::Debug for CsrConfig {
             CsrConfig::ALLOW_TASK_FOR_PID => write!(f, "ALLOW_TASK_FOR_PID"),
             CsrConfig::ALLOW_KERNEL_DEBUGGER => write!(f, "ALLOW_KERNEL_DEBUGGER"),
             CsrConfig::ALLOW_APPLE_INTERNAL => write!(f, "ALLOW_APPLE_INTERNAL"),
-            CsrConfig::ALLOW_DESTRUCTIVE_DTRACE => write!(f, "ALLOW_DESTRUCTIVE_DTRACE | ALLOW_UNRESTRICTED_DTRACE"),
+            CsrConfig::ALLOW_DESTRUCTIVE_DTRACE => {
+                write!(f, "ALLOW_DESTRUCTIVE_DTRACE | ALLOW_UNRESTRICTED_DTRACE")
+            }
             CsrConfig::ALLOW_UNRESTRICTED_NVRAM => write!(f, "ALLOW_UNRESTRICTED_NVRAM"),
             CsrConfig::ALLOW_DEVICE_CONFIGURATION => write!(f, "ALLOW_DEVICE_CONFIGURATION"),
             CsrConfig::ALLOW_ANY_RECOVERY_OS => write!(f, "ALLOW_ANY_RECOVERY_OS"),
             CsrConfig::ALLOW_UNAPPROVED_KEXTS => write!(f, "ALLOW_UNAPPROVED_KEXTS"),
-            CsrConfig::ALLOW_EXECUTABLE_POLICY_OVERRIDE => write!(f, "ALLOW_EXECUTABLE_POLICY_OVERRIDE"),
+            CsrConfig::ALLOW_EXECUTABLE_POLICY_OVERRIDE => {
+                write!(f, "ALLOW_EXECUTABLE_POLICY_OVERRIDE")
+            }
             CsrConfig::ALLOW_UNAUTHENTICATED_ROOT => write!(f, "ALLOW_UNAUTHENTICATED_ROOT"),
-            _ => Ok(())
+            _ => Ok(()),
         }
     }
 }

@@ -3,7 +3,6 @@ use std::collections::VecDeque;
 use std::ptr::slice_from_raw_parts;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-
 use cursive::event::{Event, EventResult, Key};
 use cursive::traits::{Resizable, Scrollable};
 use cursive::view::ViewWrapper;
@@ -11,8 +10,6 @@ use cursive::views::{LinearLayout, NamedView, Panel};
 use cursive::{Cursive, Vec2, View};
 
 use tokio::runtime::Handle;
-
-
 
 use crate::tui::omnibox::command::OmniboxCommand;
 use crate::tui::omnibox::subscribed_view::{

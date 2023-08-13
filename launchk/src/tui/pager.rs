@@ -4,8 +4,8 @@ use std::process::{Command, Stdio};
 use std::sync::mpsc::Sender;
 
 use super::root::CbSinkMessage;
-use cursive::Cursive;
 use clearscreen;
+use cursive::Cursive;
 
 lazy_static! {
     static ref PAGER: String = env::var("PAGER").unwrap_or("less".to_string());

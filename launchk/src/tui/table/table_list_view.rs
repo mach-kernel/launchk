@@ -3,8 +3,8 @@ use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::rc::Rc;
 
-use std::sync::Arc;
 use std::collections::hash_map::DefaultHasher;
+use std::sync::Arc;
 
 use cursive::event::{Event, EventResult};
 use cursive::traits::{Resizable, Scrollable};
@@ -26,7 +26,7 @@ pub struct TableListView<T> {
     linear_layout: LinearLayout,
     // LinearLayout swallows T from , but we still need it
     inner: PhantomData<T>,
-    last_hash: RefCell<u64>
+    last_hash: RefCell<u64>,
 }
 
 impl<T: 'static + TableListItem> TableListView<T> {
@@ -59,14 +59,14 @@ impl<T: 'static + TableListItem> TableListView<T> {
             linear_layout,
             column_sizer,
             inner: PhantomData::default(),
-            last_hash
+            last_hash,
         }
     }
 
     pub fn replace_and_preserve_selection<I>(&mut self, items: I)
     where
         I: IntoIterator<Item = T>,
-        T: Hash
+        T: Hash,
     {
         let rows: Vec<(String, T)> = items
             .into_iter()
@@ -92,13 +92,15 @@ impl<T: 'static + TableListItem> TableListView<T> {
         rows.hash(&mut row_hasher);
         let hash = row_hasher.finish();
 
-        if *self.last_hash.borrow() == hash { return }
+        if *self.last_hash.borrow() == hash {
+            return;
+        }
         log::trace!("Replaced listview items -- new hash {}", hash);
         *self.last_hash.borrow_mut() = hash;
 
         let sv = self.get_mut_selectview();
         let current_selection = sv.selected_id().unwrap_or(0);
-        
+
         sv.clear();
         sv.add_all(rows);
         sv.set_selection(current_selection);

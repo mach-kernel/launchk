@@ -1,6 +1,3 @@
-
-
-
 use cursive::theme::{BaseColor, Color, Effect, Style};
 use cursive::utils::markup::StyledString;
 
