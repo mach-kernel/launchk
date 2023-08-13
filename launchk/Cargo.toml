@@ -9,14 +9,14 @@ edition = "2018"
 [dependencies]
 xpc-sys = { path= "../xpc-sys" }
 lazy_static = "1.4.0"
-cursive = { version = "0.19.0", features = ["toml"] }
-tokio = { version = "1.21.0", features = ["full"] }
-futures = "0.3.24"
-plist = "1.3.1"
-bitflags = "1.3.2"
-notify = "5.0.0"
-log = "0.4.14"
-env_logger = "0.9.0"
+cursive = { version = "0.20.0", features = ["toml"] }
+tokio = { version = "1.31.0", features = ["full"] }
+futures = "0.3.28"
+plist = "1.5.0"
+bitflags = "2.4.0"
+notify = "6.0.1"
+log = "0.4.20"
+env_logger = "0.10.0"
 notify-debouncer-mini = { version = "*", default-features = false }
 sudo = "0.6.0"
-clearscreen = "1.0.10"
+clearscreen = "2.0.1"
