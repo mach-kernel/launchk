@@ -654,7 +654,7 @@ dependencies = [
 
 [[package]]
 name = "launchk"
-version = "0.1.5"
+version = "0.2.0"
 dependencies = [
  "bitflags 2.4.0",
  "clearscreen",
@@ -1675,10 +1675,10 @@ checksum = "a67300977d3dc3f8034dae89778f502b6ba20b269527b3223ba59c0cf393bb8a"
 
 [[package]]
 name = "xpc-sys"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "bindgen",
- "bitflags 1.3.2",
+ "bitflags 2.4.0",
  "block",
  "lazy_static",
  "libc",

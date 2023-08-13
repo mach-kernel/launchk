@@ -1,9 +1,10 @@
-use std::os::raw::c_int;
+use std::{os::raw::c_int, fmt, fmt::Formatter};
 
 pub type csr_config_t = u32;
 
 // https://github.com/apple/darwin-xnu/blob/main/bsd/kern/kern_csr.c
 bitflags! {
+    #[derive(PartialEq, Eq)]
     pub struct CsrConfig: csr_config_t {
         const ALLOW_UNTRUSTED_KEXTS = 1 << 0;
         const ALLOW_UNRESTRICTED_FS = 1 << 1;
@@ -18,6 +19,26 @@ bitflags! {
         const ALLOW_UNAPPROVED_KEXTS = 1 << 9;
         const ALLOW_EXECUTABLE_POLICY_OVERRIDE = 1 << 10;
         const ALLOW_UNAUTHENTICATED_ROOT = 1 << 11;
+    }
+}
+
+impl fmt::Debug for CsrConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match *self {
+            CsrConfig::ALLOW_UNTRUSTED_KEXTS => write!(f, "ALLOW_UNTRUSTED_KEXTS"),
+            CsrConfig::ALLOW_UNRESTRICTED_FS => write!(f, "ALLOW_UNRESTRICTED_FS"),
+            CsrConfig::ALLOW_TASK_FOR_PID => write!(f, "ALLOW_TASK_FOR_PID"),
+            CsrConfig::ALLOW_KERNEL_DEBUGGER => write!(f, "ALLOW_KERNEL_DEBUGGER"),
+            CsrConfig::ALLOW_APPLE_INTERNAL => write!(f, "ALLOW_APPLE_INTERNAL"),
+            CsrConfig::ALLOW_DESTRUCTIVE_DTRACE => write!(f, "ALLOW_DESTRUCTIVE_DTRACE | ALLOW_UNRESTRICTED_DTRACE"),
+            CsrConfig::ALLOW_UNRESTRICTED_NVRAM => write!(f, "ALLOW_UNRESTRICTED_NVRAM"),
+            CsrConfig::ALLOW_DEVICE_CONFIGURATION => write!(f, "ALLOW_DEVICE_CONFIGURATION"),
+            CsrConfig::ALLOW_ANY_RECOVERY_OS => write!(f, "ALLOW_ANY_RECOVERY_OS"),
+            CsrConfig::ALLOW_UNAPPROVED_KEXTS => write!(f, "ALLOW_UNAPPROVED_KEXTS"),
+            CsrConfig::ALLOW_EXECUTABLE_POLICY_OVERRIDE => write!(f, "ALLOW_EXECUTABLE_POLICY_OVERRIDE"),
+            CsrConfig::ALLOW_UNAUTHENTICATED_ROOT => write!(f, "ALLOW_UNAUTHENTICATED_ROOT"),
+            _ => Ok(())
+        }
     }
 }
 
