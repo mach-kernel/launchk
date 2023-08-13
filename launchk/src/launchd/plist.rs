@@ -32,7 +32,7 @@ od -xc binary.plist
 */
 static PLIST_MAGIC: &str = "bplist00";
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum LaunchdEntryType {
     /// Runs on behalf of currently logged in user
     Agent,
@@ -46,7 +46,7 @@ impl fmt::Display for LaunchdEntryType {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum LaunchdEntryLocation {
     /// macOS system provided agent or daemon
     System,
@@ -64,7 +64,7 @@ impl fmt::Display for LaunchdEntryLocation {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct LaunchdPlist {
     pub entry_type: LaunchdEntryType,
     pub entry_location: LaunchdEntryLocation,

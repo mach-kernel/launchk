@@ -11,6 +11,7 @@ extern crate plist;
 
 use cursive::view::Resizable;
 use cursive::views::{NamedView, Panel};
+use git_version::git_version;
 use std::process::exit;
 
 use crate::launchd::plist::{init_plist_map, PLIST_MAP_INIT};
@@ -38,7 +39,7 @@ fn main() {
     let root_layout = NamedView::new("root_layout", root_layout);
 
     let panel = Panel::new(root_layout)
-        .title("launchk")
+        .title(format!("launchk ({})", git_version!()))
         .full_width()
         .full_height();
 

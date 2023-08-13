@@ -10,7 +10,7 @@ use crate::traits::xpc_value::TryXPCValue;
 
 /// LimitLoadToSessionType key in XPC response
 /// https://developer.apple.com/library/archive/technotes/tn2083/_index.html
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum SessionType {
     Aqua = 0,
     StandardIO,
@@ -70,7 +70,7 @@ impl TryFrom<Arc<XPCObject>> for SessionType {
 }
 
 // Huge thanks to: https://saelo.github.io/presentations/bits_of_launchd.pdf
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum DomainType {
     System = 1,
     User = 2,

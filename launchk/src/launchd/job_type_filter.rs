@@ -2,7 +2,7 @@ use std::fmt;
 use std::fmt::Formatter;
 
 bitflags! {
-    #[derive(Clone, Copy, Default, Eq, PartialEq)]
+    #[derive(Clone, Copy, Default, Eq, PartialEq, Hash)]
     /// Bitmask for filtering on the job type, which is a mix
     /// of scope (where it's located), and kind (agent v. daemon)
     pub struct JobTypeFilter: u32 {

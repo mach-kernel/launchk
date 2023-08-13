@@ -89,5 +89,5 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 12] = [
         OmniboxCommand::ProcInfo,
     ),
     ("help", "🤔  Show all commands", OmniboxCommand::Help),
-    ("exit", "🚪 see ya!", OmniboxCommand::Quit),
+    ("exit", "🚪  see ya!", OmniboxCommand::Quit),
 ];
