@@ -8,6 +8,8 @@ extern crate lazy_static;
 #[macro_use]
 extern crate bitflags;
 
+pub use libc::MAP_SHARED;
+use libc::{geteuid, mach_task_self_, strerror, sysctlbyname, KERN_SUCCESS, MACH_PORT_NULL};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_long, c_void};
 use std::ptr::null_mut;
@@ -68,8 +70,8 @@ pub struct _os_alloc_once_s {
 
 #[repr(C)]
 pub struct xpc_global_data {
-    pub a: u_int64_t,
-    pub xpc_flags: u_int64_t,
+    pub a: u64,
+    pub xpc_flags: u64,
     pub task_bootstrap_port: mach_port_t,
     pub xpc_bootstrap_pipe: xpc_pipe_t,
 }
@@ -88,7 +90,7 @@ pub fn rs_strerror(err: i32) -> String {
 
 /// Attempt to yield existing bootstrap_port if not MACH_PORT_NULL
 pub unsafe fn get_bootstrap_port() -> mach_port_t {
-    if bootstrap_port == MACH_PORT_NULL {
+    if bootstrap_port == MACH_PORT_NULL as mach_port_t {
         log::debug!("Bootstrap port is null! Querying for port");
         lookup_bootstrap_port()
     } else {
@@ -155,7 +157,7 @@ pub unsafe fn read_xpc_global_data() -> Option<&'static xpc_global_data> {
 pub unsafe fn rs_sysctlbyname(name: &str) -> Result<String, String> {
     let name = CString::new(name).unwrap();
     let mut ret_buf: [c_char; 256] = [0; 256];
-    let mut size = ret_buf.len() as u64;
+    let mut size = ret_buf.len();
 
     let err = sysctlbyname(
         name.as_ptr(),
