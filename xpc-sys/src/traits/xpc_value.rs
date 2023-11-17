@@ -6,10 +6,11 @@ use std::rc::Rc;
 use crate::objects::xpc_object::{MachPortType, XPCObject};
 use crate::objects::xpc_type;
 use crate::{
-    mach_port_t, xpc_array_apply, xpc_bool_get_value, xpc_double_get_value,
-    xpc_int64_get_value, xpc_mach_send_get_right, xpc_object_t, xpc_string_get_string_ptr,
-    xpc_type_get_name, xpc_uint64_get_value,
+    xpc_array_apply, xpc_bool_get_value, xpc_double_get_value, xpc_int64_get_value,
+    xpc_mach_send_get_right, xpc_object_t, xpc_string_get_string_ptr, xpc_type_get_name,
+    xpc_uint64_get_value,
 };
+use libc::mach_port_t;
 
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::ValueError;
@@ -121,12 +122,12 @@ impl TryXPCValue<Vec<Arc<XPCObject>>> for XPCObject {
 #[cfg(test)]
 mod tests {
     use crate::get_bootstrap_port;
-    use crate::mach_port_t;
     use crate::objects::xpc_error::XPCError;
     use crate::objects::xpc_error::XPCError::ValueError;
     use crate::objects::xpc_object::MachPortType;
     use crate::objects::xpc_object::XPCObject;
     use crate::traits::xpc_value::TryXPCValue;
+    use libc::mach_port_t;
     use std::sync::Arc;
 
     #[test]

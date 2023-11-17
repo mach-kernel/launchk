@@ -2,10 +2,11 @@ use libc::c_int;
 
 use crate::objects::xpc_type::XPCType;
 use crate::{
-    mach_port_t, xpc_array_append_value, xpc_array_create, xpc_bool_create, xpc_copy,
-    xpc_copy_description, xpc_double_create, xpc_fd_create, xpc_int64_create, xpc_mach_recv_create,
-    xpc_mach_send_create, xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
+    xpc_array_append_value, xpc_array_create, xpc_bool_create, xpc_copy, xpc_copy_description,
+    xpc_double_create, xpc_fd_create, xpc_int64_create, xpc_mach_recv_create, xpc_mach_send_create,
+    xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
 };
+use libc::mach_port_t;
 use std::ffi::{CStr, CString};
 use std::os::unix::prelude::RawFd;
 use std::ptr::null_mut;
