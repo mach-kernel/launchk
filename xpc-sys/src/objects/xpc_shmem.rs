@@ -39,7 +39,7 @@ impl XPCShmem {
             Err(XPCError::IOError(rs_strerror(err)))
         } else {
             let xpc_object: XPCObject =
-                unsafe { xpc_shmem_create(region as *mut c_void, size as u64).into() };
+                unsafe { xpc_shmem_create(region as *mut c_void, size).into() };
 
             log::info!(
                 "XPCShmem new (region: {:p}, xpc_object_t {:p})",

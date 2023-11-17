@@ -6,7 +6,7 @@ use std::rc::Rc;
 use crate::objects::xpc_object::{MachPortType, XPCObject};
 use crate::objects::xpc_type;
 use crate::{
-    mach_port_t, size_t, xpc_array_apply, xpc_bool_get_value, xpc_double_get_value,
+    mach_port_t, xpc_array_apply, xpc_bool_get_value, xpc_double_get_value,
     xpc_int64_get_value, xpc_mach_send_get_right, xpc_object_t, xpc_string_get_string_ptr,
     xpc_type_get_name, xpc_uint64_get_value,
 };
@@ -95,7 +95,7 @@ impl TryXPCValue<Vec<Arc<XPCObject>>> for XPCObject {
         let vec: Rc<RefCell<Vec<Arc<XPCObject>>>> = Rc::new(RefCell::new(vec![]));
         let vec_rc_clone = vec.clone();
 
-        let block = ConcreteBlock::new(move |_: size_t, obj: xpc_object_t| {
+        let block = ConcreteBlock::new(move |_: usize, obj: xpc_object_t| {
             let xpc_object: XPCObject = XPCObject::xpc_copy(obj);
             vec_rc_clone.borrow_mut().push(xpc_object.into());
             true

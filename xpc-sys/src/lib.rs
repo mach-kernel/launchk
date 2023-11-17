@@ -155,7 +155,7 @@ pub unsafe fn read_xpc_global_data() -> Option<&'static xpc_global_data> {
 pub unsafe fn rs_sysctlbyname(name: &str) -> Result<String, String> {
     let name = CString::new(name).unwrap();
     let mut ret_buf: [c_char; 256] = [0; 256];
-    let mut size = ret_buf.len() as u64;
+    let mut size = ret_buf.len();
 
     let err = sysctlbyname(
         name.as_ptr(),
