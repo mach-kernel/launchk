@@ -25,6 +25,13 @@ fn main() {
         // bindings for.
         .header(xpc_path)
         .header(bootstrap_path)
+        // Filter the results to only relevant symbols
+        .allowlist_function("^xpc_.*")
+        .allowlist_var("^_xpc_.*")
+        .allowlist_var("^bootstrap_port")
+        // The following symbols should probably be in libc or mach2, but are not
+        .allowlist_function("^mach_port.*")
+        .allowlist_function("^vm_allocate")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))

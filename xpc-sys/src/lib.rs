@@ -8,6 +8,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate bitflags;
 
+pub use libc::MAP_SHARED;
 use libc::{geteuid, mach_task_self_, strerror, sysctlbyname, KERN_SUCCESS, MACH_PORT_NULL};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_long, c_void};
