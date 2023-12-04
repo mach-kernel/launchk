@@ -220,6 +220,12 @@ impl Drop for XPCObject {
     /// https://developer.apple.com/documentation/xpc/1505851-xpc_release
     fn drop(&mut self) {
         let XPCObject(ptr, _) = &self;
+
+        if *ptr == null_mut() {
+            log::info!("XPCObject drop null -- will not call xpc_release() (default?)");
+            return 
+        }
+
         log::info!(
             "XPCObject drop ({:p}, {}, {})",
             *ptr,
@@ -229,6 +235,7 @@ impl Drop for XPCObject {
                 .map(|(r, xr)| format!("refs {} xrefs {}", r, xr))
                 .unwrap_or("refs ???".to_string()),
         );
+
         unsafe { xpc_release(*ptr) }
     }
 }
