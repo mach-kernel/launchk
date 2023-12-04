@@ -98,7 +98,7 @@ impl fmt::Display for XPCObject {
         let XPCObject(ptr, _) = self;
 
         if *ptr == null_mut() {
-            write!(f, "XPCObject is NULL")
+            write!(f, "{:?} xpc_object_t is NULL", self)
         } else {
             let xpc_desc = unsafe { xpc_copy_description(*ptr) };
             let cstr = unsafe { CStr::from_ptr(xpc_desc) };
@@ -222,7 +222,7 @@ impl Drop for XPCObject {
         let XPCObject(ptr, _) = &self;
 
         if *ptr == null_mut() {
-            log::info!("XPCObject drop null -- will not call xpc_release() (default?)");
+            log::info!("XPCObject xpc_object_t is NULL, not calling xpc_release() (Default?)");
             return 
         }
 
@@ -266,5 +266,19 @@ mod tests {
         ] {
             assert!(obj.get_refs().is_some())
         }
+    }
+
+    #[test]
+    fn drop_default() {
+        let my_obj = XPCObject::default();
+        drop(my_obj);
+    }
+
+    #[test]
+    fn display_default() {
+        let my_obj = XPCObject::default();
+        assert!(
+            format!("{}", my_obj) == "XPCObject(0x0, XPCType(0x0)) xpc_object_t is NULL"
+        );
     }
 }
