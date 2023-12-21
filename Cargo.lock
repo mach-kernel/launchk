@@ -1648,7 +1648,7 @@ checksum = "a67300977d3dc3f8034dae89778f502b6ba20b269527b3223ba59c0cf393bb8a"
 
 [[package]]
 name = "xpc-sys"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "bindgen",
  "bitflags 2.4.0",

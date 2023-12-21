@@ -85,12 +85,6 @@ impl XPCObject {
     }
 }
 
-impl Default for XPCObject {
-    fn default() -> Self {
-        Self(null_mut(), XPCType(null_mut()))
-    }
-}
-
 impl fmt::Display for XPCObject {
     /// Use xpc_copy_description to show as a string, for
     /// _xpc_type_dictionary contents are shown!
@@ -266,19 +260,5 @@ mod tests {
         ] {
             assert!(obj.get_refs().is_some())
         }
-    }
-
-    #[test]
-    fn drop_default() {
-        let my_obj = XPCObject::default();
-        drop(my_obj);
-    }
-
-    #[test]
-    fn display_default() {
-        let my_obj = XPCObject::default();
-        assert!(
-            format!("{}", my_obj) == "XPCObject(0x0, XPCType(0x0)) xpc_object_t is NULL"
-        );
     }
 }
