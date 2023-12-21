@@ -216,7 +216,7 @@ impl Drop for XPCObject {
         let XPCObject(ptr, _) = &self;
 
         if *ptr == null_mut() {
-            log::info!("XPCObject xpc_object_t is NULL, not calling xpc_release() (Default?)");
+            log::info!("XPCObject xpc_object_t is NULL, not calling xpc_release()");
             return 
         }
 
