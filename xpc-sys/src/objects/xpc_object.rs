@@ -85,12 +85,6 @@ impl XPCObject {
     }
 }
 
-impl Default for XPCObject {
-    fn default() -> Self {
-        Self(null_mut(), XPCType(null_mut()))
-    }
-}
-
 impl fmt::Display for XPCObject {
     /// Use xpc_copy_description to show as a string, for
     /// _xpc_type_dictionary contents are shown!
@@ -98,7 +92,7 @@ impl fmt::Display for XPCObject {
         let XPCObject(ptr, _) = self;
 
         if *ptr == null_mut() {
-            write!(f, "XPCObject is NULL")
+            write!(f, "{:?} xpc_object_t is NULL", self)
         } else {
             let xpc_desc = unsafe { xpc_copy_description(*ptr) };
             let cstr = unsafe { CStr::from_ptr(xpc_desc) };
@@ -220,6 +214,12 @@ impl Drop for XPCObject {
     /// https://developer.apple.com/documentation/xpc/1505851-xpc_release
     fn drop(&mut self) {
         let XPCObject(ptr, _) = &self;
+
+        if *ptr == null_mut() {
+            log::info!("XPCObject xpc_object_t is NULL, not calling xpc_release()");
+            return 
+        }
+
         log::info!(
             "XPCObject drop ({:p}, {}, {})",
             *ptr,
@@ -229,6 +229,7 @@ impl Drop for XPCObject {
                 .map(|(r, xr)| format!("refs {} xrefs {}", r, xr))
                 .unwrap_or("refs ???".to_string()),
         );
+
         unsafe { xpc_release(*ptr) }
     }
 }
