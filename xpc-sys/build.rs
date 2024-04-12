@@ -29,6 +29,8 @@ fn main() {
         .allowlist_function("^xpc_.*")
         .allowlist_var("^_xpc_.*")
         .allowlist_var("^bootstrap_port")
+        // This function began appearing as of macOS 14.4 SDK headers
+        .blocklist_function("xpc_dictionary_set_mach_send")
         // The following symbols should probably be in libc or mach2, but are not
         .allowlist_function("^mach_port.*")
         .allowlist_function("^vm_allocate")
