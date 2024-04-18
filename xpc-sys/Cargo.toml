@@ -7,6 +7,7 @@ license = "MIT"
 edition = "2018"
 keywords = ["apple", "xpc", "xpc-dictionary"]
 categories = ["external-ffi-bindings", "os::macos-apis"]
+repository = "https://github.com/mach-kernel/launchk"
 
 [package.metadata.docs.rs]
 # This sets the default target to `x86_64-unknown-linux-gnu`
