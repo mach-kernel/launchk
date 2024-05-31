@@ -104,7 +104,7 @@ pub const SYSTEM_LAUNCH_DAEMONS: &str = "/System/Library/LaunchDaemons";
 
 async fn fsnotify_subscriber() {
     let (tx, rx): (Sender<DebounceEventResult>, Receiver<DebounceEventResult>) = channel();
-    let mut debouncer = new_debouncer(Duration::from_secs(5), None, tx).unwrap();
+    let mut debouncer = new_debouncer(Duration::from_secs(5), tx).unwrap();
     let watcher = debouncer.watcher();
 
     // Register plist paths
