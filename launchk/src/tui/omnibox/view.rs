@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, TryLockResult};
 use std::time::Duration;
 
 use tokio::runtime::Handle;
@@ -27,6 +27,7 @@ pub enum OmniboxEvent {
 #[derive(Debug, Clone)]
 pub enum OmniboxError {
     ReferenceError,
+    StateError,
     CommandError(String),
     Many(Vec<OmniboxError>),
 }
@@ -90,7 +91,7 @@ async fn tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>) {
 pub struct OmniboxView {
     state: Arc<RwLock<OmniboxState>>,
     tx: Sender<OmniboxEvent>,
-    last_size: RefCell<XY<usize>>,
+    last_size: Arc<RwLock<XY<usize>>>,
 }
 
 impl OmniboxView {
@@ -108,7 +109,7 @@ impl OmniboxView {
             Self {
                 state,
                 tx: tx.clone(),
-                last_size: RefCell::new(XY::new(0, 0)),
+                last_size: Arc::new(RwLock::new(XY::new(0, 0))),
             },
             tx,
             rx,
@@ -273,7 +274,7 @@ impl OmniboxView {
         printer.print(XY::new(start, 0), format!("-- {}", desc).as_str());
     }
 
-    fn draw_job_type_filter(&self, printer: &Printer<'_, '_>) {
+    fn draw_job_type_filter(&self, printer: &Printer<'_, '_>) -> Result<(), OmniboxError> {
         let read = self.state.read().expect("Must read state");
         let OmniboxState {
             job_type_filter,
@@ -287,8 +288,8 @@ impl OmniboxView {
             "[system global user agent daemon loaded]".len()
         };
 
-        if jtf_ofs < self.last_size.borrow().x {
-            jtf_ofs = self.last_size.borrow().x - jtf_ofs;
+        if jtf_ofs < self.last_size.read().map_err(|_| OmniboxError::StateError)?.x {
+            jtf_ofs = self.last_size.read().map_err(|_| OmniboxError::StateError)?.x - jtf_ofs;
         }
 
         printer.print(XY::new(jtf_ofs, 0), "[");
@@ -330,6 +331,8 @@ impl OmniboxView {
         }
 
         printer.print(XY::new(jtf_ofs, 0), "]");
+
+        Ok(())
     }
 }
 
@@ -340,7 +343,12 @@ impl View for OmniboxView {
     }
 
     fn layout(&mut self, sz: Vec2) {
-        self.last_size.replace(sz);
+        match self.last_size.try_write() {
+            Ok(mut lsz) => *lsz = sz,
+            Err(_) => {
+                log::error!("Unable to update view last_size")
+            }
+        }
     }
 
     fn on_event(&mut self, event: Event) -> EventResult {

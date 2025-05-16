@@ -35,7 +35,7 @@ impl View for TableHeaders {
                 format!(
                     "{:with_padding$}",
                     column,
-                    with_padding = self.column_sizer.width_for_index(i)
+                    with_padding = self.column_sizer.width_for_index(i).unwrap_or(1)
                 )
             })
             .collect::<Vec<String>>()

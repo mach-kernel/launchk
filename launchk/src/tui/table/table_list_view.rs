@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 
 use std::collections::hash_map::DefaultHasher;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use cursive::event::{Event, EventResult};
 use cursive::traits::{Resizable, Scrollable};
@@ -26,10 +26,10 @@ pub struct TableListView<T> {
     linear_layout: LinearLayout,
     // LinearLayout swallows T from , but we still need it
     inner: PhantomData<T>,
-    last_hash: RefCell<u64>,
+    last_hash: Arc<RwLock<u64>>,
 }
 
-impl<T: 'static + TableListItem> TableListView<T> {
+impl<T: 'static + TableListItem + Send + Sync> TableListView<T> {
     pub fn new<I, K>(columns: I) -> TableListView<T>
     where
         I: IntoIterator<Item = (K, Option<usize>)> + Clone,
@@ -40,7 +40,7 @@ impl<T: 'static + TableListItem> TableListView<T> {
             .into_iter()
             .map(|(n, _)| n.as_ref().to_string());
         let column_sizer = ColumnSizer::new(columns);
-        let last_hash = RefCell::new(0u64);
+        let last_hash = Arc::new(RwLock::new(0u64));
 
         let mut linear_layout = LinearLayout::vertical();
         linear_layout.add_child(
@@ -77,7 +77,7 @@ impl<T: 'static + TableListItem> TableListView<T> {
                     .take(self.column_sizer.num_columns)
                     .enumerate()
                     .map(|(i, field)| {
-                        let wfi = self.column_sizer.width_for_index(i);
+                        let wfi = self.column_sizer.width_for_index(i).unwrap_or(1);
                         let mut truncated = field.clone();
                         truncated.truncate(wfi - 1);
                         format!("{:with_padding$}", truncated, with_padding = wfi)
@@ -92,11 +92,19 @@ impl<T: 'static + TableListItem> TableListView<T> {
         rows.hash(&mut row_hasher);
         let hash = row_hasher.finish();
 
-        if *self.last_hash.borrow() == hash {
-            return;
+        match self.last_hash.try_read() {
+            Ok(lh) => {
+                if (*lh == hash) { return; }
+            }
+            _ => {}
         }
+
         log::trace!("Replaced listview items -- new hash {}", hash);
-        *self.last_hash.borrow_mut() = hash;
+
+        match self.last_hash.try_write() {
+            Ok(mut lh) => *lh = hash,
+            _ => {}
+        }
 
         let sv = self.get_mut_selectview();
         let current_selection = sv.selected_id().unwrap_or(0);
@@ -106,7 +114,7 @@ impl<T: 'static + TableListItem> TableListView<T> {
         sv.set_selection(current_selection);
     }
 
-    pub fn get_highlighted_row(&self) -> Option<Rc<T>> {
+    pub fn get_highlighted_row(&self) -> Option<Arc<T>> {
         self.get_selectview().selection()
     }
 
@@ -139,7 +147,7 @@ impl<T: 'static + TableListItem> TableListView<T> {
     }
 }
 
-impl<T: 'static + TableListItem> ViewWrapper for TableListView<T> {
+impl<T: 'static + TableListItem + Send + Sync> ViewWrapper for TableListView<T> {
     wrap_impl!(self.linear_layout: LinearLayout);
 
     fn wrap_on_event(&mut self, event: Event) -> EventResult {

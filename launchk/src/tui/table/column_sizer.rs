@@ -1,12 +1,14 @@
 use std::{cell::Cell, collections::HashMap, sync::Arc};
+use std::sync::atomic::AtomicUsize;
+use std::sync::RwLock;
 
 /// Width oriented column sizing utility
 pub struct ColumnSizer {
     /// Non user defined columns are an even split of space remaining from
     /// x - user_sizes_total
-    pub dynamic_column_size: Cell<usize>,
+    pub dynamic_column_size: Arc<RwLock<usize>>,
     /// TODO; wtf do I mean by padding
-    pub padding: Cell<usize>,
+    pub padding: Arc<RwLock<usize>>,
     /// Column index -> width
     pub user_sizes: HashMap<usize, usize>,
     pub num_columns: usize,
@@ -14,6 +16,11 @@ pub struct ColumnSizer {
     num_dynamic_columns: usize,
     /// Sum of user size widths
     user_sizes_total: usize,
+}
+
+pub enum ColumnSizerError {
+    UpdateError,
+    ReadError,
 }
 
 impl ColumnSizer {
@@ -47,48 +54,61 @@ impl ColumnSizer {
     }
 
     /// Get the width for a column by index
-    pub fn width_for_index(&self, i: usize) -> usize {
+    pub fn width_for_index(&self, i: usize) -> Result<usize, ColumnSizerError> {
         let size = self
             .user_sizes
             .get(&i)
             .map(Clone::clone)
-            .unwrap_or(self.dynamic_column_size.get());
+            .unwrap_or(
+                *self
+                    .dynamic_column_size
+                    .try_read()
+                    .map_err(|_| ColumnSizerError::ReadError)?
+            );
 
         // I have 'sized' my user defined columns around how much
         // space I need to just display the font, and the rest by
         // blindly dividing space, only apply padding to UDCs
         let size = if self.user_sizes.contains_key(&i) {
-            size + self.padding.get()
+            size + *self.padding.try_read().map_err(|_| ColumnSizerError::ReadError)?
         } else {
             size
         };
 
-        if size > 1 {
+        let final_size = if size > 1 {
             size
         } else {
             1
-        }
+        };
+
+        Ok(final_size)
     }
 
     /// Call when x changes to recompute dynamic_column_size and padding
-    pub fn update_x(&self, x: usize) {
+    pub fn update_x(&self, x: usize) -> Result<(), ColumnSizerError> {
         let mut remaining = if x > self.user_sizes_total {
             x - self.user_sizes_total
         } else {
             0
         };
 
-        let mut dcs = remaining / self.num_dynamic_columns;
-        if dcs > 35 {
-            dcs = 35;
+        let mut new_dcs = remaining / self.num_dynamic_columns;
+        if new_dcs > 35 {
+            new_dcs = 35;
         }
 
-        if remaining > (self.num_dynamic_columns * dcs) {
-            remaining = remaining - (self.num_dynamic_columns * dcs);
+        if remaining > (self.num_dynamic_columns * new_dcs) {
+            remaining = remaining - (self.num_dynamic_columns * new_dcs);
         }
 
-        self.dynamic_column_size.set(dcs);
-        self.padding
-            .set(remaining / (self.num_dynamic_columns + self.user_sizes.len()));
+        match (self.dynamic_column_size.try_write(), self.padding.try_write()) {
+            (Ok(mut dcs), Ok(mut pad)) => {
+                *dcs = new_dcs;
+                *pad = remaining / (self.num_dynamic_columns + self.user_sizes.len());
+
+                Ok(())
+            }
+            _ => Err(ColumnSizerError::UpdateError)
+        }
     }
 }
