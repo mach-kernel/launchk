@@ -18,6 +18,7 @@ pub struct ColumnSizer {
     user_sizes_total: usize,
 }
 
+#[derive(Debug)]
 pub enum ColumnSizerError {
     UpdateError,
     ReadError,

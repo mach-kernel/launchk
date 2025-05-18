@@ -160,7 +160,7 @@ impl<T: 'static + TableListItem + Send + Sync> ViewWrapper for TableListView<T> 
     }
 
     fn wrap_layout(&mut self, size: Vec2) {
-        self.column_sizer.update_x(size.x);
+        self.column_sizer.update_x(size.x).expect("Must update");
         self.linear_layout.layout(size);
     }
 }
