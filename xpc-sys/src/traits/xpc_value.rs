@@ -10,12 +10,12 @@ use crate::{
     xpc_mach_send_get_right, xpc_object_t, xpc_string_get_string_ptr, xpc_type_get_name,
     xpc_uint64_get_value,
 };
-use libc::mach_port_t;
 
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::ValueError;
 use crate::objects::xpc_type::check_xpc_type;
 use std::sync::Arc;
+use mach2::port::mach_port_t;
 
 /// Implement to get data out of xpc_type_t and into
 /// a Rust native data type

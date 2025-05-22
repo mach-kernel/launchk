@@ -20,6 +20,7 @@ lazy_static = "1.4.0"
 log = "0.4.20"
 bitflags = "2.4.0"
 libc = "0.2.147"
+mach2 = "0.4.2"
 
 [build-dependencies]
 bindgen = "0.69.1"

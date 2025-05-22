@@ -12,10 +12,11 @@ use crate::objects::xpc_error::XPCError::DictionaryError;
 use crate::objects::xpc_object::XPCObject;
 use crate::rs_strerror;
 use crate::{
-    errno, xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t,
+    xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t,
 };
 
 use block::ConcreteBlock;
+use libc::__error;
 
 /// A wrapper around Rust HashMap<String, Arc<XPCObject>> that can
 /// be Into<XPCObject>
@@ -120,7 +121,7 @@ impl TryFrom<&XPCObject> for XPCDictionary {
         } else {
             Err(DictionaryError(format!(
                 "xpc_dictionary_apply failed: {}",
-                rs_strerror(unsafe { errno })
+                rs_strerror(unsafe { *__error() })
             )))
         }
     }

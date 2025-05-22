@@ -1,4 +1,4 @@
-use libc::{mkfifo, mode_t, open, tmpnam, O_RDONLY, O_WRONLY};
+use libc::{__error, mkfifo, mode_t, open, tmpnam, O_RDONLY, O_WRONLY};
 use std::os::unix::prelude::RawFd;
 use std::{
     ffi::{CStr, CString},
@@ -8,7 +8,7 @@ use std::{
     ptr::null_mut,
 };
 
-use crate::{errno, rs_strerror};
+use crate::rs_strerror;
 
 /// A wrapper around a UNIX FIFO
 pub struct UnixFifo(pub CString);
@@ -62,7 +62,7 @@ impl UnixFifo {
         if err == 0 {
             Ok(())
         } else {
-            Err(rs_strerror(unsafe { errno }))
+            Err(rs_strerror(unsafe { *__error() }))
         }
     }
 }
