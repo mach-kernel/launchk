@@ -1,7 +1,5 @@
-use std::cell::RefCell;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
-use std::rc::Rc;
 
 use std::collections::hash_map::DefaultHasher;
 use std::sync::{Arc, RwLock};
@@ -94,7 +92,7 @@ impl<T: 'static + TableListItem + Send + Sync> TableListView<T> {
 
         match self.last_hash.try_read() {
             Ok(lh) => {
-                if (*lh == hash) { return; }
+                if *lh == hash { return; }
             }
             _ => {}
         }

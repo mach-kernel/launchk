@@ -1,5 +1,5 @@
 use xpc_sys::objects::xpc_dictionary::XPCDictionary;
-use xpc_sys::traits::query_builder::QueryBuilder;
+use xpc_sys::traits::dict_builder::DictBuilder;
 
 // A bunch of XPCDictionary 'protos' that can be extended to make XPC queries
 

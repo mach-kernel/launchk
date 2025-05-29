@@ -1,6 +1,5 @@
-use std::cell::RefCell;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, RwLock, TryLockResult};
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use tokio::runtime::Handle;
