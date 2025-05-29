@@ -5,8 +5,8 @@
 Various utilities for conveniently dealing with XPC in Rust.
 
 - [Object lifecycle](#object-lifecycle)
-- [QueryBuilder](#query-builder)
 - [XPC Dictionary](#xpc-dictionary)
+  - [Builder](#builder)
 - [XPC Array](#xpc-array)
 - [XPC Shmem](#xpc-shmem)
 
@@ -64,34 +64,6 @@ pub struct XPCObject(pub xpc_object_t, pub XPCType);
 ```
 
 When it is dropped, [`xpc_release`](https://developer.apple.com/documentation/xpc/1505851-xpc_release) is called.
-
-[Top](#xpc-sys)
-
-#### QueryBuilder
-
-While we can go from `HashMap<&str, XPCObject>` to `XPCObject`, it can be a little verbose. A `QueryBuilder` trait exposes some builder methods to make building an XPC dictionary a little easier (without all of the `into()`s, and some additional error checking).
-
-To write the query for `launchctl list`:
-
-```rust
-    let LIST_SERVICES: XPCDictionary = XPCDictionary::new()
-        // "list com.apple.Spotlight" (if specified)
-        // .entry("name", "com.apple.Spotlight");
-        .entry("subsystem", 3 as u64)
-        .entry("handle", 0 as u64)
-        .entry("routine", 815 as u64)
-        .entry("legacy", true);
-
-    let reply: Result<XPCDictionary, XPCError> = XPCDictionary::new()
-        // LIST_SERVICES is a proto 
-        .extend(&LIST_SERVICES)
-        // Specify the domain type, or fall back on requester domain
-        .with_domain_type_or_default(Some(domain_type))
-        .entry_if_present("name", name)
-        .pipe_routine_with_error_handling();
-```
-
-In addition to checking `errno` is 0, `pipe_routine_with_error_handling` also looks for possible `error`  and `errors` keys in the response dictionary and provides an `Err()` with `xpc_strerror` contents.
 
 [Top](#xpc-sys)
 
@@ -160,6 +132,34 @@ let response: Result<XPCDictionary, XPCError> = xpc_object
 let XPCDictionary(hm) = response.unwrap();
 let whatever = hm.get("...");
 ```
+
+[Top](#xpc-sys)
+
+##### Builder
+
+A `DictBuilder` trait exposes some builder methods to make building an XPC dictionary easier (without all the `into()`s, and some additional error checking).
+
+To make the dict for `launchctl list`:
+
+```rust
+let LIST_SERVICES: XPCDictionary = XPCDictionary::new()
+    // "list com.apple.Spotlight" (if specified)
+    // .entry("name", "com.apple.Spotlight");
+    .entry("subsystem", 3 as u64)
+    .entry("handle", 0 as u64)
+    .entry("routine", 815 as u64)
+    .entry("legacy", true);
+
+let reply: Result<XPCDictionary, XPCError> = XPCDictionary::new()
+    // LIST_SERVICES is a proto 
+    .extend(&LIST_SERVICES)
+    // Specify the domain type, or fall back on requester domain
+    .with_domain_type_or_default(Some(domain_type))
+    .entry_if_present("name", name)
+    .pipe_routine_with_error_handling();
+```
+
+In addition to checking `errno` is 0, `pipe_routine_with_error_handling` also looks for possible `error`  and `errors` keys in the response dictionary and provides an `Err()` with `xpc_strerror` contents.
 
 [Top](#xpc-sys)
 

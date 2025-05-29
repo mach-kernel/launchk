@@ -1,7 +1,5 @@
-use std::cell::RefCell;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
-use std::rc::Rc;
 
 use std::collections::hash_map::DefaultHasher;
 use std::sync::{Arc, RwLock};
@@ -94,7 +92,7 @@ impl<T: 'static + TableListItem + Send + Sync> TableListView<T> {
 
         match self.last_hash.try_read() {
             Ok(lh) => {
-                if (*lh == hash) { return; }
+                if *lh == hash { return; }
             }
             _ => {}
         }
@@ -160,7 +158,7 @@ impl<T: 'static + TableListItem + Send + Sync> ViewWrapper for TableListView<T> 
     }
 
     fn wrap_layout(&mut self, size: Vec2) {
-        self.column_sizer.update_x(size.x);
+        self.column_sizer.update_x(size.x).expect("Must update");
         self.linear_layout.layout(size);
     }
 }

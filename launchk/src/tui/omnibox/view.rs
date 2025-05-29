@@ -1,6 +1,5 @@
-use std::cell::RefCell;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, RwLock, TryLockResult};
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use tokio::runtime::Handle;
@@ -339,7 +338,7 @@ impl OmniboxView {
 impl View for OmniboxView {
     fn draw(&self, printer: &Printer<'_, '_>) {
         self.draw_command_header(printer);
-        self.draw_job_type_filter(printer);
+        self.draw_job_type_filter(printer).expect("Must draw");
     }
 
     fn layout(&mut self, sz: Vec2) {

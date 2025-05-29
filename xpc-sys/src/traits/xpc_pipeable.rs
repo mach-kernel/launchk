@@ -56,7 +56,7 @@ pub trait XPCPipeable {
 
     fn handle_pipe_routine(ptr: xpc_object_t, errno: i32) -> XPCPipeResult {
         if errno == 0 {
-            Ok(ptr.into())
+            Ok(unsafe { XPCObject::from_raw(ptr) })
         } else {
             Err(PipeError(rs_xpc_strerror(errno)))
         }

@@ -1,5 +1,4 @@
-use std::{cell::Cell, collections::HashMap, sync::Arc};
-use std::sync::atomic::AtomicUsize;
+use std::{collections::HashMap, sync::Arc};
 use std::sync::RwLock;
 
 /// Width oriented column sizing utility
@@ -18,6 +17,7 @@ pub struct ColumnSizer {
     user_sizes_total: usize,
 }
 
+#[derive(Debug)]
 pub enum ColumnSizerError {
     UpdateError,
     ReadError,

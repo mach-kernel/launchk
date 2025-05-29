@@ -16,7 +16,7 @@ use crate::launchd::entry_status::ENTRY_STATUS_CACHE;
 use std::iter::FromIterator;
 use xpc_sys::objects::xpc_dictionary::XPCDictionary;
 use xpc_sys::objects::xpc_error::XPCError;
-use xpc_sys::traits::query_builder::QueryBuilder;
+use xpc_sys::traits::dict_builder::DictBuilder;
 
 use xpc_sys::enums::{DomainType, SessionType};
 
@@ -158,7 +158,7 @@ pub fn disable<S: Into<String>>(
 /// dumpstate contents into, and return the bytes written and
 /// shmem region
 pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
-    let shmem = XPCShmem::new_task_self(
+    let shmem = XPCShmem::allocate_task_self(
         0x1400000,
         i32::try_from(MAP_SHARED).expect("Must conv flags"),
     )?;
@@ -174,7 +174,7 @@ pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
 }
 
 pub fn dumpjpcategory() -> Result<(usize, XPCShmem), XPCError> {
-    let shmem = XPCShmem::new_task_self(
+    let shmem = XPCShmem::allocate_task_self(
         0x1400000,
         i32::try_from(MAP_SHARED).expect("Must conv flags"),
     )?;
@@ -190,7 +190,7 @@ pub fn dumpjpcategory() -> Result<(usize, XPCShmem), XPCError> {
 }
 
 pub fn procinfo(pid: i64) -> Result<(usize, XPCShmem), XPCError> {
-    let shmem = XPCShmem::new_task_self(
+    let shmem = XPCShmem::allocate_task_self(
         0x1400000,
         i32::try_from(MAP_SHARED).expect("Must conv flags"),
     )?;
