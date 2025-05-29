@@ -9,7 +9,7 @@ use cursive::direction::Direction;
 use cursive::event::EventResult;
 use cursive::view::CannotFocus;
 use cursive::view::ViewWrapper;
-use cursive::{Cursive, View, XY};
+use cursive::{Cursive, CursiveExt, View, XY};
 use sudo::RunningAs;
 
 use tokio::runtime::Handle;
@@ -214,12 +214,15 @@ impl ServiceListView {
 
         match cmd {
             OmniboxCommand::Edit => {
-                edit_and_replace(&plist).map_err(OmniboxError::CommandError)?;
+                let edited =
+                    edit_and_replace(&plist).map_err(OmniboxError::CommandError);
 
-                // Clear term
+                // Reinit curses
                 self.cb_sink
-                    .send(Box::new(Cursive::clear))
+                    .send(Box::new(|siv: &mut Cursive| siv.run()))
                     .expect("Must clear");
+
+                edited?;
 
                 Ok(Some(OmniboxCommand::Confirm(
                     format!("Reload {}?", name),

@@ -5,7 +5,7 @@ use std::sync::mpsc::Sender;
 
 use super::root::CbSinkMessage;
 use clearscreen;
-use cursive::Cursive;
+use cursive::{Cursive, CursiveExt};
 
 lazy_static! {
     static ref PAGER: String = env::var("PAGER").unwrap_or("less".to_string());
@@ -31,7 +31,7 @@ pub fn show_pager(cbsink: &Sender<CbSinkMessage>, buf: &[u8]) -> Result<(), Stri
     let res = pager.wait().map_err(|e| e.to_string())?;
 
     cbsink
-        .send(Box::new(Cursive::clear))
+        .send(Box::new(|siv: &mut Cursive| { siv.run(); }))
         .expect("Must clear after");
 
     if res.success() {

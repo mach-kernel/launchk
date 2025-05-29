@@ -247,6 +247,7 @@ impl OmniboxSubscriber for RootLayout {
                         s.quit();
                     }))
                     .expect("Must quit");
+
                 Ok(None)
             }
             OmniboxEvent::Command(OmniboxCommand::Sudo) => {
