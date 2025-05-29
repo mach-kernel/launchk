@@ -1,11 +1,7 @@
 use libc::c_int;
 
 use crate::objects::xpc_type::XPCType;
-use crate::{
-    xpc_array_append_value, xpc_array_create, xpc_bool_create, xpc_copy, xpc_copy_description,
-    xpc_double_create, xpc_fd_create, xpc_int64_create, xpc_mach_recv_create, xpc_mach_send_create,
-    xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
-};
+use crate::{xpc_array_append_value, xpc_array_create, xpc_bool_create, xpc_copy, xpc_copy_description, xpc_double_create, xpc_fd_create, xpc_int64_create, xpc_mach_recv_create, xpc_mach_send_create, xpc_object_t, xpc_release, xpc_retain, xpc_string_create, xpc_uint64_create};
 use libc::mach_port_t;
 use std::ffi::{CStr, CString};
 use std::os::unix::prelude::RawFd;
@@ -23,6 +19,14 @@ unsafe impl Send for XPCObject {}
 unsafe impl Sync for XPCObject {}
 
 impl XPCObject {
+    pub unsafe fn from_raw(value: xpc_object_t) -> XPCObject {
+        Self::new(value)
+    }
+
+    pub unsafe fn from_raw_retain(value: xpc_object_t) -> XPCObject {
+        Self::new(xpc_retain(value))
+    }
+
     fn new(value: xpc_object_t) -> Self {
         let obj = Self(value, value.into());
 
@@ -101,11 +105,11 @@ impl fmt::Display for XPCObject {
     }
 }
 
-impl From<xpc_object_t> for XPCObject {
-    fn from(value: xpc_object_t) -> Self {
-        XPCObject::new(value)
-    }
-}
+// impl From<xpc_object_t> for XPCObject {
+//     fn from(value: xpc_object_t) -> Self {
+//         XPCObject::new(value)
+//     }
+// }
 
 impl From<i64> for XPCObject {
     /// Create XPCObject via xpc_int64_create

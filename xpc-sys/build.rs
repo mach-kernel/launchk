@@ -27,7 +27,11 @@ fn main() {
         .header(bootstrap_path)
         // Filter the results to only relevant symbols
         .allowlist_function("^xpc_.*")
+        .allowlist_function("^dispatch.*")
+        .allowlist_function("^CF.*")
+        .allowlist_var("DISPATCH.*")
         .allowlist_var("^_xpc_.*")
+        .allowlist_var(("^XPC.*"))
         .blocklist_type("^mach.*")
         // This function began appearing as of macOS 14.4 SDK headers
         .blocklist_function("xpc_dictionary_set_mach_send")

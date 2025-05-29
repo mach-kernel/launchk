@@ -152,7 +152,7 @@ impl TryFrom<xpc_object_t> for XPCDictionary {
     /// related to passing in objects other than XPC_TYPE_DICTIONARY
     #[must_use]
     fn try_from(value: xpc_object_t) -> Result<XPCDictionary, XPCError> {
-        let obj: XPCObject = value.into();
+        let obj: XPCObject = unsafe { XPCObject::from_raw(value) };
         obj.try_into()
     }
 }
@@ -179,7 +179,7 @@ where
             }
         }
 
-        dict.into()
+        unsafe { XPCObject::from_raw(dict) }
     }
 }
 
