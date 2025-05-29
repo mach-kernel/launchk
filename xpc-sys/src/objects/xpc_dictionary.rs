@@ -11,9 +11,7 @@ use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::DictionaryError;
 use crate::objects::xpc_object::XPCObject;
 use crate::rs_strerror;
-use crate::{
-    xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t,
-};
+use crate::{xpc_dictionary_apply, xpc_dictionary_create, xpc_dictionary_set_value, xpc_object_t};
 
 use block::ConcreteBlock;
 use libc::__error;

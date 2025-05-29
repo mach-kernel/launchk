@@ -31,7 +31,7 @@ fn main() {
         .allowlist_function("^CF.*")
         .allowlist_var("DISPATCH.*")
         .allowlist_var("^_xpc_.*")
-        .allowlist_var(("^XPC.*"))
+        .allowlist_var("^XPC.*")
         .blocklist_type("^mach.*")
         // This function began appearing as of macOS 14.4 SDK headers
         .blocklist_function("xpc_dictionary_set_mach_send")

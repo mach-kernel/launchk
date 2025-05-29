@@ -14,8 +14,8 @@ use crate::{
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_error::XPCError::ValueError;
 use crate::objects::xpc_type::check_xpc_type;
-use std::sync::Arc;
 use mach2::port::mach_port_t;
+use std::sync::Arc;
 
 /// Implement to get data out of xpc_type_t and into
 /// a Rust native data type
