@@ -5,9 +5,9 @@ use crate::objects::xpc_object::MachPortType;
 use crate::objects::xpc_object::XPCObject;
 use mach2::port::mach_port_t;
 
-/// Builder methods for XPCDictionary to make querying easier
-pub trait QueryBuilder {
-    /// Add entry to query
+/// Builder methods for XPCDictionary
+pub trait DictBuilder {
+    /// Add entry
     fn entry<S: Into<String>, O: Into<XPCObject>>(self, key: S, value: O) -> XPCDictionary;
 
     /// Add entry if option is Some()
@@ -58,7 +58,7 @@ pub trait QueryBuilder {
     }
 }
 
-impl QueryBuilder for XPCDictionary {
+impl DictBuilder for XPCDictionary {
     fn entry<S: Into<String>, O: Into<XPCObject>>(mut self, key: S, value: O) -> XPCDictionary {
         let Self(hm) = &mut self;
         let xpc_object: XPCObject = value.into();

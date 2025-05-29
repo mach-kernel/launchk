@@ -1,6 +1,6 @@
 use crate::objects::xpc_error::XPCError;
 use crate::objects::xpc_object::XPCObject;
-use crate::{rs_strerror, xpc_shmem_create};
+use crate::{rs_strerror, xpc_object_t, xpc_retain, xpc_shmem_create, xpc_shmem_map};
 use mach2::port::mach_port_t;
 use mach2::traps::mach_task_self;
 use mach2::vm::{mach_vm_allocate, mach_vm_deallocate};
@@ -14,7 +14,7 @@ use std::sync::Arc;
 /// member of XPC type _xpc_type_shmem
 #[derive(Debug, Clone)]
 pub struct XPCShmem {
-    pub task: mach_port_t,
+    pub task: Option<mach_port_t>,
     pub size: mach_vm_size_t,
     pub region: *mut c_void,
     pub xpc_object: Arc<XPCObject>,
@@ -23,9 +23,32 @@ pub struct XPCShmem {
 unsafe impl Send for XPCShmem {}
 
 impl XPCShmem {
+    pub fn from_xpc_object(value: XPCObject) -> XPCShmem {
+        let mut region: *mut c_void = null_mut();
+        let size: mach_vm_size_t = unsafe { xpc_shmem_map(value.as_ptr(), &mut region) as mach_vm_size_t };
+
+        XPCShmem {
+            task: None,
+            region,
+            size,
+            xpc_object: Arc::new(value)
+        }
+    }
+
+    pub unsafe fn from_raw(value: xpc_object_t) -> XPCShmem {
+        let mut region: *mut c_void = null_mut();
+        let size: mach_vm_size_t = unsafe { xpc_shmem_map(value, &mut region) as mach_vm_size_t };
+
+        XPCShmem {
+            task: None,
+            region,
+            size,
+            xpc_object: XPCObject::from_raw(value).into()
+        }
+    }
+
     /// Allocate a region of memory of vm_size_t & flags, then wrap in a XPC Object
-    #[must_use]
-    pub fn new(task: mach_port_t, size: mach_vm_size_t, flags: c_int) -> Result<XPCShmem, XPCError> {
+    pub fn allocate(task: mach_port_t, size: mach_vm_size_t, flags: c_int) -> Result<XPCShmem, XPCError> {
         let mut region: *mut c_void = null_mut();
         let err = unsafe {
             mach_vm_allocate(
@@ -50,7 +73,7 @@ impl XPCShmem {
             );
 
             Ok(XPCShmem {
-                task,
+                task: Some(task),
                 size,
                 region,
                 xpc_object: xpc_object.into(),
@@ -58,11 +81,23 @@ impl XPCShmem {
         }
     }
 
-    /// new() with _mach_task_self
+    /// Make a new XPCShmem with _mach_task_self
     /// https://web.mit.edu/darwin/src/modules/xnu/osfmk/man/mach_task_self.html
-    #[must_use]
-    pub fn new_task_self(size: mach_vm_size_t, flags: c_int) -> Result<XPCShmem, XPCError> {
-        unsafe { Self::new(mach_task_self(), size, flags) }
+    pub fn allocate_task_self(size: mach_vm_size_t, flags: c_int) -> Result<XPCShmem, XPCError> {
+        unsafe { Self::allocate(mach_task_self(), size, flags) }
+    }
+}
+
+impl From<XPCObject> for XPCShmem {
+    fn from(value: XPCObject) -> Self {
+        Self::from_xpc_object(value)
+    }
+}
+
+impl From<&XPCObject> for XPCShmem {
+    fn from(value: &XPCObject) -> Self {
+        unsafe { xpc_retain(value.as_ptr()); }
+        Self::from_xpc_object(value.clone())
     }
 }
 
@@ -80,7 +115,7 @@ impl Drop for XPCShmem {
             xpc_object.as_ptr()
         );
 
-        let ok = unsafe { mach_vm_deallocate(*task, *region as mach_vm_address_t, *size) };
+        let ok = unsafe { mach_vm_deallocate(task.unwrap_or(mach_task_self()), *region as mach_vm_address_t, *size) };
 
         if ok != 0 {
             panic!("shmem won't drop (vm_deallocate errno {})", ok);
@@ -93,16 +128,17 @@ mod tests {
     use crate::objects::xpc_dictionary::XPCDictionary;
     use crate::objects::xpc_object::XPCObject;
     use crate::objects::xpc_shmem::XPCShmem;
-    use crate::traits::query_builder::QueryBuilder;
+    use crate::traits::dict_builder::DictBuilder;
     use crate::{dispatch_get_global_queue, xpc_connection_create, xpc_connection_create_from_endpoint, xpc_connection_resume, xpc_connection_send_message, xpc_connection_set_event_handler, xpc_connection_t, xpc_endpoint_create, xpc_object_t, xpc_retain, xpc_shmem_map, DISPATCH_QUEUE_PRIORITY_HIGH};
     use block::ConcreteBlock;
     use libc::MAP_SHARED;
 
     use std::convert::TryInto;
     use std::ffi::c_void;
+    use std::ops::Deref;
     use std::ptr::{null, null_mut};
     use std::slice::from_raw_parts;
-    use std::sync::mpsc;
+    use std::sync::{mpsc, Arc};
 
     fn activate_with_handler<F>(peer: xpc_connection_t, f: F) -> xpc_connection_t where F: Fn(xpc_object_t) + 'static {
         let block = ConcreteBlock::new(f);
@@ -122,7 +158,7 @@ mod tests {
 
         // Pages aligned by 16k on aarch64 and 4k on amd64. If you pass a smaller number
         // you will get the minimum page size per alignment
-        let shmem = XPCShmem::new_task_self(16384, MAP_SHARED)
+        let shmem = XPCShmem::allocate_task_self(16384, MAP_SHARED)
             .expect("Must make shmem");
 
         let shmem_slice = unsafe {
@@ -174,11 +210,11 @@ mod tests {
             .try_into()
             .expect("Must dict");
 
-        let rx_shmem = recv.get(&["shmem"]).unwrap();
+        let rx_shmem: XPCShmem = recv.get(&["shmem"]).unwrap().deref().into();
 
         // Map region from handle
         let mut rx_shmem_region: *mut c_void = null_mut();
-        unsafe { xpc_shmem_map(rx_shmem.as_ptr(), &mut rx_shmem_region); }
+        unsafe { xpc_shmem_map(rx_shmem.xpc_object.as_ptr(), &mut rx_shmem_region); }
 
         let rx_shmem_slice: &[u8] = unsafe { from_raw_parts(rx_shmem_region as *const _, nums.len()) };
 
