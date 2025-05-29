@@ -94,7 +94,7 @@ mod tests {
     use crate::objects::xpc_object::XPCObject;
     use crate::objects::xpc_shmem::XPCShmem;
     use crate::traits::query_builder::QueryBuilder;
-    use crate::{dispatch_get_global_queue, xpc_connection_create, xpc_connection_create_from_endpoint, xpc_connection_resume, xpc_connection_send_message, xpc_connection_set_event_handler, xpc_connection_t, xpc_dictionary_get_string, xpc_endpoint_create, xpc_object_t, xpc_retain, xpc_shmem_map, DISPATCH_QUEUE_PRIORITY_HIGH};
+    use crate::{dispatch_get_global_queue, xpc_connection_create, xpc_connection_create_from_endpoint, xpc_connection_resume, xpc_connection_send_message, xpc_connection_set_event_handler, xpc_connection_t, xpc_endpoint_create, xpc_object_t, xpc_retain, xpc_shmem_map, DISPATCH_QUEUE_PRIORITY_HIGH};
     use block::ConcreteBlock;
     use libc::MAP_SHARED;
 
