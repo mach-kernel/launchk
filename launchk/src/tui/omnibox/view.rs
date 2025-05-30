@@ -195,19 +195,19 @@ impl OmniboxView {
 
     /// Toggle bitmask on key
     fn handle_job_type_filter(event: &Event, state: &OmniboxState) -> Option<OmniboxState> {
-        let mut jtf = state.job_type_filter.clone();
+        let jtf = state.job_type_filter.clone();
 
-        match event {
-            Event::Char('s') => jtf.toggle(JobTypeFilter::SYSTEM),
-            Event::Char('g') => jtf.toggle(JobTypeFilter::GLOBAL),
-            Event::Char('u') => jtf.toggle(JobTypeFilter::USER),
-            Event::Char('a') => jtf.toggle(JobTypeFilter::AGENT),
-            Event::Char('d') => jtf.toggle(JobTypeFilter::DAEMON),
-            Event::Char('l') => jtf.toggle(JobTypeFilter::LOADED),
+        let new_jtf = match event {
+            Event::Char('s') => jtf.clear_scope().toggle_yield(JobTypeFilter::SYSTEM),
+            Event::Char('g') => jtf.clear_scope().toggle_yield(JobTypeFilter::GLOBAL),
+            Event::Char('u') => jtf.clear_scope().toggle_yield(JobTypeFilter::USER),
+            Event::Char('a') => jtf.clear_type().toggle_yield(JobTypeFilter::AGENT),
+            Event::Char('d') => jtf.clear_type().toggle_yield(JobTypeFilter::DAEMON),
+            Event::Char('l') => jtf.toggle_yield(JobTypeFilter::LOADED),
             _ => return None,
         };
 
-        Some(state.with_new(Some(OmniboxMode::JobTypeFilter), None, None, Some(jtf)))
+        Some(state.with_new(Some(OmniboxMode::JobTypeFilter), None, None, Some(new_jtf)))
     }
 
     fn draw_command_header(&self, printer: &Printer<'_, '_>) {
