@@ -19,10 +19,10 @@ use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxView};
 use crate::tui::pager::show_pager;
 use crate::tui::service_list::view::ServiceListView;
 use crate::{
-    launchd::query::dumpjpcategory,
+    launchd::command::dumpjpcategory,
     tui::dialog::{show_csr_info, show_help},
 };
-use crate::{launchd::query::dumpstate, tui::dialog};
+use crate::{launchd::command::dumpstate, tui::dialog};
 use std::thread;
 
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;

@@ -150,12 +150,12 @@ mod tests {
     use libc::MAP_SHARED;
     use std::collections::HashMap;
 
-    use std::convert::TryInto;
+    
     use std::ffi::c_void;
     use std::ops::Deref;
     use std::ptr::{null, null_mut};
     use std::slice::from_raw_parts;
-    use std::sync::{mpsc, Arc};
+    use std::sync::mpsc;
     use crate::object::try_xpc_into_rust::TryXPCIntoRust;
 
     fn activate_with_handler<F>(peer: xpc_connection_t, f: F) -> xpc_connection_t

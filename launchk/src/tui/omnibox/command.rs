@@ -10,8 +10,12 @@ pub enum OmniboxCommand {
     // to avoid having to prompt the user
     LoadRequest,
     UnloadRequest,
+    BootstrapRequest,
+    BootoutRequest,
     EnableRequest,
     DisableRequest,
+    Bootstrap(String),
+    Bootout(DomainType),
     Load(SessionType, DomainType, Option<u64>),
     Unload(DomainType, Option<u64>),
     // Reuses domain, handle, limit load to session type from existing
@@ -43,14 +47,14 @@ impl fmt::Display for OmniboxCommand {
 
 pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 12] = [
     (
-        "load",
-        "▶️  Load highlighted job",
-        OmniboxCommand::LoadRequest,
+        "bootstrap",
+        "▶️  Bootstrap highlighted service",
+        OmniboxCommand::BootstrapRequest,
     ),
     (
-        "unload",
-        "⏏️  Unload highlighted job",
-        OmniboxCommand::UnloadRequest,
+        "bootout",
+        "⏏️  Remove highlighted job",
+        OmniboxCommand::BootoutRequest,
     ),
     (
         "enable",

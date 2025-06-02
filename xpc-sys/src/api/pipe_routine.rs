@@ -3,7 +3,6 @@ use crate::object::xpc_error::XPCError;
 use crate::object::xpc_error::XPCError::PipeRoutineError;
 use crate::object::xpc_object::{XPCHashMap, XPCObject};
 use crate::{_xpc_pipe_interface_routine, get_xpc_bootstrap_pipe, rs_xpc_strerror, xpc_object_t, xpc_pipe_routine, xpc_pipe_routine_with_flags, xpc_pipe_t};
-use std::convert::TryInto;
 use std::ptr::null_mut;
 
 fn check_error(errno: i32) -> Result<(), XPCError> {
@@ -78,8 +77,8 @@ pub fn pipe_interface_routine<S: Into<XPCObject>>(
     }
 }
 
-pub fn handle_reply_dict_errors(reply: Result<XPCObject, XPCError>) -> Result<XPCObject, XPCError> {
-    let dict: XPCHashMap = reply.clone()?.to_rust()?;
+pub fn handle_reply_dict_errors(reply: XPCObject) -> Result<XPCObject, XPCError> {
+    let dict: XPCHashMap = reply.clone().to_rust()?;
 
     if dict.contains_key("error") {
         let errcode: i64 = dict.get("error").unwrap().to_rust()?;
@@ -93,7 +92,7 @@ pub fn handle_reply_dict_errors(reply: Result<XPCObject, XPCError>) -> Result<XP
         let errors_dict: XPCHashMap = dict.get("errors").unwrap().to_rust()?;
 
         if errors_dict.is_empty() {
-            return reply;
+            return Ok(reply);
         }
 
         let errors: Vec<String> = errors_dict
@@ -106,6 +105,6 @@ pub fn handle_reply_dict_errors(reply: Result<XPCObject, XPCError>) -> Result<XP
 
         Err(PipeRoutineError(errors.join("\n")))
     } else {
-        reply
+        Ok(reply)
     }
 }

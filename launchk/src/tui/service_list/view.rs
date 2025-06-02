@@ -18,8 +18,8 @@ use xpc_sys::enums::{DomainType, SessionType};
 
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::launchd::plist::{edit_and_replace, LaunchdEntryLocation, LABEL_TO_ENTRY_CONFIG};
-use crate::launchd::query::procinfo;
-use crate::launchd::query::{disable, enable, list_all, load, unload};
+use crate::launchd::command::{bootout, procinfo};
+use crate::launchd::command::{disable, enable, list_all, load};
 use crate::launchd::{
     entry_status::get_entry_status, entry_status::LaunchdEntryStatus, plist::LaunchdPlist,
 };
@@ -234,18 +234,15 @@ impl ServiceListView {
                     .map(|_| None)
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
             }
-            OmniboxCommand::Unload(dt, _handle) => {
+            OmniboxCommand::Bootout(dt) => {
                 let LaunchdEntryStatus {
-                    limit_load_to_session_type,
+                    
                     ..
                 } = status;
 
-                unload(
+                bootout(
                     name,
-                    plist.plist_path,
-                    Some(dt),
-                    Some(limit_load_to_session_type),
-                    None,
+                    dt
                 )
                 .map(|_| None)
                 .map_err(|e| OmniboxError::CommandError(e.to_string()))
@@ -315,7 +312,7 @@ impl ServiceListView {
                     )]
                 },
             ))),
-            OmniboxCommand::UnloadRequest => {
+            OmniboxCommand::BootoutRequest => {
                 let LaunchdEntryStatus { domain, .. } = status;
 
                 match domain {
@@ -324,7 +321,7 @@ impl ServiceListView {
                         true,
                         |dt, _| vec![OmniboxCommand::Unload(dt, None)],
                     ))),
-                    _ => Ok(Some(OmniboxCommand::Unload(domain, None))),
+                    _ => Ok(Some(OmniboxCommand::Bootout(domain))),
                 }
             }
             OmniboxCommand::EnableRequest => Ok(Some(OmniboxCommand::DomainSessionPrompt(
@@ -366,7 +363,7 @@ impl ServiceListView {
 
                 Ok(None)
             }
-            OmniboxCommand::Edit | OmniboxCommand::Load(_, _, _) | OmniboxCommand::Unload(_, _) => {
+            OmniboxCommand::Edit | OmniboxCommand::Load(_, _, _) | OmniboxCommand::Unload(_, _) | OmniboxCommand::Bootout(_) => {
                 self.handle_plist_command(cmd)
             }
             _ => Ok(None),

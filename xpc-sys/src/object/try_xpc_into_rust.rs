@@ -5,7 +5,7 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::rc::Rc;
 
-use crate::object::xpc_object::{MachPortType, XPCObject};
+use crate::object::xpc_object::{MachPortType, XPCHashMap, XPCObject};
 use crate::object::xpc_type;
 use crate::{object, rs_strerror, xpc_array_apply, xpc_bool_get_value, xpc_dictionary_apply, xpc_double_get_value, xpc_int64_get_value, xpc_mach_send_get_right, xpc_object_t, xpc_string_get_string_ptr, xpc_type_get_name, xpc_uint64_get_value};
 
@@ -16,8 +16,7 @@ use libc::__error;
 use mach2::port::mach_port_t;
 use std::sync::Arc;
 
-/// Implement to get data out of xpc_type_t and into
-/// a Rust native data type
+/// Go from xpc_object_t to a Rust type
 pub trait TryXPCIntoRust<Out> {
     fn to_rust(&self) -> Result<Out, XPCError>;
 }
@@ -37,7 +36,6 @@ impl TryXPCIntoRust<u64> for XPCObject {
 }
 
 impl TryXPCIntoRust<f64> for XPCObject {
-    #[must_use]
     fn to_rust(&self) -> Result<f64, XPCError> {
         check_xpc_type(&self, &xpc_type::Double)?;
         Ok(unsafe { xpc_double_get_value(self.as_ptr()) })
@@ -45,7 +43,6 @@ impl TryXPCIntoRust<f64> for XPCObject {
 }
 
 impl TryXPCIntoRust<String> for XPCObject {
-    #[must_use]
     fn to_rust(&self) -> Result<String, XPCError> {
         check_xpc_type(&self, &xpc_type::String)?;
         let cstr = unsafe { CStr::from_ptr(xpc_string_get_string_ptr(self.as_ptr())) };
@@ -55,7 +52,6 @@ impl TryXPCIntoRust<String> for XPCObject {
 }
 
 impl TryXPCIntoRust<bool> for XPCObject {
-    #[must_use]
     fn to_rust(&self) -> Result<bool, XPCError> {
         check_xpc_type(&self, &xpc_type::Bool)?;
         Ok(unsafe { xpc_bool_get_value(self.as_ptr()) })
@@ -63,7 +59,6 @@ impl TryXPCIntoRust<bool> for XPCObject {
 }
 
 impl TryXPCIntoRust<(MachPortType, mach_port_t)> for XPCObject {
-    #[must_use]
     fn to_rust(&self) -> Result<(MachPortType, mach_port_t), XPCError> {
         let types = [
             check_xpc_type(&self, &xpc_type::MachSend).map(|()| MachPortType::Send),
@@ -86,7 +81,6 @@ impl TryXPCIntoRust<(MachPortType, mach_port_t)> for XPCObject {
 }
 
 impl TryXPCIntoRust<Vec<Arc<XPCObject>>> for XPCObject {
-    #[must_use]
     fn to_rust(&self) -> Result<Vec<Arc<XPCObject>>, XPCError> {
         check_xpc_type(&self, &xpc_type::Array)?;
 
@@ -116,16 +110,16 @@ impl TryXPCIntoRust<Vec<Arc<XPCObject>>> for XPCObject {
     }
 }
 
-impl TryXPCIntoRust<HashMap<String, Arc<XPCObject>>> for XPCObject
+impl TryXPCIntoRust<XPCHashMap> for XPCObject
 {
-    fn to_rust(&self) -> Result<HashMap<String, Arc<XPCObject>>, XPCError> {
+    fn to_rust(&self) -> Result<XPCHashMap, XPCError> {
         if self.xpc_type() != *object::xpc_type::Dictionary {
             return Err(DictionaryError(
                 "Only XPC_TYPE_DICTIONARY allowed".to_string(),
             ));
         }
 
-        let map: Arc<RefCell<HashMap<String, Arc<XPCObject>>>> =
+        let map: Arc<RefCell<XPCHashMap>> =
             Arc::new(RefCell::new(HashMap::new()));
         let map_block_clone = map.clone();
 
@@ -166,12 +160,12 @@ impl TryXPCIntoRust<HashMap<String, Arc<XPCObject>>> for XPCObject
 mod tests {
     use crate::object::xpc_error::XPCError;
     use crate::object::xpc_error::XPCError::ValueError;
-    use crate::object::xpc_object::MachPortType;
+    use crate::object::xpc_object::{MachPortType, XPCHashMap};
     use crate::object::xpc_object::XPCObject;
     use crate::object::try_xpc_into_rust::TryXPCIntoRust;
     use crate::{get_bootstrap_port, xpc_dictionary_create, xpc_dictionary_set_int64};
     use libc::mach_port_t;
-    use std::collections::HashMap;
+    
     use std::ffi::CString;
     use std::ptr::{null, null_mut};
     use std::sync::Arc;
@@ -263,7 +257,7 @@ mod tests {
 
         unsafe { xpc_dictionary_set_int64(raw_dict, key.as_ptr(), value) };
 
-        let map: HashMap<String, Arc<XPCObject>> = unsafe {
+        let map: XPCHashMap = unsafe {
             XPCObject::from_raw(raw_dict).to_rust().unwrap()
         };
 
