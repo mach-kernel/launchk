@@ -66,15 +66,21 @@ fn build_entry_status<S: Into<String>>(label: S) -> LaunchdEntryStatus {
     let response = find_in_all(label_string.clone());
 
     let entry_config = crate::launchd::plist::for_label(label_string.clone());
-    let entry_config_domain = entry_config
-        .clone()
-        .map(|ec| ec.entry_location.into())
-        .unwrap_or(DomainType::RequestorDomain);
 
-    let domain = response
+    log::info!("build_entry_status: {:?}", entry_config);
+
+    let found_domain = response
         .clone()
         .map(|(domain, _)| domain)
-        .unwrap_or(entry_config_domain);
+        .ok();
+
+    // Prefer to infer domain from location of the plist,
+    // otherwise try to find it at runtime
+    let domain = entry_config
+        .clone()
+        .map(|ec| ec.entry_location.into())
+        .or(found_domain)
+        .unwrap_or(DomainType::RequestorDomain);
 
     let service: XPCHashMap = response
         .and_then(|(_, d)| d.get("service").ok_or(XPCError::NotFound).cloned())

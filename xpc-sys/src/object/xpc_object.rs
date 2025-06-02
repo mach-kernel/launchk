@@ -30,6 +30,13 @@ impl XPCObject {
         Self::new(xpc_retain(value))
     }
 
+    /// Box fd in an XPC object which "behaves like dup()", allowing
+    /// to close after wrapping.
+    pub unsafe fn from_raw_fd(value: RawFd) -> Self {
+        log::info!("Making FD from {}", value);
+        unsafe { XPCObject::new(xpc_fd_create(value)) }
+    }
+
     fn new(value: xpc_object_t) -> Self {
         let obj = Self(value, value.into());
 
@@ -122,6 +129,20 @@ impl From<u64> for XPCObject {
     }
 }
 
+impl From<i32> for XPCObject {
+    /// Create XPCObject via xpc_int64_create
+    fn from(value: i32) -> Self {
+        unsafe { XPCObject::new(xpc_int64_create(value as i64)) }
+    }
+}
+
+impl From<u32> for XPCObject {
+    /// Create XPCObject via xpc_uint64_create
+    fn from(value: u32) -> Self {
+        unsafe { XPCObject::new(xpc_uint64_create(value as u64)) }
+    }
+}
+
 impl From<f64> for XPCObject {
     /// Create XPCObject via xpc_double_create
     fn from(value: f64) -> Self {
@@ -190,15 +211,6 @@ impl<R: AsRef<XPCObject>> From<R> for XPCObject {
     /// https://developer.apple.com/documentation/xpc/1505584-xpc_copy?language=objc
     fn from(other: R) -> Self {
         Self::xpc_copy(other.as_ref().as_ptr())
-    }
-}
-
-impl From<RawFd> for XPCObject {
-    /// Box fd in an XPC object which "behaves like dup()", allowing
-    /// to close after wrapping.
-    fn from(value: RawFd) -> Self {
-        log::info!("Making FD from {}", value);
-        unsafe { XPCObject::new(xpc_fd_create(value)) }
     }
 }
 

@@ -16,6 +16,14 @@ pub trait DictBuilder {
         value: Option<O>,
     ) -> XPCHashMap;
 
+    /// Add entry if option is Some()
+    fn entry_if<S: Into<String>, O: Into<XPCObject>>(
+        self,
+        pred: bool,
+        key: S,
+        value: O,
+    ) -> XPCHashMap;
+
     /// Extend an existing XPCHashMap
     fn extend(self, other: &XPCHashMap) -> XPCHashMap;
 
@@ -73,6 +81,14 @@ impl DictBuilder for XPCHashMap {
             self
         } else {
             self.entry(key, value.unwrap())
+        }
+    }
+
+    fn entry_if<S: Into<String>, O: Into<XPCObject>>(self, pred: bool, key: S, value: O) -> XPCHashMap {
+        if pred {
+            self.entry(key, value)
+        } else {
+            self
         }
     }
 

@@ -20,7 +20,7 @@ use xpc_sys::object::xpc_object::XPCHashMap;
 pub fn find_in_all<S: Into<String>>(label: S) -> Result<(DomainType, XPCHashMap), XPCError> {
     let label_string = label.into();
 
-    for domain_type in DomainType::System as u64..=DomainType::RequestorDomain as u64 {
+    for domain_type in DomainType::System as u64..=DomainType::PID as u64 {
         let dict: XPCHashMap = HashMap::new()
             .extend(&LIST_SERVICES)
             .entry("type", domain_type)
@@ -148,8 +148,12 @@ pub fn bootout<S: Into<String>>(
     let dict = HashMap::new()
         .entry("name", label_string)
         .entry("no-einprogress", true)
-        .entry("handle", 0u64)
-        .entry("type", domain_type as u64);
+        // no handle for system
+        .entry_if(domain_type == DomainType::System, "handle", 0u64)
+        .entry_if(domain_type == DomainType::System, "type", 1u64)
+        // uid as handle for user
+        .entry_if(domain_type == DomainType::User, "handle", rs_geteuid() as u64)
+        .entry_if(domain_type == DomainType::User, "type", 8u64);
 
     pipe_interface_routine(None, 801, dict, None)
         .and_then(handle_reply_dict_errors)
@@ -170,10 +174,14 @@ pub fn bootstrap<S: Into<String>>(
         .remove(&label_string);
 
     let dict = HashMap::new()
-        .entry("handle", 0u64)
-        .entry("type", domain_type as u64)
         .entry("by-cli", true)
-        .entry("paths", vec![plist_path.into()]);
+        .entry("paths", vec![plist_path.into()])
+        // no handle for system
+        .entry_if(domain_type == DomainType::System, "handle", 0u64)
+        .entry_if(domain_type == DomainType::System, "type", 1u64)
+        // uid as handle for user
+        .entry_if(domain_type == DomainType::User, "handle", rs_geteuid() as u64)
+        .entry_if(domain_type == DomainType::User, "type", 8u64);
 
     pipe_interface_routine(None, 800, dict, None)
         .and_then(handle_reply_dict_errors)
