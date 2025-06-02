@@ -13,6 +13,7 @@ use std::process::Command;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::runtime::Handle;
+use xpc_sys::enums::DomainType;
 
 pub static PLIST_MAP_INIT: Once = Once::new();
 
@@ -56,6 +57,15 @@ pub enum LaunchdEntryLocation {
     Global,
     /// User provided agent
     User,
+}
+
+impl From<LaunchdEntryLocation> for DomainType {
+    fn from(value: LaunchdEntryLocation) -> Self {
+        match value {
+            LaunchdEntryLocation::Global | LaunchdEntryLocation::System => DomainType::System,
+            LaunchdEntryLocation::User => DomainType::User
+        }
+    }
 }
 
 impl fmt::Display for LaunchdEntryLocation {

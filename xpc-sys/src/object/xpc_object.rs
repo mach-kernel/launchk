@@ -232,11 +232,11 @@ impl Drop for XPCObject {
         let XPCObject(ptr, _) = &self;
 
         if *ptr == null_mut() {
-            log::info!("XPCObject xpc_object_t is NULL, not calling xpc_release()");
+            log::trace!("XPCObject xpc_object_t is NULL, not calling xpc_release()");
             return;
         }
 
-        log::info!(
+        log::trace!(
             "XPCObject drop ({:p}, {}, {})",
             *ptr,
             &self.xpc_type(),

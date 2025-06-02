@@ -18,7 +18,7 @@ use xpc_sys::enums::{DomainType, SessionType};
 
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::launchd::plist::{edit_and_replace, LaunchdEntryLocation, LABEL_TO_ENTRY_CONFIG};
-use crate::launchd::command::{bootout, procinfo};
+use crate::launchd::command::{bootout, bootstrap, procinfo};
 use crate::launchd::command::{disable, enable, list_all, load};
 use crate::launchd::{
     entry_status::get_entry_status, entry_status::LaunchdEntryStatus, plist::LaunchdPlist,
@@ -234,18 +234,15 @@ impl ServiceListView {
                     .map(|_| None)
                     .map_err(|e| OmniboxError::CommandError(e.to_string()))
             }
+            OmniboxCommand::Bootstrap(dt) => {
+                bootstrap(name, dt, plist.plist_path)
+                    .map(|_| None)
+                    .map_err(|e| OmniboxError::CommandError(e.to_string()))
+            }
             OmniboxCommand::Bootout(dt) => {
-                let LaunchdEntryStatus {
-                    
-                    ..
-                } = status;
-
-                bootout(
-                    name,
-                    dt
-                )
-                .map(|_| None)
-                .map_err(|e| OmniboxError::CommandError(e.to_string()))
+                bootout(name, dt)
+                    .map(|_| None)
+                    .map_err(|e| OmniboxError::CommandError(e.to_string()))
             }
             _ => Ok(None),
         }
@@ -255,18 +252,16 @@ impl ServiceListView {
         let (ServiceListItem { name, status, .. }, plist) = self.with_active_item_plist()?;
 
         let need_escalate = plist
-            .map(|LaunchdPlist { entry_location, .. }| {
-                entry_location == LaunchdEntryLocation::System
-                    || entry_location == LaunchdEntryLocation::Global
-            })
-            .unwrap_or(true);
+            .map(|p| p.entry_location.into())
+            .map(|d: DomainType| d == DomainType::System)
+            .unwrap_or(false);
 
         match cmd {
-            OmniboxCommand::LoadRequest
-            | OmniboxCommand::UnloadRequest
             | OmniboxCommand::DisableRequest
             | OmniboxCommand::EnableRequest
             | OmniboxCommand::ProcInfo
+            | OmniboxCommand::BootstrapRequest
+            | OmniboxCommand::BootoutRequest
             | OmniboxCommand::Edit => {
                 if (sudo::check() != RunningAs::Root) && need_escalate {
                     return Ok(Some(OmniboxCommand::Confirm(
@@ -301,28 +296,13 @@ impl ServiceListView {
                     ]))),
                 }
             }
-            OmniboxCommand::LoadRequest => Ok(Some(OmniboxCommand::DomainSessionPrompt(
-                name.clone(),
-                false,
-                |dt, st| {
-                    vec![OmniboxCommand::Load(
-                        st.expect("Must be provided"),
-                        dt,
-                        None,
-                    )]
-                },
-            ))),
+            OmniboxCommand::BootstrapRequest => {
+                let LaunchdEntryStatus { domain, .. } = status;
+                Ok(Some(OmniboxCommand::Bootstrap(domain)))
+            }
             OmniboxCommand::BootoutRequest => {
                 let LaunchdEntryStatus { domain, .. } = status;
-
-                match domain {
-                    DomainType::Unknown => Ok(Some(OmniboxCommand::DomainSessionPrompt(
-                        name.clone(),
-                        true,
-                        |dt, _| vec![OmniboxCommand::Unload(dt, None)],
-                    ))),
-                    _ => Ok(Some(OmniboxCommand::Bootout(domain))),
-                }
+                Ok(Some(OmniboxCommand::Bootout(domain)))
             }
             OmniboxCommand::EnableRequest => Ok(Some(OmniboxCommand::DomainSessionPrompt(
                 name.clone(),
@@ -363,7 +343,7 @@ impl ServiceListView {
 
                 Ok(None)
             }
-            OmniboxCommand::Edit | OmniboxCommand::Load(_, _, _) | OmniboxCommand::Unload(_, _) | OmniboxCommand::Bootout(_) => {
+            OmniboxCommand::Edit | OmniboxCommand::Load(_, _, _) | OmniboxCommand::Unload(_, _) | OmniboxCommand::Bootout(_) | OmniboxCommand::Bootstrap(_) => {
                 self.handle_plist_command(cmd)
             }
             _ => Ok(None),

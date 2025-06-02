@@ -39,7 +39,6 @@ impl From<u64> for SessionType {
     }
 }
 
-// TODO: This feels terrible
 impl From<String> for SessionType {
     fn from(value: String) -> Self {
         let aqua: String = SessionType::Aqua.to_string();

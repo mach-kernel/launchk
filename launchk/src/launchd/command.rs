@@ -138,6 +138,7 @@ pub fn bootout<S: Into<String>>(
     domain_type: DomainType,
 ) -> Result<XPCHashMap, XPCError> {
     let label_string = label.into();
+    log::debug!("bootout: {} {}", &label_string, domain_type);
 
     ENTRY_STATUS_CACHE
         .lock()
@@ -148,9 +149,33 @@ pub fn bootout<S: Into<String>>(
         .entry("name", label_string)
         .entry("no-einprogress", true)
         .entry("handle", 0u64)
-        .entry("type", 1u64);
+        .entry("type", domain_type as u64);
 
     pipe_interface_routine(None, 801, dict, None)
+        .and_then(handle_reply_dict_errors)
+        .and_then(|o| o.to_rust())
+}
+
+pub fn bootstrap<S: Into<String>>(
+    label: S,
+    domain_type: DomainType,
+    plist_path: S,
+) -> Result<XPCHashMap, XPCError> {
+    let label_string = label.into();
+    log::debug!("bootstrap: {} {}", &label_string, domain_type);
+
+    ENTRY_STATUS_CACHE
+        .lock()
+        .expect("Must invalidate")
+        .remove(&label_string);
+
+    let dict = HashMap::new()
+        .entry("handle", 0u64)
+        .entry("type", domain_type as u64)
+        .entry("by-cli", true)
+        .entry("paths", vec![plist_path.into()]);
+
+    pipe_interface_routine(None, 800, dict, None)
         .and_then(handle_reply_dict_errors)
         .and_then(|o| o.to_rust())
 }

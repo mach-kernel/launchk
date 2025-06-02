@@ -65,10 +65,16 @@ fn build_entry_status<S: Into<String>>(label: S) -> LaunchdEntryStatus {
     let label_string = label.into();
     let response = find_in_all(label_string.clone());
 
+    let entry_config = crate::launchd::plist::for_label(label_string.clone());
+    let entry_config_domain = entry_config
+        .clone()
+        .map(|ec| ec.entry_location.into())
+        .unwrap_or(DomainType::RequestorDomain);
+
     let domain = response
         .clone()
         .map(|(domain, _)| domain)
-        .unwrap_or(DomainType::Unknown);
+        .unwrap_or(entry_config_domain);
 
     let service: XPCHashMap = response
         .and_then(|(_, d)| d.get("service").ok_or(XPCError::NotFound).cloned())
@@ -80,15 +86,14 @@ fn build_entry_status<S: Into<String>>(label: S) -> LaunchdEntryStatus {
         .and_then(|o| o.to_rust().ok())
         .unwrap_or(0);
 
-    let limit_load_to_session_type: u64 = service
+    let limit_load_to_session_type: SessionType = service
         .get("LimitLoadToSessionType")
         .and_then(|o| o.to_rust().ok())
-        .unwrap_or(SessionType::Unknown as u64);
-
-    let entry_config = crate::launchd::plist::for_label(label_string.clone());
+        .map(|s: String| SessionType::from(s))
+        .unwrap_or(SessionType::Unknown);
 
     LaunchdEntryStatus {
-        limit_load_to_session_type: SessionType::from(limit_load_to_session_type),
+        limit_load_to_session_type,
         domain,
         plist: entry_config,
         pid,

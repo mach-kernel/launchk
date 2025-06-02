@@ -14,7 +14,7 @@ pub enum OmniboxCommand {
     BootoutRequest,
     EnableRequest,
     DisableRequest,
-    Bootstrap(String),
+    Bootstrap(DomainType),
     Bootout(DomainType),
     Load(SessionType, DomainType, Option<u64>),
     Unload(DomainType, Option<u64>),
