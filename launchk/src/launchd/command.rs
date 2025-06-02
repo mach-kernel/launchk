@@ -20,7 +20,7 @@ use xpc_sys::object::xpc_object::XPCHashMap;
 pub fn find_in_all<S: Into<String>>(label: S) -> Result<(DomainType, XPCHashMap), XPCError> {
     let label_string = label.into();
 
-    for domain_type in DomainType::System as u64..=DomainType::PID as u64 {
+    for domain_type in DomainType::System as u64..=DomainType::RequestorDomain as u64 {
         let dict: XPCHashMap = HashMap::new()
             .extend(&LIST_SERVICES)
             .entry("type", domain_type)
@@ -83,54 +83,6 @@ pub fn list_all() -> HashSet<String> {
         .flat_map(|k: Vec<String>| k.into_iter());
 
     HashSet::from_iter(list)
-}
-
-pub fn load<S: Into<String>>(
-    label: S,
-    plist_path: S,
-    domain_type: Option<DomainType>,
-    session: Option<SessionType>,
-    handle: Option<u64>,
-) -> Result<XPCHashMap, XPCError> {
-    ENTRY_STATUS_CACHE
-        .lock()
-        .expect("Must invalidate")
-        .remove(&label.into());
-
-    let dict = HashMap::new()
-        .extend(&LOAD_PATHS)
-        .with_domain_type_or_default(domain_type)
-        .with_session_type_or_default(session)
-        .with_handle_or_default(handle)
-        .entry("paths", vec![plist_path.into()]);
-
-    pipe_routine(None, dict)
-        .and_then(handle_reply_dict_errors)
-        .and_then(|o| o.to_rust())
-}
-
-pub fn unload<S: Into<String>>(
-    label: S,
-    plist_path: S,
-    domain_type: Option<DomainType>,
-    session: Option<SessionType>,
-    handle: Option<u64>,
-) -> Result<XPCHashMap, XPCError> {
-    ENTRY_STATUS_CACHE
-        .lock()
-        .expect("Must invalidate")
-        .remove(&label.into());
-
-    let dict = HashMap::new()
-        .extend(&UNLOAD_PATHS)
-        .with_domain_type_or_default(domain_type)
-        .with_session_type_or_default(session)
-        .with_handle_or_default(handle)
-        .entry("paths", vec![plist_path.into()]);
-
-    pipe_routine(None, dict)
-        .and_then(handle_reply_dict_errors)
-        .and_then(|o| o.to_rust())
 }
 
 pub fn bootout<S: Into<String>>(

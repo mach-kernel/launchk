@@ -64,7 +64,6 @@ pub fn get_entry_status<S: Into<String>>(label: S) -> LaunchdEntryStatus {
 fn build_entry_status<S: Into<String>>(label: S) -> LaunchdEntryStatus {
     let label_string = label.into();
     let response = find_in_all(label_string.clone());
-
     let entry_config = crate::launchd::plist::for_label(label_string.clone());
 
     log::info!("build_entry_status: {:?}", entry_config);

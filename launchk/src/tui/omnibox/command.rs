@@ -6,10 +6,6 @@ pub enum OmniboxCommand {
     Chain(Vec<OmniboxCommand>),
     // (message, on ok)
     Confirm(String, Vec<OmniboxCommand>),
-    // Try to see if we have session type & domain in entry_status,
-    // to avoid having to prompt the user
-    LoadRequest,
-    UnloadRequest,
     BootstrapRequest,
     BootoutRequest,
     EnableRequest,
@@ -18,8 +14,6 @@ pub enum OmniboxCommand {
     Bootout(DomainType),
     Load(SessionType, DomainType, Option<u64>),
     Unload(DomainType, Option<u64>),
-    // Reuses domain, handle, limit load to session type from existing
-    Reload,
     Enable(DomainType),
     Disable(DomainType),
     Edit,
@@ -45,7 +39,7 @@ impl fmt::Display for OmniboxCommand {
     }
 }
 
-pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 12] = [
+pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 11] = [
     (
         "bootstrap",
         "▶️  Bootstrap highlighted service",
@@ -68,13 +62,8 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 12] = [
     ),
     (
         "edit",
-        "✍️  Edit plist with $EDITOR then reload job",
+        "✍️  Edit plist with $EDITOR",
         OmniboxCommand::Edit,
-    ),
-    (
-        "reload",
-        "🔄  Reload highlighted job",
-        OmniboxCommand::Reload,
     ),
     ("csrinfo", "ℹ️  See all CSR flags", OmniboxCommand::CSRInfo),
     (

@@ -14,12 +14,12 @@ use sudo::RunningAs;
 
 use tokio::runtime::Handle;
 use tokio::time::interval;
-use xpc_sys::enums::{DomainType, SessionType};
+use xpc_sys::enums::DomainType;
 
-use crate::launchd::job_type_filter::JobTypeFilter;
-use crate::launchd::plist::{edit_and_replace, LaunchdEntryLocation, LABEL_TO_ENTRY_CONFIG};
 use crate::launchd::command::{bootout, bootstrap, procinfo};
-use crate::launchd::command::{disable, enable, list_all, load};
+use crate::launchd::command::{disable, enable, list_all};
+use crate::launchd::job_type_filter::JobTypeFilter;
+use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};
 use crate::launchd::{
     entry_status::get_entry_status, entry_status::LaunchdEntryStatus, plist::LaunchdPlist,
 };
@@ -215,24 +215,16 @@ impl ServiceListView {
         match cmd {
             OmniboxCommand::Edit => {
                 let edited =
-                    edit_and_replace(&plist).map_err(OmniboxError::CommandError);
+                    edit_and_replace(&plist)
+                        .map_err(OmniboxError::CommandError)
+                        .map(|()| Option::<OmniboxCommand>::None);
 
                 // Reinit curses
                 self.cb_sink
                     .send(Box::new(|siv: &mut Cursive| siv.run()))
                     .expect("Must clear");
 
-                edited?;
-
-                Ok(Some(OmniboxCommand::Confirm(
-                    format!("Reload {}?", name),
-                    vec![OmniboxCommand::Reload],
-                )))
-            }
-            OmniboxCommand::Load(st, dt, _handle) => {
-                load(name, plist.plist_path, Some(dt), Some(st), None)
-                    .map(|_| None)
-                    .map_err(|e| OmniboxError::CommandError(e.to_string()))
+                edited
             }
             OmniboxCommand::Bootstrap(dt) => {
                 bootstrap(name, dt, plist.plist_path)
@@ -274,28 +266,6 @@ impl ServiceListView {
         };
 
         match cmd {
-            OmniboxCommand::Reload => {
-                let LaunchdEntryStatus {
-                    limit_load_to_session_type,
-                    domain,
-                    ..
-                } = status;
-
-                match (limit_load_to_session_type, domain) {
-                    (_, DomainType::Unknown) | (SessionType::Unknown, _) => Ok(Some(
-                        OmniboxCommand::DomainSessionPrompt(name.clone(), false, |dt, st| {
-                            vec![
-                                OmniboxCommand::Unload(dt.clone(), None),
-                                OmniboxCommand::Load(st.expect("Must provide"), dt, None),
-                            ]
-                        }),
-                    )),
-                    (st, dt) => Ok(Some(OmniboxCommand::Chain(vec![
-                        OmniboxCommand::Unload(dt.clone(), None),
-                        OmniboxCommand::Load(st.clone(), dt.clone(), None),
-                    ]))),
-                }
-            }
             OmniboxCommand::BootstrapRequest => {
                 let LaunchdEntryStatus { domain, .. } = status;
                 Ok(Some(OmniboxCommand::Bootstrap(domain)))

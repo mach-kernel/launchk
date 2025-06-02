@@ -63,7 +63,7 @@ impl TryFrom<Arc<XPCObject>> for SessionType {
 
     fn try_from(value: Arc<XPCObject>) -> Result<Self, Self::Error> {
         check_xpc_type(&*value, &xpc_type::String)?;
-        let string: String = value.to_rust().unwrap();
+        let string: String = value.to_rust()?;
         Ok(string.into())
     }
 }
