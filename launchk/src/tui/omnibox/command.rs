@@ -10,6 +10,7 @@ pub enum OmniboxCommand {
     BootoutRequest,
     EnableRequest,
     DisableRequest,
+    Blame,
     Bootstrap(DomainType),
     Bootout(DomainType),
     Load(SessionType, DomainType, Option<u64>),
@@ -39,7 +40,12 @@ impl fmt::Display for OmniboxCommand {
     }
 }
 
-pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 11] = [
+pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 12] = [
+    (
+        "blame",
+        "❔  Why launchd launched the service",
+        OmniboxCommand::Blame,
+    ),
     (
         "bootstrap",
         "▶️  Bootstrap highlighted service",

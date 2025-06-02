@@ -16,13 +16,14 @@ use tokio::runtime::Handle;
 use tokio::time::interval;
 use xpc_sys::enums::DomainType;
 
-use crate::launchd::command::{bootout, bootstrap, procinfo};
+use crate::launchd::command::{blame, bootout, bootstrap, procinfo};
 use crate::launchd::command::{disable, enable, list_all};
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};
 use crate::launchd::{
     entry_status::get_entry_status, entry_status::LaunchdEntryStatus, plist::LaunchdPlist,
 };
+use crate::tui::dialog::show_notice;
 use crate::tui::omnibox::command::OmniboxCommand;
 
 use crate::tui::omnibox::state::OmniboxState;
@@ -266,6 +267,16 @@ impl ServiceListView {
         };
 
         match cmd {
+            OmniboxCommand::Blame => {
+                let LaunchdEntryStatus { domain, .. } = status;
+                let response = blame(name, domain)
+                    .map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+                self.cb_sink.send(show_notice(
+                    format!("{}", response),
+                    Some("Reason".to_string())
+                )).unwrap();
+                Ok(None)
+            }
             OmniboxCommand::BootstrapRequest => {
                 let LaunchdEntryStatus { domain, .. } = status;
                 Ok(Some(OmniboxCommand::Bootstrap(domain)))

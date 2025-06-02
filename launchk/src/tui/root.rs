@@ -144,7 +144,7 @@ impl RootLayout {
                     .expect("Must send response commands"),
                 Err(OmniboxError::CommandError(s)) => self
                     .cbsink_channel
-                    .send(dialog::show_error(s.clone()))
+                    .send(dialog::show_notice(s.clone(), None))
                     .expect("Must show error"),
                 _ => {}
             }

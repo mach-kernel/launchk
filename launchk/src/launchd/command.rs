@@ -1,4 +1,4 @@
-use crate::launchd::message::{DISABLE_NAMES, DUMPJPCATEGORY, DUMPSTATE, ENABLE_NAMES, LIST_SERVICES, LOAD_PATHS, PROCINFO, UNLOAD_PATHS};
+use crate::launchd::message::{DISABLE_NAMES, DUMPJPCATEGORY, DUMPSTATE, ENABLE_NAMES, LIST_SERVICES, PROCINFO};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 
@@ -12,7 +12,7 @@ use crate::launchd::entry_status::ENTRY_STATUS_CACHE;
 use std::iter::FromIterator;
 use xpc_sys::api::dict_builder::DictBuilder;
 use xpc_sys::api::pipe_routine::{handle_reply_dict_errors, pipe_interface_routine, pipe_routine};
-use xpc_sys::enums::{DomainType, SessionType};
+use xpc_sys::enums::DomainType;
 use xpc_sys::object::try_xpc_into_rust::TryXPCIntoRust;
 use xpc_sys::object::xpc_error::XPCError;
 use xpc_sys::object::xpc_object::XPCHashMap;
@@ -83,6 +83,39 @@ pub fn list_all() -> HashSet<String> {
         .flat_map(|k: Vec<String>| k.into_iter());
 
     HashSet::from_iter(list)
+}
+
+pub fn blame<S: Into<String>>(
+    label: S,
+    domain_type: DomainType,
+) -> Result<String, XPCError> {
+    let label_string = label.into();
+    log::debug!("blame: {} {}", &label_string, domain_type);
+
+    ENTRY_STATUS_CACHE
+        .lock()
+        .expect("Must invalidate")
+        .remove(&label_string);
+
+    let dict = HashMap::new()
+        .entry("name", label_string)
+        // no handle for system
+        .entry_if(domain_type == DomainType::System, "handle", 0u64)
+        .entry_if(domain_type == DomainType::System, "type", 1u64)
+        // uid as handle for user
+        .entry_if(domain_type == DomainType::User, "handle", rs_geteuid() as u64)
+        .entry_if(domain_type == DomainType::User, "type", 8u64);
+
+    let response: XPCHashMap = pipe_interface_routine(None, 707, dict, None)
+        .and_then(handle_reply_dict_errors)
+        .and_then(|o| o.to_rust())?;
+
+    let reason: String = response
+        .get("reason")
+        .ok_or(XPCError::NotFound)
+        .and_then(|o| o.to_rust())?;
+
+    Ok(reason)
 }
 
 pub fn bootout<S: Into<String>>(

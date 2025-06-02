@@ -16,13 +16,13 @@ use xpc_sys::csr::{csr_check, CsrConfig};
 use xpc_sys::enums::{DomainType, SessionType};
 
 /// XPC "error" key can be present with no failure..."notice"?
-pub fn show_error(err: String) -> CbSinkMessage {
+pub fn show_notice(msg: String, title: Option<String>) -> CbSinkMessage {
     let cl = |siv: &mut Cursive| {
-        let dialog = Dialog::around(TextView::new(err))
+        let dialog = Dialog::around(TextView::new(msg))
             .button("Ok", |s| {
                 s.pop_layer();
             })
-            .title("Notice");
+            .title(title.unwrap_or("Notice".to_string()));
 
         siv.add_layer(dialog);
     };
