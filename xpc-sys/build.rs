@@ -26,7 +26,8 @@ fn main() {
         .header(xpc_path)
         .header(bootstrap_path)
         // Filter the results to only relevant symbols
-        .allowlist_function("^xpc_.*")
+        .allowlist_function("^xpc.*")
+        .allowlist_function("^_xpc.*")
         .allowlist_function("^dispatch.*")
         .allowlist_function("^CF.*")
         .allowlist_var("DISPATCH.*")

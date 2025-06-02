@@ -23,10 +23,10 @@ use std::ptr::null_mut;
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 //
+pub mod api;
 pub mod csr;
 pub mod enums;
-pub mod objects;
-pub mod traits;
+pub mod object;
 //
 
 pub type xpc_pipe_t = *mut c_void;
@@ -47,6 +47,9 @@ extern "C" {
         flags: u64,
     ) -> c_int;
     pub fn xpc_pipe_routine(pipe: xpc_pipe_t, msg: xpc_object_t, reply: *mut xpc_object_t)
+        -> c_int;
+
+    pub fn _xpc_pipe_interface_routine(pipe: xpc_pipe_t, routine: u64, msg: xpc_object_t, reply: *mut xpc_object_t, flags: u64)
         -> c_int;
 
     // https://grep.app/search?q=_xpc_type_mach_.%2A&regexp=true

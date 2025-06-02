@@ -1,26 +1,25 @@
 use libc::c_int;
+use std::collections::HashMap;
 
-use crate::objects::xpc_type::XPCType;
-use crate::{
-    xpc_array_append_value, xpc_array_create, xpc_bool_create, xpc_copy, xpc_copy_description,
-    xpc_double_create, xpc_fd_create, xpc_int64_create, xpc_mach_recv_create, xpc_mach_send_create,
-    xpc_object_t, xpc_release, xpc_retain, xpc_string_create, xpc_uint64_create,
-};
+use crate::object::xpc_type::XPCType;
+use crate::{xpc_array_append_value, xpc_array_create, xpc_bool_create, xpc_copy, xpc_copy_description, xpc_dictionary_create, xpc_dictionary_set_value, xpc_double_create, xpc_fd_create, xpc_int64_create, xpc_mach_recv_create, xpc_mach_send_create, xpc_object_t, xpc_release, xpc_retain, xpc_string_create, xpc_uint64_create};
 use libc::mach_port_t;
 use std::ffi::{CStr, CString};
 use std::os::unix::prelude::RawFd;
-use std::ptr::null_mut;
+use std::ptr::{null, null_mut};
 
-use crate::objects::xpc_dictionary::XPCDictionary;
-use crate::objects::xpc_type;
-use crate::objects::xpc_type::check_xpc_type;
+use crate::object::xpc_type;
+use crate::object::xpc_type::check_xpc_type;
 use std::fmt;
+use std::sync::Arc;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct XPCObject(xpc_object_t, pub XPCType);
 
 unsafe impl Send for XPCObject {}
 unsafe impl Sync for XPCObject {}
+
+pub type XPCHashMap = HashMap<String, Arc<XPCObject>>;
 
 impl XPCObject {
     pub unsafe fn from_raw(value: xpc_object_t) -> XPCObject {
@@ -109,12 +108,6 @@ impl fmt::Display for XPCObject {
     }
 }
 
-// impl From<xpc_object_t> for XPCObject {
-//     fn from(value: xpc_object_t) -> Self {
-//         XPCObject::new(value)
-//     }
-// }
-
 impl From<i64> for XPCObject {
     /// Create XPCObject via xpc_int64_create
     fn from(value: i64) -> Self {
@@ -192,14 +185,6 @@ impl From<String> for XPCObject {
     }
 }
 
-impl From<XPCDictionary> for XPCObject {
-    /// Use From<HashMap<Into<String>, Arc<XPCObject>>>
-    fn from(xpcd: XPCDictionary) -> Self {
-        let XPCDictionary(hm) = xpcd;
-        hm.into()
-    }
-}
-
 impl<R: AsRef<XPCObject>> From<R> for XPCObject {
     /// Use xpc_copy() to copy out of refs.
     /// https://developer.apple.com/documentation/xpc/1505584-xpc_copy?language=objc
@@ -214,6 +199,29 @@ impl From<RawFd> for XPCObject {
     fn from(value: RawFd) -> Self {
         log::info!("Making FD from {}", value);
         unsafe { XPCObject::new(xpc_fd_create(value)) }
+    }
+}
+
+impl<S> From<HashMap<S, Arc<XPCObject>>> for XPCObject
+where
+    S: Into<String>,
+{
+    /// Creates a XPC dictionary
+    ///
+    /// Values must be Arc<XPCObject> but can encapsulate any
+    /// valid xpc_object_t
+    fn from(message: HashMap<S, Arc<XPCObject>>) -> Self {
+        let dict = unsafe { xpc_dictionary_create(null(), null_mut(), 0) };
+
+        for (k, v) in message {
+            unsafe {
+                let as_str: String = k.into();
+                let cstr = CString::new(as_str).unwrap();
+                xpc_dictionary_set_value(dict, cstr.as_ptr(), v.as_ptr());
+            }
+        }
+
+        unsafe { XPCObject::from_raw(dict) }
     }
 }
 
@@ -242,14 +250,21 @@ impl Drop for XPCObject {
     }
 }
 
+impl Clone for XPCObject {
+    fn clone(&self) -> Self {
+        XPCObject::xpc_copy(self.as_ptr())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::os::unix::prelude::RawFd;
-
     use libc::mach_port_t;
+    use std::collections::HashMap;
+    use std::ffi::{CStr, CString};
+    use std::os::unix::prelude::RawFd;
+    use std::sync::Arc;
 
-    use crate::get_bootstrap_port;
-    use crate::objects::xpc_dictionary::XPCDictionary;
+    use crate::{get_bootstrap_port, xpc_dictionary_get_string};
 
     use super::MachPortType;
     use super::XPCObject;
@@ -262,11 +277,25 @@ mod tests {
         for obj in &[
             XPCObject::from(5.24 as f64),
             XPCObject::from("foo"),
-            XPCObject::from(XPCDictionary::new()),
             XPCObject::from(1 as RawFd),
             XPCObject::from((MachPortType::Send, bootstrap_port)),
         ] {
             assert!(obj.get_refs().is_some())
         }
+    }
+
+    #[test]
+    fn xpc_object_from_hashmap() {
+        let mut hm: HashMap<&str, Arc<XPCObject>> = HashMap::new();
+        let value = "foo";
+        hm.insert("test", XPCObject::from(value).into());
+
+        let xpc_object = XPCObject::from(hm);
+        let key = CString::new("test").unwrap();
+
+        let cstr =
+            unsafe { CStr::from_ptr(xpc_dictionary_get_string(xpc_object.as_ptr(), key.as_ptr())) };
+
+        assert_eq!(cstr.to_str().unwrap(), value);
     }
 }

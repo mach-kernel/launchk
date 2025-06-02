@@ -5,9 +5,9 @@ use crate::{
     xpc_type_get_name, xpc_type_t,
 };
 
-use crate::objects::xpc_error::XPCError;
-use crate::objects::xpc_error::XPCError::ValueError;
-use crate::objects::xpc_object::XPCObject;
+use crate::object::xpc_error::XPCError;
+use crate::object::xpc_error::XPCError::ValueError;
+use crate::object::xpc_object::XPCObject;
 use std::ffi::CStr;
 use std::fmt;
 use std::ptr::null;

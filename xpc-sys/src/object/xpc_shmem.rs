@@ -1,5 +1,5 @@
-use crate::objects::xpc_error::XPCError;
-use crate::objects::xpc_object::XPCObject;
+use crate::object::xpc_error::XPCError;
+use crate::object::xpc_object::XPCObject;
 use crate::{rs_strerror, xpc_object_t, xpc_retain, xpc_shmem_create, xpc_shmem_map};
 use mach2::port::mach_port_t;
 use mach2::traps::mach_task_self;
@@ -137,10 +137,9 @@ impl Drop for XPCShmem {
 
 #[cfg(test)]
 mod tests {
-    use crate::objects::xpc_dictionary::XPCDictionary;
-    use crate::objects::xpc_object::XPCObject;
-    use crate::objects::xpc_shmem::XPCShmem;
-    use crate::traits::dict_builder::DictBuilder;
+    use crate::api::dict_builder::DictBuilder;
+    use crate::object::xpc_object::{XPCHashMap, XPCObject};
+    use crate::object::xpc_shmem::XPCShmem;
     use crate::{
         dispatch_get_global_queue, xpc_connection_create, xpc_connection_create_from_endpoint,
         xpc_connection_resume, xpc_connection_send_message, xpc_connection_set_event_handler,
@@ -149,6 +148,7 @@ mod tests {
     };
     use block::ConcreteBlock;
     use libc::MAP_SHARED;
+    use std::collections::HashMap;
 
     use std::convert::TryInto;
     use std::ffi::c_void;
@@ -156,6 +156,7 @@ mod tests {
     use std::ptr::{null, null_mut};
     use std::slice::from_raw_parts;
     use std::sync::{mpsc, Arc};
+    use crate::object::try_xpc_into_rust::TryXPCIntoRust;
 
     fn activate_with_handler<F>(peer: xpc_connection_t, f: F) -> xpc_connection_t
     where
@@ -217,7 +218,7 @@ mod tests {
         });
 
         // Send XPC dictionary with a shmem field
-        let dict: XPCObject = XPCDictionary::new()
+        let dict: XPCObject = HashMap::new()
             .entry("shmem", &shmem.xpc_object)
             .into();
 
@@ -226,9 +227,11 @@ mod tests {
         }
 
         // Read the same message back from the channel and assert the contents of the shmem
-        let recv: XPCDictionary = rx.recv().expect("Must recv").try_into().expect("Must dict");
+        let recv: XPCHashMap = rx
+            .recv().expect("Must recv")
+            .to_rust().expect("Must dict");
 
-        let rx_shmem: XPCShmem = recv.get(&["shmem"]).unwrap().deref().into();
+        let rx_shmem: XPCShmem = recv.get("shmem").unwrap().deref().into();
 
         // Map region from handle
         let mut rx_shmem_region: *mut c_void = null_mut();

@@ -1,27 +1,26 @@
 use crate::enums::{DomainType, SessionType};
 use crate::get_bootstrap_port;
-use crate::objects::xpc_dictionary::XPCDictionary;
-use crate::objects::xpc_object::MachPortType;
-use crate::objects::xpc_object::XPCObject;
+use crate::object::xpc_object::{MachPortType, XPCHashMap};
+use crate::object::xpc_object::XPCObject;
 use mach2::port::mach_port_t;
 
-/// Builder methods for XPCDictionary
+/// Builder methods for XPCHashMap
 pub trait DictBuilder {
     /// Add entry
-    fn entry<S: Into<String>, O: Into<XPCObject>>(self, key: S, value: O) -> XPCDictionary;
+    fn entry<S: Into<String>, O: Into<XPCObject>>(self, key: S, value: O) -> XPCHashMap;
 
     /// Add entry if option is Some()
     fn entry_if_present<S: Into<String>, O: Into<XPCObject>>(
         self,
         key: S,
         value: Option<O>,
-    ) -> XPCDictionary;
+    ) -> XPCHashMap;
 
-    /// Extend an existing XPCDictionary
-    fn extend(self, other: &XPCDictionary) -> XPCDictionary;
+    /// Extend an existing XPCHashMap
+    fn extend(self, other: &XPCHashMap) -> XPCHashMap;
 
     /// Adds "domain_port" with get_bootstrap_port() -> _xpc_type_mach_send
-    fn with_domain_port_as_bootstrap_port(self) -> XPCDictionary
+    fn with_domain_port_as_bootstrap_port(self) -> XPCHashMap
     where
         Self: Sized,
     {
@@ -34,7 +33,7 @@ pub trait DictBuilder {
     }
 
     /// Adds provided session type or falls back on Aqua
-    fn with_session_type_or_default(self, session: Option<SessionType>) -> XPCDictionary
+    fn with_session_type_or_default(self, session: Option<SessionType>) -> XPCHashMap
     where
         Self: Sized,
     {
@@ -42,7 +41,7 @@ pub trait DictBuilder {
     }
 
     /// Adds provided handle or falls back on 0
-    fn with_handle_or_default(self, handle: Option<u64>) -> XPCDictionary
+    fn with_handle_or_default(self, handle: Option<u64>) -> XPCHashMap
     where
         Self: Sized,
     {
@@ -50,7 +49,7 @@ pub trait DictBuilder {
     }
 
     /// Adds provided DomainType, falls back on 7 (requestor's domain)
-    fn with_domain_type_or_default(self, t: Option<DomainType>) -> XPCDictionary
+    fn with_domain_type_or_default(self, t: Option<DomainType>) -> XPCHashMap
     where
         Self: Sized,
     {
@@ -58,11 +57,10 @@ pub trait DictBuilder {
     }
 }
 
-impl DictBuilder for XPCDictionary {
-    fn entry<S: Into<String>, O: Into<XPCObject>>(mut self, key: S, value: O) -> XPCDictionary {
-        let Self(hm) = &mut self;
+impl DictBuilder for XPCHashMap {
+    fn entry<S: Into<String>, O: Into<XPCObject>>(mut self, key: S, value: O) -> XPCHashMap {
         let xpc_object: XPCObject = value.into();
-        hm.insert(key.into(), xpc_object.into());
+        self.insert(key.into(), xpc_object.into());
         self
     }
 
@@ -70,7 +68,7 @@ impl DictBuilder for XPCDictionary {
         self,
         key: S,
         value: Option<O>,
-    ) -> XPCDictionary {
+    ) -> XPCHashMap {
         if value.is_none() {
             self
         } else {
@@ -78,10 +76,9 @@ impl DictBuilder for XPCDictionary {
         }
     }
 
-    fn extend(mut self, other: &XPCDictionary) -> XPCDictionary {
-        let Self(self_hm) = &mut self;
-        let Self(other_hm) = other;
-        self_hm.extend(other_hm.iter().map(|(s, o)| (s.clone(), o.clone())));
+    fn extend(mut self, other: &XPCHashMap) -> XPCHashMap {
+        let m = &mut self;
+        m.extend(other.iter().map(|(s, o)| (s.clone(), o.clone())));
         self
     }
 }
