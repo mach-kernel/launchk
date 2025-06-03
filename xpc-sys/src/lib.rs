@@ -119,7 +119,7 @@ pub unsafe fn lookup_bootstrap_port() -> mach_port_t {
 
     let kr: kern_return_t = mach_ports_lookup(mach_task_self(), &mut found_ports, &mut num_ports);
 
-    if kr != KERN_SUCCESS as i32 {
+    if kr != KERN_SUCCESS {
         panic!("Unable to obtain Mach bootstrap port!");
     }
 

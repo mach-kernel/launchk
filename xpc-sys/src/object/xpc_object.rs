@@ -110,7 +110,7 @@ impl fmt::Display for XPCObject {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let XPCObject(ptr, _) = self;
 
-        if *ptr == null_mut() {
+        if (*ptr).is_null() {
             write!(f, "{:?} xpc_object_t is NULL", self)
         } else {
             let xpc_desc = unsafe { xpc_copy_description(*ptr) };
@@ -248,7 +248,7 @@ impl Drop for XPCObject {
     fn drop(&mut self) {
         let XPCObject(ptr, _) = &self;
 
-        if *ptr == null_mut() {
+        if (*ptr).is_null() {
             log::trace!("XPCObject xpc_object_t is NULL, not calling xpc_release()");
             return;
         }
@@ -292,7 +292,7 @@ mod tests {
         let bootstrap_port: mach_port_t = unsafe { get_bootstrap_port() };
 
         for obj in &[
-            XPCObject::from(5.24 as f64),
+            XPCObject::from(5.24_f64),
             XPCObject::from("foo"),
             XPCObject::from(1 as RawFd),
             XPCObject::from((MachPortType::Send, bootstrap_port)),

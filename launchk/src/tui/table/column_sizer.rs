@@ -55,7 +55,7 @@ impl ColumnSizer {
 
     /// Get the width for a column by index
     pub fn width_for_index(&self, i: usize) -> Result<usize, ColumnSizerError> {
-        let size = self.user_sizes.get(&i).map(Clone::clone).unwrap_or(
+        let size = self.user_sizes.get(&i).copied().unwrap_or(
             *self
                 .dynamic_column_size
                 .try_read()
@@ -81,11 +81,7 @@ impl ColumnSizer {
 
     /// Call when x changes to recompute dynamic_column_size and padding
     pub fn update_x(&self, x: usize) -> Result<(), ColumnSizerError> {
-        let mut remaining = if x > self.user_sizes_total {
-            x - self.user_sizes_total
-        } else {
-            0
-        };
+        let mut remaining = x.saturating_sub(self.user_sizes_total);
 
         let mut new_dcs = remaining / self.num_dynamic_columns;
         if new_dcs > 35 {
@@ -93,7 +89,7 @@ impl ColumnSizer {
         }
 
         if remaining > (self.num_dynamic_columns * new_dcs) {
-            remaining = remaining - (self.num_dynamic_columns * new_dcs);
+            remaining -= self.num_dynamic_columns * new_dcs;
         }
 
         match (

@@ -248,7 +248,7 @@ pub fn init_plist_map(runtime_handle: &Handle) {
 /// Get plist for a label
 pub fn for_label<S: Into<String>>(label: S) -> Option<LaunchdPlist> {
     let label_map = LABEL_TO_ENTRY_CONFIG.read().ok()?;
-    label_map.get(label.into().as_str()).map(|c| c.clone())
+    label_map.get(label.into().as_str()).cloned()
 }
 
 /// Given a LaunchdPlist, start editor pointing to temporary file
@@ -285,7 +285,7 @@ pub fn edit_and_replace(plist_meta: &LaunchdPlist) -> Result<(), String> {
     let exit = Command::new(&*EDITOR)
         .arg(&temp_path)
         .status()
-        .map_err(|e| format!("{} failed: {}", &*EDITOR, e.to_string()))?;
+        .map_err(|e| format!("{} failed: {}", &*EDITOR, e))?;
 
     if !exit.success() {
         return Err(format!("{} did not exit successfully", &*EDITOR));

@@ -1,5 +1,5 @@
 use std::fmt;
-use xpc_sys::enums::{DomainType, SessionType};
+use xpc_sys::enums::DomainType;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum OmniboxCommand {
@@ -13,17 +13,9 @@ pub enum OmniboxCommand {
     Blame,
     Bootstrap(DomainType),
     Bootout(DomainType),
-    Load(SessionType, DomainType, Option<u64>),
-    Unload(DomainType, Option<u64>),
     Enable(DomainType),
     Disable(DomainType),
     Edit,
-    // (unit label, prompt for domain only?, action gen fn)
-    DomainSessionPrompt(
-        String,
-        bool,
-        fn(DomainType, Option<SessionType>) -> Vec<OmniboxCommand>,
-    ),
     FocusServiceList,
     CSRInfo,
     DumpState,
@@ -53,7 +45,7 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 12] = [
     ),
     (
         "bootout",
-        "⏏️  Remove highlighted job",
+        "⏏️  Stop highlighted service",
         OmniboxCommand::BootoutRequest,
     ),
     (

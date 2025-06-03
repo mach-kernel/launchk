@@ -56,7 +56,7 @@ impl<T: 'static + TableListItem + Send + Sync> TableListView<T> {
         Self {
             linear_layout,
             column_sizer,
-            inner: PhantomData::default(),
+            inner: PhantomData,
             last_hash,
         }
     }
@@ -90,21 +90,15 @@ impl<T: 'static + TableListItem + Send + Sync> TableListView<T> {
         rows.hash(&mut row_hasher);
         let hash = row_hasher.finish();
 
-        match self.last_hash.try_read() {
-            Ok(lh) => {
-                if *lh == hash {
-                    return;
-                }
+        if let Ok(lh) = self.last_hash.try_read() {
+            if *lh == hash {
+                return;
             }
-            _ => {}
         }
 
         log::trace!("Replaced listview items -- new hash {}", hash);
 
-        match self.last_hash.try_write() {
-            Ok(mut lh) => *lh = hash,
-            _ => {}
-        }
+        if let Ok(mut lh) = self.last_hash.try_write() { *lh = hash }
 
         let sv = self.get_mut_selectview();
         let current_selection = sv.selected_id().unwrap_or(0);
@@ -126,10 +120,7 @@ impl<T: 'static + TableListItem + Send + Sync> TableListView<T> {
             .and_then(|c| {
                 c.as_any_mut()
                     .downcast_mut::<ScrollView<ResizedView<ResizedView<SelectView<T>>>>>()
-            })
-            .and_then(|v| Some(v.get_inner_mut()))
-            .and_then(|v| Some(v.get_inner_mut()))
-            .and_then(|v| Some(v.get_inner_mut()))
+            }).map(|v| v.get_inner_mut()).map(|v| v.get_inner_mut()).map(|v| v.get_inner_mut())
             .expect("Unable to get SelectView")
     }
 
@@ -139,10 +130,7 @@ impl<T: 'static + TableListItem + Send + Sync> TableListView<T> {
             .and_then(|c| {
                 c.as_any()
                     .downcast_ref::<ScrollView<ResizedView<ResizedView<SelectView<T>>>>>()
-            })
-            .and_then(|v| Some(v.get_inner()))
-            .and_then(|v| Some(v.get_inner()))
-            .and_then(|v| Some(v.get_inner()))
+            }).map(|v| v.get_inner()).map(|v| v.get_inner()).map(|v| v.get_inner())
             .expect("Unable to get SelectView")
     }
 }

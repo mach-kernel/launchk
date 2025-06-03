@@ -1,4 +1,3 @@
-use bitflags::Flags;
 use std::fmt;
 use std::fmt::Formatter;
 use std::ops::BitAnd;
@@ -43,7 +42,7 @@ impl JobTypeFilter {
 /// hotkey status
 impl fmt::Display for JobTypeFilter {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut display = format!("");
+        let mut display = String::new();
 
         if (*self & JobTypeFilter::SYSTEM) == JobTypeFilter::SYSTEM {
             display.push('s');

@@ -8,30 +8,30 @@ lazy_static! {
     pub static ref LIST_SERVICES: XPCHashMap = HashMap::new()
         // "list com.apple.Spotlight" (if specified)
         // .entry("name", "com.apple.Spotlight");
-        .entry("subsystem", 3 as u64)
-        .entry("handle", 0 as u64)
-        .entry("routine", 815 as u64)
+        .entry("subsystem", 3_u64)
+        .entry("handle", 0_u64)
+        .entry("routine", 815_u64)
         .entry("legacy", true);
 
     /// launchctl dumpstate
     /// Requires a shmem xpc_object_t member, see XPCShmem for more details
     pub static ref DUMPSTATE: XPCHashMap = HashMap::new()
-        .entry("subsystem", 3 as u64)
-        .entry("routine", 834 as u64)
-        .entry("type", 1 as u64)
+        .entry("subsystem", 3_u64)
+        .entry("routine", 834_u64)
+        .entry("type", 1_u64)
         .with_handle_or_default(None);
 
     /// launchctl dumpjpcategory
     /// Requires a FD".entry("fd", 1 as RawFd)"
     pub static ref DUMPJPCATEGORY: XPCHashMap = HashMap::new()
-        .entry("subsystem", 3 as u64)
-        .entry("routine", 837 as u64)
-        .entry("type", 1 as u64)
+        .entry("subsystem", 3_u64)
+        .entry("routine", 837_u64)
+        .entry("type", 1_u64)
         .with_handle_or_default(None);
 
     /// launchctl procinfo
     /// Requires a FD".entry("fd", 1 as RawFd)"
     pub static ref PROCINFO: XPCHashMap = HashMap::new()
-        .entry("subsystem", 2 as u64)
-        .entry("routine", 708 as u64);
+        .entry("subsystem", 2_u64)
+        .entry("routine", 708_u64);
 }

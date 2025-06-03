@@ -189,7 +189,9 @@ impl ViewWrapper for RootLayout {
     fn wrap_on_event(&mut self, event: Event) -> EventResult {
         log::trace!("on_event: {:?}", event);
 
-        let ev = match event {
+        
+
+        match event {
             Event::Char('/')
             | Event::Char(':')
             | Event::CtrlChar('u')
@@ -216,9 +218,7 @@ impl ViewWrapper for RootLayout {
                 self.layout.on_event(event)
             }
             _ => self.layout.on_event(event),
-        };
-
-        ev
+        }
     }
 
     fn wrap_layout(&mut self, size: Vec2) {
@@ -270,17 +270,6 @@ impl OmniboxSubscriber for RootLayout {
                     .expect("Must show prompt");
                 Ok(None)
             }
-            OmniboxEvent::Command(OmniboxCommand::DomainSessionPrompt(label, domain_only, f)) => {
-                self.cbsink_channel
-                    .send(dialog::domain_session_prompt(
-                        label,
-                        domain_only,
-                        self.omnibox_tx.clone(),
-                        f,
-                    ))
-                    .expect("Must show prompt");
-                Ok(None)
-            }
             OmniboxEvent::Command(OmniboxCommand::CSRInfo) => {
                 self.cbsink_channel
                     .send(show_csr_info())
@@ -297,7 +286,7 @@ impl OmniboxSubscriber for RootLayout {
                 show_pager(&self.cbsink_channel, unsafe {
                     &*slice_from_raw_parts(shmem.region as *mut u8, size)
                 })
-                .map_err(|e| OmniboxError::CommandError(e))?;
+                .map_err(OmniboxError::CommandError)?;
 
                 Ok(None)
             }
@@ -308,7 +297,7 @@ impl OmniboxSubscriber for RootLayout {
                 show_pager(&self.cbsink_channel, unsafe {
                     &*slice_from_raw_parts(shmem.region as *mut u8, size)
                 })
-                .map_err(|e| OmniboxError::CommandError(e))?;
+                .map_err(OmniboxError::CommandError)?;
 
                 Ok(None)
             }

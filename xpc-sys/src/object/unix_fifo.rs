@@ -71,6 +71,6 @@ impl Drop for UnixFifo {
     fn drop(&mut self) {
         let Self(fifo_name) = self;
 
-        remove_file(&fifo_name.to_string_lossy().to_string()).expect("Must rm FIFO");
+        remove_file(fifo_name.to_string_lossy().to_string()).expect("Must rm FIFO");
     }
 }

@@ -26,7 +26,7 @@ pub fn pipe_routine<S: Into<XPCObject>>(
     let errno = unsafe { xpc_pipe_routine(pipe, dict.into().as_ptr(), &mut reply) };
     check_error(errno)?;
 
-    if reply == null_mut() {
+    if reply.is_null() {
         Err(PipeRoutineError("reply was null".to_string()))
     } else {
         Ok(unsafe { XPCObject::from_raw(reply) })
@@ -46,7 +46,7 @@ pub fn pipe_routine_with_flags<S: Into<XPCObject>>(
     };
     check_error(errno)?;
 
-    if reply == null_mut() {
+    if reply.is_null() {
         Err(PipeRoutineError("reply was null".to_string()))
     } else {
         Ok(unsafe { XPCObject::from_raw(reply) })
@@ -74,7 +74,7 @@ pub fn pipe_interface_routine<S: Into<XPCObject>>(
 
     check_error(errno)?;
 
-    if reply == null_mut() {
+    if reply.is_null() {
         Err(PipeRoutineError("reply was null".to_string()))
     } else {
         Ok(unsafe { XPCObject::from_raw(reply) })

@@ -64,11 +64,10 @@ pub fn list_all() -> HashSet<String> {
             let svc_for_type = list(t.clone(), None)
                 .and_then(|d| {
                     d.get("services")
-                        .ok_or(XPCError::NotFound)
-                        .map(|o| o.clone())
+                        .ok_or(XPCError::NotFound).cloned()
                 })
                 .and_then(|o| o.to_rust())
-                .map(|d: XPCHashMap| d.keys().map(|k| k.clone()).collect());
+                .map(|d: XPCHashMap| d.keys().cloned().collect());
 
             if svc_for_type.is_err() {
                 log::error!(
@@ -276,7 +275,7 @@ pub fn read_disabled_hashset(domain_type: DomainType) -> Result<HashSet<String>,
 
     // Copy out of shmem and make a CString
     let slice: &[u8] = unsafe { from_raw_parts(shmem.region as *const _, sz) };
-    let data: Vec<u8> = slice.iter().map(|c| c.clone()).collect();
+    let data: Vec<u8> = slice.to_vec();
     let cs = unsafe { CString::from_vec_unchecked(data) };
 
     // Find all the quoted service names
@@ -289,6 +288,6 @@ pub fn read_disabled_hashset(domain_type: DomainType) -> Result<HashSet<String>,
         .collect();
 
     let mut hs = HashSet::new();
-    hs.extend(services.iter().map(|s| s.clone()));
+    hs.extend(services.iter().cloned());
     Ok(hs)
 }

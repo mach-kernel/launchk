@@ -27,28 +27,28 @@ pub trait TryXPCIntoRust<Out> {
 
 impl TryXPCIntoRust<i64> for XPCObject {
     fn to_rust(&self) -> Result<i64, XPCError> {
-        check_xpc_type(&self, &xpc_type::Int64)?;
+        check_xpc_type(self, &xpc_type::Int64)?;
         Ok(unsafe { xpc_int64_get_value(self.as_ptr()) })
     }
 }
 
 impl TryXPCIntoRust<u64> for XPCObject {
     fn to_rust(&self) -> Result<u64, XPCError> {
-        check_xpc_type(&self, &xpc_type::UInt64)?;
+        check_xpc_type(self, &xpc_type::UInt64)?;
         Ok(unsafe { xpc_uint64_get_value(self.as_ptr()) })
     }
 }
 
 impl TryXPCIntoRust<f64> for XPCObject {
     fn to_rust(&self) -> Result<f64, XPCError> {
-        check_xpc_type(&self, &xpc_type::Double)?;
+        check_xpc_type(self, &xpc_type::Double)?;
         Ok(unsafe { xpc_double_get_value(self.as_ptr()) })
     }
 }
 
 impl TryXPCIntoRust<String> for XPCObject {
     fn to_rust(&self) -> Result<String, XPCError> {
-        check_xpc_type(&self, &xpc_type::String)?;
+        check_xpc_type(self, &xpc_type::String)?;
         let cstr = unsafe { CStr::from_ptr(xpc_string_get_string_ptr(self.as_ptr())) };
 
         Ok(cstr.to_string_lossy().to_string())
@@ -57,7 +57,7 @@ impl TryXPCIntoRust<String> for XPCObject {
 
 impl TryXPCIntoRust<bool> for XPCObject {
     fn to_rust(&self) -> Result<bool, XPCError> {
-        check_xpc_type(&self, &xpc_type::Bool)?;
+        check_xpc_type(self, &xpc_type::Bool)?;
         Ok(unsafe { xpc_bool_get_value(self.as_ptr()) })
     }
 }
@@ -65,8 +65,8 @@ impl TryXPCIntoRust<bool> for XPCObject {
 impl TryXPCIntoRust<(MachPortType, mach_port_t)> for XPCObject {
     fn to_rust(&self) -> Result<(MachPortType, mach_port_t), XPCError> {
         let types = [
-            check_xpc_type(&self, &xpc_type::MachSend).map(|()| MachPortType::Send),
-            check_xpc_type(&self, &xpc_type::MachRecv).map(|()| MachPortType::Recv),
+            check_xpc_type(self, &xpc_type::MachSend).map(|()| MachPortType::Send),
+            check_xpc_type(self, &xpc_type::MachRecv).map(|()| MachPortType::Recv),
         ];
 
         for check in &types {
@@ -86,7 +86,7 @@ impl TryXPCIntoRust<(MachPortType, mach_port_t)> for XPCObject {
 
 impl TryXPCIntoRust<Vec<Arc<XPCObject>>> for XPCObject {
     fn to_rust(&self) -> Result<Vec<Arc<XPCObject>>, XPCError> {
-        check_xpc_type(&self, &xpc_type::Array)?;
+        check_xpc_type(self, &xpc_type::Array)?;
 
         let vec: Rc<RefCell<Vec<Arc<XPCObject>>>> = Rc::new(RefCell::new(vec![]));
         let vec_rc_clone = vec.clone();
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn xpc_to_rs_with_wrong_type() {
-        let an_i64 = XPCObject::from(42 as i64);
+        let an_i64 = XPCObject::from(42_i64);
         let as_u64: Result<u64, XPCError> = an_i64.to_rust();
 
         assert_eq!(
@@ -187,7 +187,7 @@ mod tests {
     fn bool_to_rust() {
         let xpc_bool = XPCObject::from(true);
         let rs_bool: bool = xpc_bool.to_rust().unwrap();
-        assert_eq!(true, rs_bool);
+        assert!(rs_bool);
     }
 
     #[test]

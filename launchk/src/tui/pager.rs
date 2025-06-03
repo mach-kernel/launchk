@@ -4,7 +4,6 @@ use std::process::{Command, Stdio};
 use std::sync::mpsc::Sender;
 
 use super::root::CbSinkMessage;
-use clearscreen;
 use cursive::{Cursive, CursiveExt};
 
 lazy_static! {

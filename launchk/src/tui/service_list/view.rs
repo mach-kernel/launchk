@@ -139,7 +139,6 @@ impl ServiceListView {
 
         let mut items: Vec<ServiceListItem> = plists
             .keys()
-            .into_iter()
             .chain(running_no_plist)
             .filter_map(|label| {
                 if !name_filter.is_empty()
@@ -254,7 +253,7 @@ impl ServiceListView {
     }
 
     fn handle_plist_command(&self, cmd: OmniboxCommand) -> OmniboxResult {
-        let (ServiceListItem { name, status, .. }, plist) = self.with_active_item_plist()?;
+        let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
 
         let plist =
             plist.ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
@@ -314,38 +313,23 @@ impl ServiceListView {
                     blame(name, domain).map_err(|e| OmniboxError::CommandError(e.to_string()))?;
                 self.cb_sink
                     .send(show_notice(
-                        format!("{}", response),
+                        response.to_string(),
                         Some("Reason".to_string()),
                     ))
                     .unwrap();
                 Ok(None)
             }
             OmniboxCommand::BootstrapRequest => {
-                let LaunchdEntryStatus { domain, .. } = status;
-                Ok(Some(OmniboxCommand::Bootstrap(domain)))
+                Ok(Some(OmniboxCommand::Bootstrap(status.domain)))
             }
             OmniboxCommand::BootoutRequest => {
-                let LaunchdEntryStatus { domain, .. } = status;
-                Ok(Some(OmniboxCommand::Bootout(domain)))
+                Ok(Some(OmniboxCommand::Bootout(status.domain)))
             }
-            OmniboxCommand::EnableRequest => Ok(Some(OmniboxCommand::DomainSessionPrompt(
-                name.clone(),
-                true,
-                |dt, _| vec![OmniboxCommand::Enable(dt)],
-            ))),
+            OmniboxCommand::EnableRequest => {
+                Ok(Some(OmniboxCommand::Enable(status.domain)))
+            },
             OmniboxCommand::DisableRequest => {
-                let LaunchdEntryStatus { domain, .. } = status;
-
-                match domain {
-                    DomainType::Unknown => Ok(Some(OmniboxCommand::DomainSessionPrompt(
-                        name.clone(),
-                        true,
-                        |dt, _| vec![OmniboxCommand::Disable(dt)],
-                    ))),
-                    _ => Ok(Some(OmniboxCommand::Chain(vec![OmniboxCommand::Disable(
-                        domain,
-                    )]))),
-                }
+                Ok(Some(OmniboxCommand::Disable(status.domain)))
             }
             OmniboxCommand::Enable(dt) => enable(name, dt)
                 .map(|_| None)
@@ -363,13 +347,11 @@ impl ServiceListView {
                 show_pager(&self.cb_sink, unsafe {
                     &*slice_from_raw_parts(shmem.region as *mut u8, size)
                 })
-                .map_err(|e| OmniboxError::CommandError(e))?;
+                .map_err(OmniboxError::CommandError)?;
 
                 Ok(None)
             }
             OmniboxCommand::Edit
-            | OmniboxCommand::Load(_, _, _)
-            | OmniboxCommand::Unload(_, _)
             | OmniboxCommand::Bootout(_)
             | OmniboxCommand::Bootstrap(_) => self.handle_plist_command(cmd),
             _ => Ok(None),

@@ -10,7 +10,6 @@ use crate::object::xpc_error::XPCError::ValueError;
 use crate::object::xpc_object::XPCObject;
 use std::ffi::CStr;
 use std::fmt;
-use std::ptr::null;
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,7 +49,7 @@ impl fmt::Display for XPCType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let XPCType(t) = self;
 
-        if *t == null() {
+        if (*t).is_null() {
             return write!(f, "NULL");
         }
 

@@ -195,7 +195,7 @@ impl OmniboxView {
 
     /// Toggle bitmask on key
     fn handle_job_type_filter(event: &Event, state: &OmniboxState) -> Option<OmniboxState> {
-        let jtf = state.job_type_filter.clone();
+        let jtf = state.job_type_filter;
 
         let new_jtf = match event {
             Event::Char('s') => jtf.clear_scope().toggle_yield(JobTypeFilter::SYSTEM),
@@ -223,7 +223,7 @@ impl OmniboxView {
             OmniboxMode::LabelFilter => "Filter > ",
             OmniboxMode::CommandFilter => "Command > ",
             OmniboxMode::CommandConfirm(_) => "OK! > ",
-            _ if command_filter.len() < 1 && label_filter.len() > 0 => "Filter > ",
+            _ if command_filter.is_empty() && !label_filter.is_empty() => "Filter > ",
             _ => "",
         };
 
@@ -236,7 +236,7 @@ impl OmniboxView {
             purple
         };
 
-        let visible_filter = if command_filter.len() > 0 || *mode == OmniboxMode::CommandFilter {
+        let visible_filter = if !command_filter.is_empty() || *mode == OmniboxMode::CommandFilter {
             command_filter
         } else {
             label_filter
@@ -387,8 +387,8 @@ impl View for OmniboxView {
                 Some("".to_string()),
                 None,
             )),
-            (e, OmniboxMode::Idle) => Self::handle_job_type_filter(&e, &*state),
-            (e, _) => Self::handle_active(&e, &*state),
+            (e, OmniboxMode::Idle) => Self::handle_job_type_filter(&e, &state),
+            (e, _) => Self::handle_active(&e, &state),
         };
 
         if new_state.is_none() {
