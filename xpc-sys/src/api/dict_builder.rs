@@ -1,5 +1,5 @@
 use crate::enums::{DomainType, SessionType};
-use crate::get_bootstrap_port;
+use crate::{get_bootstrap_port, rs_geteuid};
 use crate::object::xpc_object::{MachPortType, XPCHashMap};
 use crate::object::xpc_object::XPCObject;
 use mach2::port::mach_port_t;
@@ -62,6 +62,20 @@ pub trait DictBuilder {
         Self: Sized,
     {
         self.entry("type", t.unwrap_or(DomainType::RequestorDomain) as u64)
+    }
+
+    /// Adds provided DomainType, falls back on 7 (requestor's domain)
+    fn handle_and_type_from_domain(self, t: DomainType) -> XPCHashMap
+    where
+        Self: Sized,
+    {
+        self
+            // no handle for system
+            .entry_if(t == DomainType::System, "handle", 0u64)
+            .entry_if(t == DomainType::System, "type", 1u64)
+            // uid as handle for user
+            .entry_if(t == DomainType::User, "handle", rs_geteuid() as u64)
+            .entry_if(t == DomainType::User, "type", 8u64)
     }
 }
 

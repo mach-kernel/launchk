@@ -1,7 +1,7 @@
 use crate::launchd::message::{DISABLE_NAMES, DUMPJPCATEGORY, DUMPSTATE, ENABLE_NAMES, LIST_SERVICES, PROCINFO};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
-
+use std::ffi::{c_char, CString};
 use xpc_sys::{
     object::xpc_shmem::XPCShmem,
     rs_geteuid,
@@ -10,6 +10,8 @@ use xpc_sys::{
 
 use crate::launchd::entry_status::ENTRY_STATUS_CACHE;
 use std::iter::FromIterator;
+use std::slice::from_raw_parts;
+use regex::Regex;
 use xpc_sys::api::dict_builder::DictBuilder;
 use xpc_sys::api::pipe_routine::{handle_reply_dict_errors, pipe_interface_routine, pipe_routine};
 use xpc_sys::enums::DomainType;
@@ -99,12 +101,7 @@ pub fn blame<S: Into<String>>(
 
     let dict = HashMap::new()
         .entry("name", label_string)
-        // no handle for system
-        .entry_if(domain_type == DomainType::System, "handle", 0u64)
-        .entry_if(domain_type == DomainType::System, "type", 1u64)
-        // uid as handle for user
-        .entry_if(domain_type == DomainType::User, "handle", rs_geteuid() as u64)
-        .entry_if(domain_type == DomainType::User, "type", 8u64);
+        .handle_and_type_from_domain(domain_type);
 
     let response: XPCHashMap = pipe_interface_routine(None, 707, dict, None)
         .and_then(handle_reply_dict_errors)
@@ -133,12 +130,7 @@ pub fn bootout<S: Into<String>>(
     let dict = HashMap::new()
         .entry("name", label_string)
         .entry("no-einprogress", true)
-        // no handle for system
-        .entry_if(domain_type == DomainType::System, "handle", 0u64)
-        .entry_if(domain_type == DomainType::System, "type", 1u64)
-        // uid as handle for user
-        .entry_if(domain_type == DomainType::User, "handle", rs_geteuid() as u64)
-        .entry_if(domain_type == DomainType::User, "type", 8u64);
+        .handle_and_type_from_domain(domain_type);
 
     pipe_interface_routine(None, 801, dict, None)
         .and_then(handle_reply_dict_errors)
@@ -161,12 +153,7 @@ pub fn bootstrap<S: Into<String>>(
     let dict = HashMap::new()
         .entry("by-cli", true)
         .entry("paths", vec![plist_path.into()])
-        // no handle for system
-        .entry_if(domain_type == DomainType::System, "handle", 0u64)
-        .entry_if(domain_type == DomainType::System, "type", 1u64)
-        // uid as handle for user
-        .entry_if(domain_type == DomainType::User, "handle", rs_geteuid() as u64)
-        .entry_if(domain_type == DomainType::User, "type", 8u64);
+        .handle_and_type_from_domain(domain_type);
 
     pipe_interface_routine(None, 800, dict, None)
         .and_then(handle_reply_dict_errors)
@@ -180,13 +167,11 @@ pub fn enable<S: Into<String>>(
     let label_string = label.into();
 
     let dict = HashMap::new()
-        .extend(&ENABLE_NAMES)
-        .with_domain_type_or_default(Some(domain_type))
         .entry("name", label_string.clone())
         .entry("names", vec![label_string])
-        .with_handle_or_default(None);
+        .handle_and_type_from_domain(domain_type);
 
-    pipe_routine(None, dict)
+    pipe_interface_routine(None, 808, dict, None)
         .and_then(handle_reply_dict_errors)
         .and_then(|o| o.to_rust())
 }
@@ -198,15 +183,14 @@ pub fn disable<S: Into<String>>(
     let label_string = label.into();
 
     let dict = HashMap::new()
-        .extend(&DISABLE_NAMES)
-        .with_domain_type_or_default(Some(domain_type))
         .entry("name", label_string.clone())
         .entry("names", vec![label_string])
-        .with_handle_or_default(None);
+        .handle_and_type_from_domain(domain_type);
 
-    pipe_routine(None, dict)
+    pipe_interface_routine(None, 809, dict, None)
         .and_then(handle_reply_dict_errors)
-        .and_then(|o| o.to_rust())}
+        .and_then(|o| o.to_rust())
+}
 
 /// Create a shared shmem region for the XPC routine to write
 /// dumpstate contents into, and return the bytes written and
@@ -273,4 +257,47 @@ pub fn procinfo(pid: i64) -> Result<(usize, XPCShmem), XPCError> {
         .to_rust()?;
 
     Ok((usize::try_from(bytes_written).unwrap(), shmem))
+}
+
+pub fn read_disabled(domain_type: DomainType) -> Result<(usize, XPCShmem), XPCError> {
+    let shmem = XPCShmem::allocate_task_self(
+        1_000_000,
+        i32::try_from(MAP_SHARED).expect("Must conv flags"),
+    )?;
+
+    let dict = HashMap::new()
+        .entry("shmem", &shmem.xpc_object)
+        .handle_and_type_from_domain(domain_type);
+
+    let response: XPCHashMap = pipe_interface_routine(None, 828, dict, None)
+        .and_then(handle_reply_dict_errors)
+        .and_then(|o| o.to_rust())?;
+
+    let bytes_written: u64 = response.get("bytes-written")
+        .ok_or(XPCError::NotFound)?
+        .to_rust()?;
+
+    Ok((usize::try_from(bytes_written).unwrap(), shmem))
+}
+
+pub fn read_disabled_hashset(domain_type: DomainType) -> Result<HashSet<String>, XPCError> {
+    let (sz, shmem) = read_disabled(domain_type)?;
+
+    // Copy out of shmem and make a CString
+    let slice: &[u8] = unsafe { from_raw_parts(shmem.region as *const _, sz) };
+    let data: Vec<u8> = slice.iter().map(|c| c.clone()).collect();
+    let cs = unsafe { CString::from_vec_unchecked(data) };
+
+    // Find all the quoted service names
+    let re = Regex::new(r#""([\w.]+)" => disabled"#)
+        .map_err(|e| XPCError::ValueError(e.to_string()))?;
+
+    let services: Vec<String> = re
+        .captures_iter(cs.to_str().unwrap())
+        .flat_map(|c| c.iter().flatten().map(|m| m.as_str().to_string()).last())
+        .collect();
+
+    let mut hs = HashSet::new();
+    hs.extend(services.iter().map(|s| s.clone()));
+    Ok(hs)
 }

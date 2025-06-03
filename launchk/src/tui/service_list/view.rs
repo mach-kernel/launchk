@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::HashSet;
+use std::ops::Deref;
 use std::ptr::slice_from_raw_parts;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, RwLock};
@@ -15,8 +16,8 @@ use sudo::RunningAs;
 use tokio::runtime::Handle;
 use tokio::time::interval;
 use xpc_sys::enums::DomainType;
-
-use crate::launchd::command::{blame, bootout, bootstrap, procinfo};
+use xpc_sys::rs_geteuid;
+use crate::launchd::command::{blame, bootout, bootstrap, procinfo, read_disabled_hashset};
 use crate::launchd::command::{disable, enable, list_all};
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};
@@ -35,27 +36,45 @@ use crate::tui::service_list::list_item::ServiceListItem;
 use crate::tui::table::table_list_view::TableListView;
 
 /// Polls XPC for job list
-async fn poll_running_jobs(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSinkMessage>) {
+async fn poll_running_jobs(service_list_state: Arc<RwLock<ServiceListState>>, cb_sink: Sender<CbSinkMessage>) {
     let mut interval = interval(Duration::from_secs(1));
 
     loop {
         interval.tick().await;
-        let write = svcs.try_write();
 
-        if write.is_err() {
-            continue;
+        match service_list_state.try_write() {
+            Ok(mut w) => {
+                let running_jobs = list_all();
+
+                let disabled_job_domain = if rs_geteuid() == 0 {
+                    DomainType::System
+                } else {
+                    DomainType::User
+                };
+
+                let disabled_jobs = read_disabled_hashset(disabled_job_domain).unwrap();
+
+                *w = ServiceListState {
+                    running_jobs,
+                    disabled_jobs,
+                }
+            }
+            Err(_) => continue
         }
-
-        let mut write = write.unwrap();
-        *write = list_all();
 
         cb_sink.send(Box::new(Cursive::noop)).expect("Must send");
     }
 }
 
+#[derive(Default)]
+struct ServiceListState {
+    running_jobs: HashSet<String>,
+    disabled_jobs: HashSet<String>
+}
+
 pub struct ServiceListView {
+    state: Arc<RwLock<ServiceListState>>,
     cb_sink: Sender<CbSinkMessage>,
-    running_jobs: Arc<RwLock<HashSet<String>>>,
     table_list_view: TableListView<ServiceListItem>,
     label_filter: Arc<RwLock<String>>,
     job_type_filter: Arc<RwLock<JobTypeFilter>>,
@@ -67,18 +86,19 @@ enum ServiceListError {
 
 impl ServiceListView {
     pub fn new(runtime_handle: &Handle, cb_sink: Sender<CbSinkMessage>) -> Self {
-        let arc_svc = Arc::new(RwLock::new(HashSet::new()));
-        runtime_handle.spawn(poll_running_jobs(arc_svc.clone(), cb_sink.clone()));
+        let service_list_state = Arc::new(RwLock::new(ServiceListState::default()));
+
+        runtime_handle.spawn(poll_running_jobs(service_list_state.clone(), cb_sink.clone()));
 
         Self {
+            state: service_list_state,
             cb_sink,
-            running_jobs: arc_svc.clone(),
             label_filter: Arc::new(RwLock::new("".into())),
             job_type_filter: Arc::new(RwLock::new(JobTypeFilter::launchk_default())),
             table_list_view: TableListView::new(vec![
                 ("Name", None),
                 ("Session", Some(12)),
-                ("Job Type", Some(14)),
+                ("Type", Some(14)),
                 ("PID", Some(6)),
                 ("Loaded", Some(6)),
             ]),
@@ -89,9 +109,15 @@ impl ServiceListView {
         let plists = LABEL_TO_ENTRY_CONFIG
             .read()
             .map_err(|_| ServiceListError::PresentationError)?;
-        let running = self.running_jobs
+
+        let state = self.state
             .read()
             .map_err(|_| ServiceListError::PresentationError)?;
+
+        let ServiceListState {
+            disabled_jobs,
+            running_jobs
+        } = state.deref();
 
         let name_filter = self.label_filter
             .read()
@@ -100,7 +126,9 @@ impl ServiceListView {
             .read()
             .map_err(|_| ServiceListError::PresentationError)?;
 
-        let running_no_plist = running.iter().filter(|r| !plists.contains_key(*r));
+        let running_no_plist = running_jobs
+            .iter()
+            .filter(|r| !plists.contains_key(*r));
 
         let mut items: Vec<ServiceListItem> = plists
             .keys()
@@ -116,14 +144,17 @@ impl ServiceListView {
                 }
 
                 let status = get_entry_status(label);
-                let is_loaded = running.contains(label);
+                let is_loaded = running_jobs.contains(label);
+                let is_disabled = disabled_jobs.contains(label);
 
                 let entry_job_type_filter = status
                     .plist
                     .as_ref()
-                    .map(|ec| ec.job_type_filter(is_loaded))
+                    .map(|ec| ec.job_type_filter(is_loaded, is_disabled))
                     .unwrap_or(if is_loaded {
                         JobTypeFilter::LOADED
+                    } else if is_disabled {
+                        JobTypeFilter::DISABLED
                     } else {
                         JobTypeFilter::default()
                     });

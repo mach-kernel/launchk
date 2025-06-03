@@ -84,7 +84,7 @@ pub struct LaunchdPlist {
 
 // TODO: This should be somewhere else
 impl LaunchdPlist {
-    pub fn job_type_filter(&self, is_loaded: bool) -> JobTypeFilter {
+    pub fn job_type_filter(&self, is_loaded: bool, is_disabled: bool) -> JobTypeFilter {
         let mut jtf = JobTypeFilter::default();
 
         match self.entry_location {
@@ -100,6 +100,10 @@ impl LaunchdPlist {
 
         if is_loaded {
             jtf.toggle(JobTypeFilter::LOADED);
+        }
+
+        if is_disabled {
+            jtf.toggle(JobTypeFilter::DISABLED);
         }
 
         jtf

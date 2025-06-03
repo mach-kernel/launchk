@@ -8,12 +8,13 @@ bitflags! {
     /// Bitmask for filtering on the job type, which is a mix
     /// of scope (where it's located), and kind (agent v. daemon)
     pub struct JobTypeFilter: u32 {
-        const SYSTEM = (1 << 1);
-        const GLOBAL = (1 << 2);
-        const USER   = (1 << 3);
-        const AGENT  = (1 << 4);
-        const DAEMON = (1 << 5);
-        const LOADED = (1 << 6);
+        const SYSTEM   = (1 << 1);
+        const GLOBAL   = (1 << 2);
+        const USER     = (1 << 3);
+        const AGENT    = (1 << 4);
+        const DAEMON   = (1 << 5);
+        const LOADED   = (1 << 6);
+        const DISABLED = (1 << 7);
     }
 }
 
