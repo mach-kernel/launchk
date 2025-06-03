@@ -1,4 +1,4 @@
-use crate::launchd::message::{DISABLE_NAMES, DUMPJPCATEGORY, DUMPSTATE, ENABLE_NAMES, LIST_SERVICES, PROCINFO};
+use crate::launchd::message::{DUMPJPCATEGORY, DUMPSTATE, LIST_SERVICES, PROCINFO};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::ffi::{c_char, CString};
@@ -9,9 +9,9 @@ use xpc_sys::{
 };
 
 use crate::launchd::entry_status::ENTRY_STATUS_CACHE;
+use regex::Regex;
 use std::iter::FromIterator;
 use std::slice::from_raw_parts;
-use regex::Regex;
 use xpc_sys::api::dict_builder::DictBuilder;
 use xpc_sys::api::pipe_routine::{handle_reply_dict_errors, pipe_interface_routine, pipe_routine};
 use xpc_sys::enums::DomainType;
