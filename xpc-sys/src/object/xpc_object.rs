@@ -294,7 +294,7 @@ mod tests {
         for obj in &[
             XPCObject::from(5.24_f64),
             XPCObject::from("foo"),
-            XPCObject::from(1 as RawFd),
+            unsafe { XPCObject::from_raw_fd(1 as RawFd) },
             XPCObject::from((MachPortType::Send, bootstrap_port)),
         ] {
             assert!(obj.get_refs().is_some())
