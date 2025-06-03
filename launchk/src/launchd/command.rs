@@ -1,12 +1,8 @@
 use crate::launchd::message::{DUMPJPCATEGORY, DUMPSTATE, LIST_SERVICES, PROCINFO};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
-use std::ffi::{c_char, CString};
-use xpc_sys::{
-    object::xpc_shmem::XPCShmem,
-    rs_geteuid,
-    MAP_SHARED,
-};
+use std::ffi::CString;
+use xpc_sys::{object::xpc_shmem::XPCShmem, rs_geteuid, MAP_SHARED};
 
 use crate::launchd::entry_status::ENTRY_STATUS_CACHE;
 use regex::Regex;
@@ -28,11 +24,10 @@ pub fn find_in_all<S: Into<String>>(label: S) -> Result<(DomainType, XPCHashMap)
             .entry("type", domain_type)
             .entry("name", label_string.clone());
 
-        let response = pipe_routine(None, dict)
-            .and_then(handle_reply_dict_errors);
+        let response = pipe_routine(None, dict).and_then(handle_reply_dict_errors);
 
         if response.is_ok() {
-            return Ok((domain_type.into(), response.unwrap().to_rust()?))
+            return Ok((domain_type.into(), response.unwrap().to_rust()?));
         }
     }
 
@@ -67,7 +62,11 @@ pub fn list_all() -> HashSet<String> {
         .iter()
         .filter_map(|t| {
             let svc_for_type = list(t.clone(), None)
-                .and_then(|d| d.get("services").ok_or(XPCError::NotFound).map(|o| o.clone()))
+                .and_then(|d| {
+                    d.get("services")
+                        .ok_or(XPCError::NotFound)
+                        .map(|o| o.clone())
+                })
                 .and_then(|o| o.to_rust())
                 .map(|d: XPCHashMap| d.keys().map(|k| k.clone()).collect());
 
@@ -87,10 +86,7 @@ pub fn list_all() -> HashSet<String> {
     HashSet::from_iter(list)
 }
 
-pub fn blame<S: Into<String>>(
-    label: S,
-    domain_type: DomainType,
-) -> Result<String, XPCError> {
+pub fn blame<S: Into<String>>(label: S, domain_type: DomainType) -> Result<String, XPCError> {
     let label_string = label.into();
     log::debug!("blame: {} {}", &label_string, domain_type);
 
@@ -115,10 +111,7 @@ pub fn blame<S: Into<String>>(
     Ok(reason)
 }
 
-pub fn bootout<S: Into<String>>(
-    label: S,
-    domain_type: DomainType,
-) -> Result<XPCHashMap, XPCError> {
+pub fn bootout<S: Into<String>>(label: S, domain_type: DomainType) -> Result<XPCHashMap, XPCError> {
     let label_string = label.into();
     log::debug!("bootout: {} {}", &label_string, domain_type);
 
@@ -160,10 +153,7 @@ pub fn bootstrap<S: Into<String>>(
         .and_then(|o| o.to_rust())
 }
 
-pub fn enable<S: Into<String>>(
-    label: S,
-    domain_type: DomainType,
-) -> Result<XPCHashMap, XPCError> {
+pub fn enable<S: Into<String>>(label: S, domain_type: DomainType) -> Result<XPCHashMap, XPCError> {
     let label_string = label.into();
 
     let dict = HashMap::new()
@@ -176,10 +166,7 @@ pub fn enable<S: Into<String>>(
         .and_then(|o| o.to_rust())
 }
 
-pub fn disable<S: Into<String>>(
-    label: S,
-    domain_type: DomainType,
-) -> Result<XPCHashMap, XPCError> {
+pub fn disable<S: Into<String>>(label: S, domain_type: DomainType) -> Result<XPCHashMap, XPCError> {
     let label_string = label.into();
 
     let dict = HashMap::new()
@@ -209,7 +196,8 @@ pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
         .and_then(handle_reply_dict_errors)
         .and_then(|o| o.to_rust())?;
 
-    let bytes_written: u64 = response.get("bytes-written")
+    let bytes_written: u64 = response
+        .get("bytes-written")
         .ok_or(XPCError::NotFound)?
         .to_rust()?;
 
@@ -230,7 +218,8 @@ pub fn dumpjpcategory() -> Result<(usize, XPCShmem), XPCError> {
         .and_then(handle_reply_dict_errors)
         .and_then(|o| o.to_rust())?;
 
-    let bytes_written: u64 = response.get("bytes-written")
+    let bytes_written: u64 = response
+        .get("bytes-written")
         .ok_or(XPCError::NotFound)?
         .to_rust()?;
 
@@ -252,7 +241,8 @@ pub fn procinfo(pid: i64) -> Result<(usize, XPCShmem), XPCError> {
         .and_then(handle_reply_dict_errors)
         .and_then(|o| o.to_rust())?;
 
-    let bytes_written: u64 = response.get("bytes-written")
+    let bytes_written: u64 = response
+        .get("bytes-written")
         .ok_or(XPCError::NotFound)?
         .to_rust()?;
 
@@ -273,7 +263,8 @@ pub fn read_disabled(domain_type: DomainType) -> Result<(usize, XPCShmem), XPCEr
         .and_then(handle_reply_dict_errors)
         .and_then(|o| o.to_rust())?;
 
-    let bytes_written: u64 = response.get("bytes-written")
+    let bytes_written: u64 = response
+        .get("bytes-written")
         .ok_or(XPCError::NotFound)?
         .to_rust()?;
 
@@ -289,8 +280,8 @@ pub fn read_disabled_hashset(domain_type: DomainType) -> Result<HashSet<String>,
     let cs = unsafe { CString::from_vec_unchecked(data) };
 
     // Find all the quoted service names
-    let re = Regex::new(r#""([\w.]+)" => disabled"#)
-        .map_err(|e| XPCError::ValueError(e.to_string()))?;
+    let re =
+        Regex::new(r#""([\w.]+)" => disabled"#).map_err(|e| XPCError::ValueError(e.to_string()))?;
 
     let services: Vec<String> = re
         .captures_iter(cs.to_str().unwrap())

@@ -66,11 +66,7 @@ pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 12] = [
         "⏏️  Disable highlighted job (prevents load)",
         OmniboxCommand::DisableRequest,
     ),
-    (
-        "edit",
-        "✍️  Edit plist with $EDITOR",
-        OmniboxCommand::Edit,
-    ),
+    ("edit", "✍️  Edit plist with $EDITOR", OmniboxCommand::Edit),
     ("csrinfo", "ℹ️  See all CSR flags", OmniboxCommand::CSRInfo),
     (
         "dumpstate",

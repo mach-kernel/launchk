@@ -287,8 +287,19 @@ impl OmniboxView {
             "[system global user agent daemon loaded]".len()
         };
 
-        if jtf_ofs < self.last_size.read().map_err(|_| OmniboxError::StateError)?.x {
-            jtf_ofs = self.last_size.read().map_err(|_| OmniboxError::StateError)?.x - jtf_ofs;
+        if jtf_ofs
+            < self
+                .last_size
+                .read()
+                .map_err(|_| OmniboxError::StateError)?
+                .x
+        {
+            jtf_ofs = self
+                .last_size
+                .read()
+                .map_err(|_| OmniboxError::StateError)?
+                .x
+                - jtf_ofs;
         }
 
         printer.print(XY::new(jtf_ofs, 0), "[");

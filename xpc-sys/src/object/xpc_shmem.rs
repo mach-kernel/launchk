@@ -150,13 +150,12 @@ mod tests {
     use libc::MAP_SHARED;
     use std::collections::HashMap;
 
-    
+    use crate::object::try_xpc_into_rust::TryXPCIntoRust;
     use std::ffi::c_void;
     use std::ops::Deref;
     use std::ptr::{null, null_mut};
     use std::slice::from_raw_parts;
     use std::sync::mpsc;
-    use crate::object::try_xpc_into_rust::TryXPCIntoRust;
 
     fn activate_with_handler<F>(peer: xpc_connection_t, f: F) -> xpc_connection_t
     where
@@ -218,18 +217,14 @@ mod tests {
         });
 
         // Send XPC dictionary with a shmem field
-        let dict: XPCObject = HashMap::new()
-            .entry("shmem", &shmem.xpc_object)
-            .into();
+        let dict: XPCObject = HashMap::new().entry("shmem", &shmem.xpc_object).into();
 
         unsafe {
             xpc_connection_send_message(endpoint_peer, xpc_retain(dict.as_ptr()));
         }
 
         // Read the same message back from the channel and assert the contents of the shmem
-        let recv: XPCHashMap = rx
-            .recv().expect("Must recv")
-            .to_rust().expect("Must dict");
+        let recv: XPCHashMap = rx.recv().expect("Must recv").to_rust().expect("Must dict");
 
         let rx_shmem: XPCShmem = recv.get("shmem").unwrap().deref().into();
 

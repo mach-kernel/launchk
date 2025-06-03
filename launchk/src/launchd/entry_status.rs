@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
-use crate::launchd::plist::LaunchdPlist;
 use crate::launchd::command::find_in_all;
+use crate::launchd::plist::LaunchdPlist;
 
 use xpc_sys::enums::{DomainType, SessionType};
 use xpc_sys::object::try_xpc_into_rust::TryXPCIntoRust;
@@ -68,10 +68,7 @@ fn build_entry_status<S: Into<String>>(label: S) -> LaunchdEntryStatus {
 
     log::info!("build_entry_status: {:?}", entry_config);
 
-    let found_domain = response
-        .clone()
-        .map(|(domain, _)| domain)
-        .ok();
+    let found_domain = response.clone().map(|(domain, _)| domain).ok();
 
     // Prefer to infer domain from location of the plist,
     // otherwise try to find it at runtime

@@ -7,7 +7,11 @@ use std::rc::Rc;
 
 use crate::object::xpc_object::{MachPortType, XPCHashMap, XPCObject};
 use crate::object::xpc_type;
-use crate::{object, rs_strerror, xpc_array_apply, xpc_bool_get_value, xpc_dictionary_apply, xpc_double_get_value, xpc_int64_get_value, xpc_mach_send_get_right, xpc_object_t, xpc_string_get_string_ptr, xpc_type_get_name, xpc_uint64_get_value};
+use crate::{
+    object, rs_strerror, xpc_array_apply, xpc_bool_get_value, xpc_dictionary_apply,
+    xpc_double_get_value, xpc_int64_get_value, xpc_mach_send_get_right, xpc_object_t,
+    xpc_string_get_string_ptr, xpc_type_get_name, xpc_uint64_get_value,
+};
 
 use crate::object::xpc_error::XPCError;
 use crate::object::xpc_error::XPCError::{DictionaryError, ValueError};
@@ -110,8 +114,7 @@ impl TryXPCIntoRust<Vec<Arc<XPCObject>>> for XPCObject {
     }
 }
 
-impl TryXPCIntoRust<XPCHashMap> for XPCObject
-{
+impl TryXPCIntoRust<XPCHashMap> for XPCObject {
     fn to_rust(&self) -> Result<XPCHashMap, XPCError> {
         if self.xpc_type() != *object::xpc_type::Dictionary {
             return Err(DictionaryError(
@@ -119,8 +122,7 @@ impl TryXPCIntoRust<XPCHashMap> for XPCObject
             ));
         }
 
-        let map: Arc<RefCell<XPCHashMap>> =
-            Arc::new(RefCell::new(HashMap::new()));
+        let map: Arc<RefCell<XPCHashMap>> = Arc::new(RefCell::new(HashMap::new()));
         let map_block_clone = map.clone();
 
         // https://developer.apple.com/documentation/xpc/1505404-xpc_dictionary_apply?language=objc
@@ -158,14 +160,14 @@ impl TryXPCIntoRust<XPCHashMap> for XPCObject
 
 #[cfg(test)]
 mod tests {
+    use crate::object::try_xpc_into_rust::TryXPCIntoRust;
     use crate::object::xpc_error::XPCError;
     use crate::object::xpc_error::XPCError::ValueError;
-    use crate::object::xpc_object::{MachPortType, XPCHashMap};
     use crate::object::xpc_object::XPCObject;
-    use crate::object::try_xpc_into_rust::TryXPCIntoRust;
+    use crate::object::xpc_object::{MachPortType, XPCHashMap};
     use crate::{get_bootstrap_port, xpc_dictionary_create, xpc_dictionary_set_int64};
     use libc::mach_port_t;
-    
+
     use std::ffi::CString;
     use std::ptr::{null, null_mut};
     use std::sync::Arc;
@@ -257,9 +259,7 @@ mod tests {
 
         unsafe { xpc_dictionary_set_int64(raw_dict, key.as_ptr(), value) };
 
-        let map: XPCHashMap = unsafe {
-            XPCObject::from_raw(raw_dict).to_rust().unwrap()
-        };
+        let map: XPCHashMap = unsafe { XPCObject::from_raw(raw_dict).to_rust().unwrap() };
 
         if let Some(xpc_object) = map.get("test") {
             assert_eq!(value, xpc_object.to_rust().unwrap());

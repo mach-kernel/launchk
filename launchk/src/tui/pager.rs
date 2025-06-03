@@ -31,7 +31,9 @@ pub fn show_pager(cbsink: &Sender<CbSinkMessage>, buf: &[u8]) -> Result<(), Stri
     let res = pager.wait().map_err(|e| e.to_string())?;
 
     cbsink
-        .send(Box::new(|siv: &mut Cursive| { siv.run(); }))
+        .send(Box::new(|siv: &mut Cursive| {
+            siv.run();
+        }))
         .expect("Must clear after");
 
     if res.success() {

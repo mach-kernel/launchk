@@ -1,7 +1,7 @@
 use crate::enums::{DomainType, SessionType};
-use crate::{get_bootstrap_port, rs_geteuid};
-use crate::object::xpc_object::{MachPortType, XPCHashMap};
 use crate::object::xpc_object::XPCObject;
+use crate::object::xpc_object::{MachPortType, XPCHashMap};
+use crate::{get_bootstrap_port, rs_geteuid};
 use mach2::port::mach_port_t;
 
 /// Builder methods for XPCHashMap
@@ -98,7 +98,12 @@ impl DictBuilder for XPCHashMap {
         }
     }
 
-    fn entry_if<S: Into<String>, O: Into<XPCObject>>(self, pred: bool, key: S, value: O) -> XPCHashMap {
+    fn entry_if<S: Into<String>, O: Into<XPCObject>>(
+        self,
+        pred: bool,
+        key: S,
+        value: O,
+    ) -> XPCHashMap {
         if pred {
             self.entry(key, value)
         } else {

@@ -2,7 +2,10 @@ use crate::object::try_xpc_into_rust::TryXPCIntoRust;
 use crate::object::xpc_error::XPCError;
 use crate::object::xpc_error::XPCError::PipeRoutineError;
 use crate::object::xpc_object::{XPCHashMap, XPCObject};
-use crate::{_xpc_pipe_interface_routine, get_xpc_bootstrap_pipe, rs_xpc_strerror, xpc_object_t, xpc_pipe_routine, xpc_pipe_routine_with_flags, xpc_pipe_t};
+use crate::{
+    _xpc_pipe_interface_routine, get_xpc_bootstrap_pipe, rs_xpc_strerror, xpc_object_t,
+    xpc_pipe_routine, xpc_pipe_routine_with_flags, xpc_pipe_t,
+};
 use std::ptr::null_mut;
 
 fn check_error(errno: i32) -> Result<(), XPCError> {
@@ -64,7 +67,8 @@ pub fn pipe_interface_routine<S: Into<XPCObject>>(
             pipe,
             routine,
             dict.into().as_ptr(),
-            &mut reply, flags.unwrap_or(0)
+            &mut reply,
+            flags.unwrap_or(0),
         )
     };
 
@@ -79,7 +83,7 @@ pub fn pipe_interface_routine<S: Into<XPCObject>>(
 
 pub fn handle_reply_dict_errors(reply: XPCObject) -> Result<XPCObject, XPCError> {
     let dict: XPCHashMap = reply.clone().to_rust()?;
-    
+
     log::debug!("XPC dictionary reply {:?}", dict);
 
     if dict.contains_key("error") {

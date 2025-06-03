@@ -63,7 +63,7 @@ impl From<LaunchdEntryLocation> for DomainType {
     fn from(value: LaunchdEntryLocation) -> Self {
         match value {
             LaunchdEntryLocation::Global | LaunchdEntryLocation::System => DomainType::System,
-            LaunchdEntryLocation::User => DomainType::User
+            LaunchdEntryLocation::User => DomainType::User,
         }
     }
 }

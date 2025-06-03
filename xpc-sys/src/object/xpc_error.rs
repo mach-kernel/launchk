@@ -1,6 +1,4 @@
-use crate::object::xpc_error::XPCError::{
-    DictionaryError, IOError, PipeRoutineError, ValueError,
-};
+use crate::object::xpc_error::XPCError::{DictionaryError, IOError, PipeRoutineError, ValueError};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 

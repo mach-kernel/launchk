@@ -1,5 +1,5 @@
-use std::{collections::HashMap, sync::Arc};
 use std::sync::RwLock;
+use std::{collections::HashMap, sync::Arc};
 
 /// Width oriented column sizing utility
 pub struct ColumnSizer {
@@ -55,31 +55,26 @@ impl ColumnSizer {
 
     /// Get the width for a column by index
     pub fn width_for_index(&self, i: usize) -> Result<usize, ColumnSizerError> {
-        let size = self
-            .user_sizes
-            .get(&i)
-            .map(Clone::clone)
-            .unwrap_or(
-                *self
-                    .dynamic_column_size
-                    .try_read()
-                    .map_err(|_| ColumnSizerError::ReadError)?
-            );
+        let size = self.user_sizes.get(&i).map(Clone::clone).unwrap_or(
+            *self
+                .dynamic_column_size
+                .try_read()
+                .map_err(|_| ColumnSizerError::ReadError)?,
+        );
 
         // I have 'sized' my user defined columns around how much
         // space I need to just display the font, and the rest by
         // blindly dividing space, only apply padding to UDCs
         let size = if self.user_sizes.contains_key(&i) {
-            size + *self.padding.try_read().map_err(|_| ColumnSizerError::ReadError)?
+            size + *self
+                .padding
+                .try_read()
+                .map_err(|_| ColumnSizerError::ReadError)?
         } else {
             size
         };
 
-        let final_size = if size > 1 {
-            size
-        } else {
-            1
-        };
+        let final_size = if size > 1 { size } else { 1 };
 
         Ok(final_size)
     }
@@ -101,14 +96,17 @@ impl ColumnSizer {
             remaining = remaining - (self.num_dynamic_columns * new_dcs);
         }
 
-        match (self.dynamic_column_size.try_write(), self.padding.try_write()) {
+        match (
+            self.dynamic_column_size.try_write(),
+            self.padding.try_write(),
+        ) {
             (Ok(mut dcs), Ok(mut pad)) => {
                 *dcs = new_dcs;
                 *pad = remaining / (self.num_dynamic_columns + self.user_sizes.len());
 
                 Ok(())
             }
-            _ => Err(ColumnSizerError::UpdateError)
+            _ => Err(ColumnSizerError::UpdateError),
         }
     }
 }

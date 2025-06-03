@@ -1,7 +1,7 @@
+use bitflags::Flags;
 use std::fmt;
 use std::fmt::Formatter;
 use std::ops::BitAnd;
-use bitflags::Flags;
 
 bitflags! {
     #[derive(Clone, Copy, Default, Eq, PartialEq, Hash)]
