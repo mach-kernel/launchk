@@ -15,19 +15,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-12
-            xcode_version: 14.0.1         # macOS SDK: 12.3
-          - runner: macos-12
-            xcode_version: 14.2           # macOS SDK: 13.1
+          # macos-12 deprecated 2024-12-03
           - runner: macos-13
             xcode_version: 15.2           # macOS SDK: 14.2
           - runner: macos-14
             xcode_version: 15.3           # macOS SDK: 14.4
-          # optionally opt into latest stable Xcode version in future
-          # - runner: macos-14
-          #   xcode_version: latest-stable
+          - runner: macos-15
+            xcode_version: 16.3           # macOS SDK: 15.4
     runs-on: ${{ matrix.runner }}
-
     steps:
     - uses: actions/checkout@v4
     - name: Setup Xcode version
