@@ -49,20 +49,18 @@ impl XPCShmem {
     }
 
     /// Allocate a region of memory of vm_size_t & flags, then wrap in a XPC Object
-    pub fn allocate(
+    pub unsafe fn allocate(
         task: mach_port_t,
         size: mach_vm_size_t,
         flags: c_int,
     ) -> Result<XPCShmem, XPCError> {
         let mut region: *mut c_void = null_mut();
-        let err = unsafe {
-            mach_vm_allocate(
-                task,
-                &mut region as *const _ as *mut mach_vm_address_t,
-                size,
-                flags,
-            )
-        };
+        let err = mach_vm_allocate(
+            task,
+            &mut region as *const _ as *mut mach_vm_address_t,
+            size,
+            flags,
+        );
 
         if err > 0 {
             Err(XPCError::IOError(rs_strerror(err)))
