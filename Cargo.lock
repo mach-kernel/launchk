@@ -671,6 +671,7 @@ dependencies = [
  "notify",
  "notify-debouncer-mini",
  "plist",
+ "regex",
  "sudo",
  "tokio",
  "xpc-sys",
