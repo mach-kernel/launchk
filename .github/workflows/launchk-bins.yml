@@ -1,4 +1,8 @@
 name: launchk-bins.yml
+
+permissions:
+  contents: write
+
 on:
   workflow_dispatch: {}
 
