@@ -105,6 +105,12 @@ impl From<&XPCObject> for XPCShmem {
     }
 }
 
+impl AsRef<XPCObject> for XPCShmem {
+    fn as_ref(&self) -> &XPCObject {
+        self.xpc_object.as_ref()
+    }
+}
+
 impl Drop for XPCShmem {
     fn drop(&mut self) {
         let XPCShmem {

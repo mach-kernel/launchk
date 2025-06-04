@@ -167,7 +167,7 @@ pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
     )?;
 
     let dict = HashMap::new()
-        .entry("shmem", &shmem.xpc_object)
+        .entry("shmem", &shmem)
         .handle_and_type_from_domain(DomainType::System);
 
     let response: XPCHashMap = pipe_interface_routine(None, 834, dict, None)
@@ -189,7 +189,7 @@ pub fn dumpjpcategory() -> Result<(usize, XPCShmem), XPCError> {
     )?;
 
     let dict = HashMap::new()
-        .entry("shmem", &shmem.xpc_object)
+        .entry("shmem", &shmem)
         .handle_and_type_from_domain(DomainType::System);
 
     let response: XPCHashMap = pipe_interface_routine(None, 837, dict, None)
@@ -211,7 +211,7 @@ pub fn procinfo(pid: i64) -> Result<(usize, XPCShmem), XPCError> {
     )?;
 
     let dict = HashMap::new()
-        .entry("shmem", &shmem.xpc_object)
+        .entry("shmem", &shmem)
         .entry("pid", pid);
 
     let response: XPCHashMap = pipe_interface_routine(None, 708, dict, None)
@@ -233,7 +233,7 @@ pub fn read_disabled(domain_type: DomainType) -> Result<(usize, XPCShmem), XPCEr
     )?;
 
     let dict = HashMap::new()
-        .entry("shmem", &shmem.xpc_object)
+        .entry("shmem", &shmem)
         .handle_and_type_from_domain(domain_type);
 
     let response: XPCHashMap = pipe_interface_routine(None, 828, dict, None)

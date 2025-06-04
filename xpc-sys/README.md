@@ -8,6 +8,7 @@ Various utilities for conveniently dealing with XPC in Rust.
 - [XPC Dictionary](#xpc-dictionary)
 - [XPC Array](#xpc-array)
 - [XPC Shmem](#xpc-shmem)
+- [Pipe Routine API](#api)
 
 #### Getting Started
 
@@ -131,10 +132,9 @@ let shmem = XPCShmem::new_task_self(
     i32::try_from(MAP_SHARED).expect("Must conv flags"),
 )?;
 
-// Use as _xpc_type_shmem argument in XPCDictionary
-let response = XPCDictionary::new()
-    .extend(&DUMPSTATE)
-    .entry("shmem", shmem.xpc_object.clone())
+// Use _xpc_type_shmem value in XPC Dictionary
+let response = HashMap::new()
+    .entry("shmem", &shmem)
     .pipe_routine_with_error_handling()?;
 ```
 
@@ -148,6 +148,46 @@ let bytes: &[u8] = unsafe {
 // Make a string from bytes in the shmem
 let mut hey_look_a_string = String::new();
 bytes.read_to_string(buf);
+```
+
+[Top](#xpc-sys)
+
+#### API
+
+The following XPC functions have Rust friendly wrappers, all of which return `Result<XPCObject, XPCError>`:
+
+| Function                    | Rust API                                   |
+|-----------------------------|--------------------------------------------|
+| xpc_pipe_routine            | api::pipe_routine::pipe_routine            |
+| xpc_pipe_routine_with_flags | api::pipe_routine::pipe_routine_with_flags |
+| _xpc_pipe_interface_routine | api::pipe_routine::pipe_interface_routine  |
+
+If desired, errors in the XPC reply can be handled by chaining `api::handle_reply_dict_errors` onto the pipe routine call.
+
+This is an example of sending `launchctl bootout` via the XPC bootstrap pipe:
+
+```rust
+let dict = HashMap::new()
+    .entry("name", label_string)
+    .entry("no-einprogress", true)
+    // Current user UID
+    .entry("handle", 501u64)
+    // Domain
+    .entry("type", 8u64);
+
+let reply: XPCHashMap = pipe_interface_routine(
+    // Some(xpc_pipe_t) or fall back to `get_xpc_bootstrap_pipe()`
+    None,
+    // routine
+    801,
+    dict,
+    // flags (or fall back to 0)
+    None
+)
+    // Check for errors in response XPC dictionary (if desired)
+    .and_then(handle_reply_dict_errors)
+    // Convert reply to a Rust hash map
+    .and_then(|o| o.to_rust())
 ```
 
 [Top](#xpc-sys)
