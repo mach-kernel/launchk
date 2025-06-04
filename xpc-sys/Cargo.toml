@@ -1,7 +1,7 @@
 [package]
 name = "xpc-sys"
 description = "Conveniently call routines with wrappers for xpc_pipe_routine() and go from Rust types to XPC objects and back!"
-version = "0.6.0"
+version = "1.0.0"
 authors = ["David Stancu <dstancu@nyu.edu>"]
 license = "MIT"
 edition = "2018"
@@ -23,5 +23,5 @@ libc = "0.2.172"
 mach2 = "0.4.2"
 
 [build-dependencies]
-bindgen = "0.69.1"
+bindgen = "0.71.1"
 xcrun = "1.0.4"
