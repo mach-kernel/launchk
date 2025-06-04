@@ -271,37 +271,6 @@ impl OmniboxSubscriber for RootLayout {
                     .expect("Must show prompt");
                 Ok(None)
             }
-            OmniboxEvent::Command(OmniboxCommand::CSRInfo) => {
-                self.cbsink_channel
-                    .send(show_csr_info())
-                    .expect("Must show prompt");
-
-                Ok(None)
-            }
-            OmniboxEvent::Command(OmniboxCommand::DumpState) => {
-                let (size, shmem) =
-                    dumpstate().map_err(|e| OmniboxError::CommandError(e.to_string()))?;
-
-                log::info!("shmem response sz {}", size);
-
-                show_pager(&self.cbsink_channel, unsafe {
-                    &*slice_from_raw_parts(shmem.region as *mut u8, size)
-                })
-                .map_err(OmniboxError::CommandError)?;
-
-                Ok(None)
-            }
-            OmniboxEvent::Command(OmniboxCommand::DumpJetsamPropertiesCategory) => {
-                let (size, shmem) =
-                    dumpjpcategory().map_err(|e| OmniboxError::CommandError(e.to_string()))?;
-
-                show_pager(&self.cbsink_channel, unsafe {
-                    &*slice_from_raw_parts(shmem.region as *mut u8, size)
-                })
-                .map_err(OmniboxError::CommandError)?;
-
-                Ok(None)
-            }
             OmniboxEvent::Command(OmniboxCommand::Help) => {
                 self.cbsink_channel
                     .send(show_help())

@@ -1,6 +1,3 @@
-pub mod message;
-
-/// queries (sorta?)
 pub mod command;
 
 pub mod entry_status;

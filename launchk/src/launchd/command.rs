@@ -1,4 +1,3 @@
-use crate::launchd::message::{DUMPJPCATEGORY, DUMPSTATE, LIST_SERVICES, PROCINFO};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::ffi::CString;
@@ -9,7 +8,7 @@ use regex::Regex;
 use std::iter::FromIterator;
 use std::slice::from_raw_parts;
 use xpc_sys::api::dict_builder::DictBuilder;
-use xpc_sys::api::pipe_routine::{handle_reply_dict_errors, pipe_interface_routine, pipe_routine};
+use xpc_sys::api::pipe_routine::{handle_reply_dict_errors, pipe_interface_routine};
 use xpc_sys::enums::DomainType;
 use xpc_sys::object::try_xpc_into_rust::TryXPCIntoRust;
 use xpc_sys::object::xpc_error::XPCError;
@@ -20,11 +19,12 @@ pub fn find_in_all<S: Into<String>>(label: S) -> Result<(DomainType, XPCHashMap)
 
     for domain_type in DomainType::System as u64..=DomainType::RequestorDomain as u64 {
         let dict: XPCHashMap = HashMap::new()
-            .extend(&LIST_SERVICES)
+            .entry("handle", 0u64)
             .entry("type", domain_type)
             .entry("name", label_string.clone());
 
-        let response = pipe_routine(None, dict).and_then(handle_reply_dict_errors);
+        let response = pipe_interface_routine(None, 815, dict, None)
+            .and_then(handle_reply_dict_errors);
 
         if response.is_ok() {
             return Ok((domain_type.into(), response.unwrap().to_rust()?));
@@ -37,52 +37,31 @@ pub fn find_in_all<S: Into<String>>(label: S) -> Result<(DomainType, XPCHashMap)
 /// Query for jobs in a domain
 pub fn list(domain_type: DomainType, name: Option<String>) -> Result<XPCHashMap, XPCError> {
     let dict = HashMap::new()
-        .extend(&LIST_SERVICES)
-        .with_domain_type_or_default(Some(domain_type))
+        .handle_and_type_from_domain(domain_type)
         .entry_if_present("name", name);
 
-    pipe_routine(None, dict)
+    pipe_interface_routine(None, 815, dict, None)
         .and_then(handle_reply_dict_errors)
         .and_then(|o| o.to_rust())
 }
 
+pub fn list_services(domain_type: DomainType, name: Option<String>) -> Result<XPCHashMap, XPCError> {
+    list(domain_type, name)?
+        .get("services")
+        .ok_or(XPCError::NotFound)?
+        .to_rust()
+}
+
 /// Query for jobs across all domain types
 pub fn list_all() -> HashSet<String> {
-    let mut everything = vec![
-        DomainType::System,
-        DomainType::RequestorUserDomain,
-        DomainType::RequestorDomain,
-    ];
+    let system_list = list_services(DomainType::System, None).unwrap();
+    let user_list = if rs_geteuid() != 0 {
+        list_services(DomainType::User, None).unwrap()
+    } else {
+        HashMap::new()
+    };
 
-    if rs_geteuid() == 0 {
-        everything.push(DomainType::User);
-    }
-
-    let list = everything
-        .iter()
-        .filter_map(|t| {
-            let svc_for_type = list(t.clone(), None)
-                .and_then(|d| {
-                    d.get("services")
-                        .ok_or(XPCError::NotFound).cloned()
-                })
-                .and_then(|o| o.to_rust())
-                .map(|d: XPCHashMap| d.keys().cloned().collect());
-
-            if svc_for_type.is_err() {
-                log::error!(
-                    "[query/list_all]: poll error {}, domain, {}",
-                    svc_for_type.err().unwrap(),
-                    t
-                );
-                None
-            } else {
-                svc_for_type.ok()
-            }
-        })
-        .flat_map(|k: Vec<String>| k.into_iter());
-
-    HashSet::from_iter(list)
+    HashSet::from_iter(system_list.keys().cloned().chain(user_list.keys().cloned()))
 }
 
 pub fn blame<S: Into<String>>(label: S, domain_type: DomainType) -> Result<String, XPCError> {
@@ -188,10 +167,10 @@ pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
     )?;
 
     let dict = HashMap::new()
-        .extend(&DUMPSTATE)
-        .entry("shmem", &shmem.xpc_object);
+        .entry("shmem", &shmem.xpc_object)
+        .handle_and_type_from_domain(DomainType::System);
 
-    let response: XPCHashMap = pipe_routine(None, dict)
+    let response: XPCHashMap = pipe_interface_routine(None, 834, dict, None)
         .and_then(handle_reply_dict_errors)
         .and_then(|o| o.to_rust())?;
 
@@ -210,10 +189,10 @@ pub fn dumpjpcategory() -> Result<(usize, XPCShmem), XPCError> {
     )?;
 
     let dict = HashMap::new()
-        .extend(&DUMPJPCATEGORY)
-        .entry("shmem", &shmem.xpc_object);
+        .entry("shmem", &shmem.xpc_object)
+        .handle_and_type_from_domain(DomainType::System);
 
-    let response: XPCHashMap = pipe_routine(None, dict)
+    let response: XPCHashMap = pipe_interface_routine(None, 837, dict, None)
         .and_then(handle_reply_dict_errors)
         .and_then(|o| o.to_rust())?;
 
@@ -232,11 +211,10 @@ pub fn procinfo(pid: i64) -> Result<(usize, XPCShmem), XPCError> {
     )?;
 
     let dict = HashMap::new()
-        .extend(&PROCINFO)
         .entry("shmem", &shmem.xpc_object)
         .entry("pid", pid);
 
-    let response: XPCHashMap = pipe_routine(None, dict)
+    let response: XPCHashMap = pipe_interface_routine(None, 708, dict, None)
         .and_then(handle_reply_dict_errors)
         .and_then(|o| o.to_rust())?;
 

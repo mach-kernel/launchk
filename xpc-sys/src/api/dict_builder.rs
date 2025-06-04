@@ -64,7 +64,6 @@ pub trait DictBuilder {
         self.entry("type", t.unwrap_or(DomainType::RequestorDomain) as u64)
     }
 
-    /// Adds provided DomainType, falls back on 7 (requestor's domain)
     fn handle_and_type_from_domain(self, t: DomainType) -> XPCHashMap
     where
         Self: Sized,

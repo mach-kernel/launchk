@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::HashSet;
+use std::iter::FromIterator;
 use std::ops::Deref;
 use std::ptr::slice_from_raw_parts;
 use std::sync::mpsc::Sender;
@@ -13,14 +14,14 @@ use cursive::view::ViewWrapper;
 use cursive::{Cursive, CursiveExt, View, XY};
 use sudo::RunningAs;
 
-use crate::launchd::command::{blame, bootout, bootstrap, procinfo, read_disabled_hashset};
-use crate::launchd::command::{disable, enable, list_all};
+use crate::launchd::command::{blame, bootout, bootstrap, dumpjpcategory, dumpstate, list_all, list_services, procinfo, read_disabled_hashset};
+use crate::launchd::command::{disable, enable};
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};
 use crate::launchd::{
     entry_status::get_entry_status, entry_status::LaunchdEntryStatus,
 };
-use crate::tui::dialog::show_notice;
+use crate::tui::dialog::{show_csr_info, show_notice};
 use crate::tui::omnibox::command::OmniboxCommand;
 use tokio::runtime::Handle;
 use tokio::time::interval;
@@ -268,7 +269,7 @@ impl ServiceListView {
         }
     }
 
-    fn handle_command(&self, cmd: OmniboxCommand, item: Arc<ServiceListItem>) -> OmniboxResult {
+    fn handle_item_command(&self, cmd: OmniboxCommand, item: Arc<ServiceListItem>) -> OmniboxResult {
         let ServiceListItem { name, status, .. } = item.deref().clone();
 
         let need_escalate = status
@@ -340,10 +341,58 @@ impl ServiceListView {
 
                 Ok(None)
             }
+            OmniboxCommand::CSRInfo => {
+                self.cb_sink
+                    .send(show_csr_info())
+                    .expect("Must show prompt");
+
+                Ok(None)
+            }
+            OmniboxCommand::DumpState => {
+                let (size, shmem) =
+                    dumpstate().map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+
+                log::info!("shmem response sz {}", size);
+
+                show_pager(&self.cb_sink, unsafe {
+                    &*slice_from_raw_parts(shmem.region as *mut u8, size)
+                })
+                    .map_err(OmniboxError::CommandError)?;
+
+                Ok(None)
+            }
+            OmniboxCommand::DumpJetsamPropertiesCategory => {
+                let (size, shmem) =
+                    dumpjpcategory().map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+
+                show_pager(&self.cb_sink, unsafe {
+                    &*slice_from_raw_parts(shmem.region as *mut u8, size)
+                })
+                    .map_err(OmniboxError::CommandError)?;
+
+                Ok(None)
+            }
             OmniboxCommand::Edit
             | OmniboxCommand::Bootout(_)
             | OmniboxCommand::Bootstrap(_) => self.handle_plist_command(cmd, item),
             _ => Ok(None),
+        }
+    }
+
+    fn handle_general_command(&self, cmd: OmniboxCommand) -> OmniboxResult {
+        match cmd {
+            OmniboxCommand::DumpJetsamPropertiesCategory => {
+                let (size, shmem) =
+                    dumpjpcategory().map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+
+                show_pager(&self.cb_sink, unsafe {
+                    &*slice_from_raw_parts(shmem.region as *mut u8, size)
+                })
+                    .map_err(OmniboxError::CommandError)?;
+
+                Ok(None)
+            }
+            _ => Ok(None)
         }
     }
 }
@@ -371,8 +420,11 @@ impl OmniboxSubscriber for ServiceListView {
         match event {
             OmniboxEvent::StateUpdate(state) =>
                 self.handle_state_update(state),
+            OmniboxEvent::Command(
+                cmd @ OmniboxCommand::DumpJetsamPropertiesCategory
+            ) => self.handle_general_command(cmd),
             OmniboxEvent::Command(cmd) if active_item.is_some() =>
-                self.handle_command(cmd, active_item.unwrap()),
+                self.handle_item_command(cmd, active_item.unwrap()),
             _ => Ok(None)
         }
     }
