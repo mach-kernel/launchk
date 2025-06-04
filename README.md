@@ -4,9 +4,7 @@
 
 A [Cursive](https://github.com/gyscos/cursive) TUI that makes XPC queries & helps manage launchd jobs.
 
-Should work on macOS 10.10+ according to the availability sec. [in the docs](https://developer.apple.com/documentation/xpc?language=objc).
-
-<img src="https://user-images.githubusercontent.com/396039/120085936-6700a180-c0aa-11eb-8606-31dc6a3cbe99.gif" width="600">
+<img src="https://github.com/user-attachments/assets/80a3bf9a-0b71-4b61-a314-830e4ca34eb1" width="400">
 
 #### Install
 
