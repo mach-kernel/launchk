@@ -35,7 +35,7 @@ impl fmt::Display for OmniboxCommand {
 pub static OMNIBOX_COMMANDS: [(&str, &str, OmniboxCommand); 12] = [
     (
         "blame",
-        "❔  Why launchd launched the service",
+        "Why launchd launched the service",
         OmniboxCommand::Blame,
     ),
     (
