@@ -84,8 +84,6 @@ pub fn pipe_interface_routine<S: Into<XPCObject>>(
 pub fn handle_reply_dict_errors(reply: XPCObject) -> Result<XPCObject, XPCError> {
     let dict: XPCHashMap = reply.clone().to_rust()?;
 
-    log::debug!("XPC dictionary reply {:?}", dict);
-
     if dict.contains_key("error") {
         let errcode: i64 = dict.get("error").unwrap().to_rust()?;
 

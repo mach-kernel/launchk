@@ -143,7 +143,6 @@ impl OmniboxView {
         };
 
         match (event, mode) {
-            (ev, OmniboxMode::JobTypeFilter) => Self::handle_job_type_filter(ev, state),
             // User -> string filters
             (Event::Char(_), OmniboxMode::LabelFilter)
             | (Event::Char(_), OmniboxMode::CommandFilter) => {
@@ -394,9 +393,8 @@ impl View for OmniboxView {
                 Some("".to_string()),
                 None,
             )),
-            (e, OmniboxMode::Idle) => Self::handle_job_type_filter(&e, &state),
-            (e, OmniboxMode::JobTypeFilter) => {
-                let s = Self::handle_active(&e, &state);
+            (e, OmniboxMode::JobTypeFilter | OmniboxMode::Idle) => {
+                let s = Self::handle_job_type_filter(&e, &state);
                 self.tx.send(OmniboxEvent::Command(OmniboxCommand::FocusServiceList)).expect("Must focus");
                 s
             },
