@@ -2,11 +2,11 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::sync::Arc;
 
-use crate::objects::xpc_error::XPCError;
-use crate::objects::xpc_object::XPCObject;
-use crate::objects::xpc_type;
-use crate::objects::xpc_type::check_xpc_type;
-use crate::traits::xpc_value::TryXPCValue;
+use crate::object::try_xpc_into_rust::TryXPCIntoRust;
+use crate::object::xpc_error::XPCError;
+use crate::object::xpc_object::XPCObject;
+use crate::object::xpc_type;
+use crate::object::xpc_type::check_xpc_type;
 
 /// LimitLoadToSessionType key in XPC response
 /// https://developer.apple.com/library/archive/technotes/tn2083/_index.html
@@ -39,7 +39,6 @@ impl From<u64> for SessionType {
     }
 }
 
-// TODO: This feels terrible
 impl From<String> for SessionType {
     fn from(value: String) -> Self {
         let aqua: String = SessionType::Aqua.to_string();
@@ -63,8 +62,8 @@ impl TryFrom<Arc<XPCObject>> for SessionType {
     type Error = XPCError;
 
     fn try_from(value: Arc<XPCObject>) -> Result<Self, Self::Error> {
-        check_xpc_type(&*value, &xpc_type::String)?;
-        let string: String = value.xpc_value().unwrap();
+        check_xpc_type(&value, &xpc_type::String)?;
+        let string: String = value.to_rust()?;
         Ok(string.into())
     }
 }

@@ -1,13 +1,14 @@
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
+use crate::launchd::command::find_in_all;
 use crate::launchd::plist::LaunchdPlist;
-use crate::launchd::query::find_in_all;
 
 use xpc_sys::enums::{DomainType, SessionType};
-use xpc_sys::traits::xpc_value::TryXPCValue;
+use xpc_sys::object::try_xpc_into_rust::TryXPCIntoRust;
+use xpc_sys::object::xpc_error::XPCError;
+use xpc_sys::object::xpc_object::XPCHashMap;
 
 const ENTRY_INFO_QUERY_TTL: Duration = Duration::from_secs(15);
 
@@ -63,27 +64,35 @@ pub fn get_entry_status<S: Into<String>>(label: S) -> LaunchdEntryStatus {
 fn build_entry_status<S: Into<String>>(label: S) -> LaunchdEntryStatus {
     let label_string = label.into();
     let response = find_in_all(label_string.clone());
+    let entry_config = crate::launchd::plist::for_label(label_string.clone());
 
-    let pid: i64 = response
-        .as_ref()
-        .map_err(|e| e.clone())
-        .and_then(|(_, r)| r.get(&["service", "PID"]))
-        .and_then(|o| o.xpc_value())
+    log::info!("build_entry_status: {:?}", entry_config);
+
+    let found_domain = response.clone().map(|(domain, _)| domain).ok();
+
+    // Prefer to infer domain from location of the plist,
+    // otherwise try to find it at runtime
+    let domain = entry_config
+        .clone()
+        .map(|ec| ec.entry_location.into())
+        .or(found_domain)
+        .unwrap_or(DomainType::RequestorDomain);
+
+    let service: XPCHashMap = response
+        .and_then(|(_, d)| d.get("service").ok_or(XPCError::NotFound).cloned())
+        .and_then(|o| o.to_rust())
+        .unwrap_or(HashMap::new());
+
+    let pid: i64 = service
+        .get("PID")
+        .and_then(|o| o.to_rust().ok())
         .unwrap_or(0);
 
-    let limit_load_to_session_type = response
-        .as_ref()
-        .map_err(|e| e.clone())
-        .and_then(|(_, r)| r.get(&["service", "LimitLoadToSessionType"]))
-        .and_then(|o| o.try_into())
+    let limit_load_to_session_type: SessionType = service
+        .get("LimitLoadToSessionType")
+        .and_then(|o| o.to_rust().ok())
+        .map(|s: String| SessionType::from(s))
         .unwrap_or(SessionType::Unknown);
-
-    let domain = response
-        .as_ref()
-        .map(|(d, _)| d.clone())
-        .unwrap_or(DomainType::Unknown);
-
-    let entry_config = crate::launchd::plist::for_label(label_string.clone());
 
     LaunchdEntryStatus {
         limit_load_to_session_type,

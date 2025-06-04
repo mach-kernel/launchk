@@ -1,0 +1,30 @@
+name: launchk-bins.yml
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  upload-bins:
+    strategy:
+      matrix:
+        # https://docs.github.com/en/actions/using-github-hosted-runners/using-github-hosted-runners/about-github-hosted-runners#standard-github-hosted-runners-for-public-repositories
+        include:
+          - target: x86_64-apple-darwin
+            os: macos-13
+          - target: arm64-apple-darwin
+            os: macos-14
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          # (required) Comma-separated list of binary names (non-extension portion of filename) to build and upload.
+          # Note that glob pattern is not supported yet.
+          bin: launchk
+          target: ${{ matrix.target }}
+          tar: unix
+          # (required) GitHub token for uploading assets to GitHub Releases.
+          token: ${{ secrets.GITHUB_TOKEN }}

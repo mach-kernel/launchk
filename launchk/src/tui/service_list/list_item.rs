@@ -1,8 +1,7 @@
-use std::borrow::Borrow;
-
 use crate::launchd::entry_status::LaunchdEntryStatus;
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::tui::table::table_list_view::TableListItem;
+use xpc_sys::enums::SessionType;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ServiceListItem {
@@ -13,14 +12,16 @@ pub struct ServiceListItem {
 
 impl TableListItem for ServiceListItem {
     fn as_row(&self) -> Vec<String> {
-        let session_type = self.status.limit_load_to_session_type.to_string();
+        let session_type = match &self.status.limit_load_to_session_type {
+            SessionType::Unknown => "-".to_string(),
+            other => other.to_string(),
+        };
 
         let entry_type = self
             .status
             .plist
-            .borrow()
             .as_ref()
-            .map(|ec| format!("{}/{}", ec.entry_location, ec.entry_type))
+            .map(|p| p.entry_type.to_string())
             .unwrap_or("-".to_string());
 
         let pid = if self.status.pid > 0 && self.job_type_filter.intersects(JobTypeFilter::LOADED) {
@@ -29,11 +30,15 @@ impl TableListItem for ServiceListItem {
             "-".to_string()
         };
 
-        let loaded = if self.job_type_filter.intersects(JobTypeFilter::LOADED) {
-            "✔"
+        let mut loaded = if self.job_type_filter.intersects(JobTypeFilter::LOADED) {
+            "✔".to_string()
         } else {
-            "✘"
+            "✘".to_string()
         };
+
+        if self.job_type_filter.intersects(JobTypeFilter::DISABLED) {
+            loaded = format!("{} disabled", loaded)
+        }
 
         vec![
             self.name.clone(),

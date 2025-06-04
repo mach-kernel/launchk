@@ -1,15 +1,12 @@
-use crate::objects::xpc_error::XPCError::{
-    DictionaryError, IOError, PipeError, QueryError, ValueError,
-};
+use crate::object::xpc_error::XPCError::{DictionaryError, IOError, PipeRoutineError, ValueError};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum XPCError {
     DictionaryError(String),
-    PipeError(String),
     ValueError(String),
-    QueryError(String),
+    PipeRoutineError(String),
     IOError(String),
     NotFound,
 }
@@ -18,8 +15,7 @@ impl Display for XPCError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let err = match self {
             DictionaryError(e) => e,
-            PipeError(e) => e,
-            QueryError(e) => e,
+            PipeRoutineError(e) => e,
             ValueError(e) => e,
             IOError(e) => e,
             _ => "",

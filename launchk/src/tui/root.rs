@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 
-use std::ptr::slice_from_raw_parts;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 use cursive::event::{Event, EventResult, Key};
@@ -16,13 +15,9 @@ use crate::tui::omnibox::subscribed_view::{
     OmniboxResult, OmniboxSubscribedView, OmniboxSubscriber, Subscribable,
 };
 use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxView};
-use crate::tui::pager::show_pager;
 use crate::tui::service_list::view::ServiceListView;
-use crate::{
-    launchd::query::dumpjpcategory,
-    tui::dialog::{show_csr_info, show_help},
-};
-use crate::{launchd::query::dumpstate, tui::dialog};
+use crate::tui::dialog::show_help;
+use crate::tui::dialog;
 use std::thread;
 
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;
@@ -65,6 +60,7 @@ impl RootLayout {
         let cbsink_channel = RootLayout::cbsink_channel(siv);
 
         runtime_handle.spawn(poll_omnibox(cbsink_channel.clone(), omnibox_rx));
+        siv.set_autorefresh(true);
 
         let mut new = Self {
             omnibox_tx,
@@ -144,7 +140,7 @@ impl RootLayout {
                     .expect("Must send response commands"),
                 Err(OmniboxError::CommandError(s)) => self
                     .cbsink_channel
-                    .send(dialog::show_error(s.clone()))
+                    .send(dialog::show_notice(s.clone(), None))
                     .expect("Must show error"),
                 _ => {}
             }
@@ -189,7 +185,9 @@ impl ViewWrapper for RootLayout {
     fn wrap_on_event(&mut self, event: Event) -> EventResult {
         log::trace!("on_event: {:?}", event);
 
-        let ev = match event {
+        
+
+        match event {
             Event::Char('/')
             | Event::Char(':')
             | Event::CtrlChar('u')
@@ -216,9 +214,7 @@ impl ViewWrapper for RootLayout {
                 self.layout.on_event(event)
             }
             _ => self.layout.on_event(event),
-        };
-
-        ev
+        }
     }
 
     fn wrap_layout(&mut self, size: Vec2) {
@@ -247,6 +243,7 @@ impl OmniboxSubscriber for RootLayout {
                         s.quit();
                     }))
                     .expect("Must quit");
+
                 Ok(None)
             }
             OmniboxEvent::Command(OmniboxCommand::Sudo) => {
@@ -267,48 +264,6 @@ impl OmniboxSubscriber for RootLayout {
                 self.cbsink_channel
                     .send(dialog::show_prompt(self.omnibox_tx.clone(), p, c))
                     .expect("Must show prompt");
-                Ok(None)
-            }
-            OmniboxEvent::Command(OmniboxCommand::DomainSessionPrompt(label, domain_only, f)) => {
-                self.cbsink_channel
-                    .send(dialog::domain_session_prompt(
-                        label,
-                        domain_only,
-                        self.omnibox_tx.clone(),
-                        f,
-                    ))
-                    .expect("Must show prompt");
-                Ok(None)
-            }
-            OmniboxEvent::Command(OmniboxCommand::CSRInfo) => {
-                self.cbsink_channel
-                    .send(show_csr_info())
-                    .expect("Must show prompt");
-
-                Ok(None)
-            }
-            OmniboxEvent::Command(OmniboxCommand::DumpState) => {
-                let (size, shmem) =
-                    dumpstate().map_err(|e| OmniboxError::CommandError(e.to_string()))?;
-
-                log::info!("shmem response sz {}", size);
-
-                show_pager(&self.cbsink_channel, unsafe {
-                    &*slice_from_raw_parts(shmem.region as *mut u8, size)
-                })
-                .map_err(|e| OmniboxError::CommandError(e))?;
-
-                Ok(None)
-            }
-            OmniboxEvent::Command(OmniboxCommand::DumpJetsamPropertiesCategory) => {
-                let (size, shmem) =
-                    dumpjpcategory().map_err(|e| OmniboxError::CommandError(e.to_string()))?;
-
-                show_pager(&self.cbsink_channel, unsafe {
-                    &*slice_from_raw_parts(shmem.region as *mut u8, size)
-                })
-                .map_err(|e| OmniboxError::CommandError(e))?;
-
                 Ok(None)
             }
             OmniboxEvent::Command(OmniboxCommand::Help) => {

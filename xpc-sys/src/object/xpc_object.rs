@@ -1,28 +1,49 @@
 use libc::c_int;
+use std::collections::HashMap;
 
-use crate::objects::xpc_type::XPCType;
+use crate::object::xpc_type::XPCType;
 use crate::{
     xpc_array_append_value, xpc_array_create, xpc_bool_create, xpc_copy, xpc_copy_description,
-    xpc_double_create, xpc_fd_create, xpc_int64_create, xpc_mach_recv_create, xpc_mach_send_create,
-    xpc_object_t, xpc_release, xpc_string_create, xpc_uint64_create,
+    xpc_dictionary_create, xpc_dictionary_set_value, xpc_double_create, xpc_fd_create,
+    xpc_int64_create, xpc_mach_recv_create, xpc_mach_send_create, xpc_object_t, xpc_release,
+    xpc_retain, xpc_string_create, xpc_uint64_create,
 };
 use libc::mach_port_t;
 use std::ffi::{CStr, CString};
 use std::os::unix::prelude::RawFd;
-use std::ptr::null_mut;
+use std::ptr::{null, null_mut};
 
-use crate::objects::xpc_dictionary::XPCDictionary;
-use crate::objects::xpc_type;
-use crate::objects::xpc_type::check_xpc_type;
+use crate::object::xpc_type;
+use crate::object::xpc_type::check_xpc_type;
 use std::fmt;
+use std::sync::Arc;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct XPCObject(xpc_object_t, pub XPCType);
 
 unsafe impl Send for XPCObject {}
 unsafe impl Sync for XPCObject {}
 
+pub type XPCHashMap = HashMap<String, Arc<XPCObject>>;
+
 impl XPCObject {
+    /// Make an XPCObject from a raw xpc_object_t
+    pub unsafe fn from_raw(value: xpc_object_t) -> XPCObject {
+        Self::new(value)
+    }
+
+    /// Make an XPCObject from a raw xpc_object_t, but also call xpc_retain on it
+    pub unsafe fn from_raw_retain(value: xpc_object_t) -> XPCObject {
+        Self::new(xpc_retain(value))
+    }
+
+    /// Box fd in an XPC object which "behaves like dup()", allowing
+    /// to close after wrapping.
+    pub unsafe fn from_raw_fd(value: RawFd) -> Self {
+        log::info!("Making FD from {}", value);
+        unsafe { XPCObject::new(xpc_fd_create(value)) }
+    }
+
     fn new(value: xpc_object_t) -> Self {
         let obj = Self(value, value.into());
 
@@ -51,7 +72,7 @@ impl XPCObject {
 
     /// Should (?) return a deep copy of the underlying object
     /// https://developer.apple.com/documentation/xpc/1505584-xpc_copy
-    pub fn xpc_copy(xpc_object: xpc_object_t) -> Self {
+    pub unsafe fn xpc_copy(xpc_object: xpc_object_t) -> Self {
         let clone = unsafe { xpc_copy(xpc_object) };
         Self::new(clone)
     }
@@ -91,19 +112,13 @@ impl fmt::Display for XPCObject {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let XPCObject(ptr, _) = self;
 
-        if *ptr == null_mut() {
+        if (*ptr).is_null() {
             write!(f, "{:?} xpc_object_t is NULL", self)
         } else {
             let xpc_desc = unsafe { xpc_copy_description(*ptr) };
             let cstr = unsafe { CStr::from_ptr(xpc_desc) };
             write!(f, "{}", cstr.to_string_lossy())
         }
-    }
-}
-
-impl From<xpc_object_t> for XPCObject {
-    fn from(value: xpc_object_t) -> Self {
-        XPCObject::new(value)
     }
 }
 
@@ -118,6 +133,20 @@ impl From<u64> for XPCObject {
     /// Create XPCObject via xpc_uint64_create
     fn from(value: u64) -> Self {
         unsafe { XPCObject::new(xpc_uint64_create(value)) }
+    }
+}
+
+impl From<i32> for XPCObject {
+    /// Create XPCObject via xpc_int64_create
+    fn from(value: i32) -> Self {
+        unsafe { XPCObject::new(xpc_int64_create(value as i64)) }
+    }
+}
+
+impl From<u32> for XPCObject {
+    /// Create XPCObject via xpc_uint64_create
+    fn from(value: u32) -> Self {
+        unsafe { XPCObject::new(xpc_uint64_create(value as u64)) }
     }
 }
 
@@ -184,28 +213,34 @@ impl From<String> for XPCObject {
     }
 }
 
-impl From<XPCDictionary> for XPCObject {
-    /// Use From<HashMap<Into<String>, Arc<XPCObject>>>
-    fn from(xpcd: XPCDictionary) -> Self {
-        let XPCDictionary(hm) = xpcd;
-        hm.into()
-    }
-}
-
 impl<R: AsRef<XPCObject>> From<R> for XPCObject {
     /// Use xpc_copy() to copy out of refs.
     /// https://developer.apple.com/documentation/xpc/1505584-xpc_copy?language=objc
     fn from(other: R) -> Self {
-        Self::xpc_copy(other.as_ref().as_ptr())
+        unsafe { Self::xpc_copy(other.as_ref().as_ptr()) }
     }
 }
 
-impl From<RawFd> for XPCObject {
-    /// Box fd in an XPC object which "behaves like dup()", allowing
-    /// to close after wrapping.
-    fn from(value: RawFd) -> Self {
-        log::info!("Making FD from {}", value);
-        unsafe { XPCObject::new(xpc_fd_create(value)) }
+impl<S> From<HashMap<S, Arc<XPCObject>>> for XPCObject
+where
+    S: Into<String>,
+{
+    /// Creates a XPC dictionary
+    ///
+    /// Values must be Arc<XPCObject> but can encapsulate any
+    /// valid xpc_object_t
+    fn from(message: HashMap<S, Arc<XPCObject>>) -> Self {
+        let dict = unsafe { xpc_dictionary_create(null(), null_mut(), 0) };
+
+        for (k, v) in message {
+            unsafe {
+                let as_str: String = k.into();
+                let cstr = CString::new(as_str).unwrap();
+                xpc_dictionary_set_value(dict, cstr.as_ptr(), v.as_ptr());
+            }
+        }
+
+        unsafe { XPCObject::from_raw(dict) }
     }
 }
 
@@ -215,12 +250,12 @@ impl Drop for XPCObject {
     fn drop(&mut self) {
         let XPCObject(ptr, _) = &self;
 
-        if *ptr == null_mut() {
-            log::info!("XPCObject xpc_object_t is NULL, not calling xpc_release()");
-            return 
+        if (*ptr).is_null() {
+            log::trace!("XPCObject xpc_object_t is NULL, not calling xpc_release()");
+            return;
         }
 
-        log::info!(
+        log::trace!(
             "XPCObject drop ({:p}, {}, {})",
             *ptr,
             &self.xpc_type(),
@@ -234,17 +269,24 @@ impl Drop for XPCObject {
     }
 }
 
+impl Clone for XPCObject {
+    fn clone(&self) -> Self {
+        unsafe { XPCObject::xpc_copy(self.as_ptr()) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::os::unix::prelude::RawFd;
-
     use libc::mach_port_t;
+    use std::collections::HashMap;
+    use std::ffi::{CStr, CString};
+    use std::os::unix::prelude::RawFd;
+    use std::sync::Arc;
 
-    use crate::get_bootstrap_port;
-    use crate::objects::xpc_dictionary::XPCDictionary;
+    use crate::{get_bootstrap_port, xpc_dictionary_get_string};
 
-    use super::MachPortType;
     use super::XPCObject;
+    use super::MachPortType;
 
     // Mostly for docs, int, uint, bool segfault here
     #[test]
@@ -252,13 +294,27 @@ mod tests {
         let bootstrap_port: mach_port_t = unsafe { get_bootstrap_port() };
 
         for obj in &[
-            XPCObject::from(5.24 as f64),
+            XPCObject::from(5.24_f64),
             XPCObject::from("foo"),
-            XPCObject::from(XPCDictionary::new()),
-            XPCObject::from(1 as RawFd),
+            unsafe { XPCObject::from_raw_fd(1 as RawFd) },
             XPCObject::from((MachPortType::Send, bootstrap_port)),
         ] {
             assert!(obj.get_refs().is_some())
         }
+    }
+
+    #[test]
+    fn xpc_object_from_hashmap() {
+        let mut hm: HashMap<&str, Arc<XPCObject>> = HashMap::new();
+        let value = "foo";
+        hm.insert("test", XPCObject::from(value).into());
+
+        let xpc_object = XPCObject::from(hm);
+        let key = CString::new("test").unwrap();
+
+        let cstr =
+            unsafe { CStr::from_ptr(xpc_dictionary_get_string(xpc_object.as_ptr(), key.as_ptr())) };
+
+        assert_eq!(cstr.to_str().unwrap(), value);
     }
 }

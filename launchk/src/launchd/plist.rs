@@ -13,6 +13,7 @@ use std::process::Command;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::runtime::Handle;
+use xpc_sys::enums::DomainType;
 
 pub static PLIST_MAP_INIT: Once = Once::new();
 
@@ -58,6 +59,15 @@ pub enum LaunchdEntryLocation {
     User,
 }
 
+impl From<LaunchdEntryLocation> for DomainType {
+    fn from(value: LaunchdEntryLocation) -> Self {
+        match value {
+            LaunchdEntryLocation::Global | LaunchdEntryLocation::System => DomainType::System,
+            LaunchdEntryLocation::User => DomainType::User,
+        }
+    }
+}
+
 impl fmt::Display for LaunchdEntryLocation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
@@ -74,7 +84,7 @@ pub struct LaunchdPlist {
 
 // TODO: This should be somewhere else
 impl LaunchdPlist {
-    pub fn job_type_filter(&self, is_loaded: bool) -> JobTypeFilter {
+    pub fn job_type_filter(&self, is_loaded: bool, is_disabled: bool) -> JobTypeFilter {
         let mut jtf = JobTypeFilter::default();
 
         match self.entry_location {
@@ -90,6 +100,10 @@ impl LaunchdPlist {
 
         if is_loaded {
             jtf.toggle(JobTypeFilter::LOADED);
+        }
+
+        if is_disabled {
+            jtf.toggle(JobTypeFilter::DISABLED);
         }
 
         jtf
@@ -177,7 +191,7 @@ fn build_label_map_entry(plist_path: PathBuf) -> Option<(String, LaunchdPlist)> 
     ))
 }
 
-fn path_if_plist(path: &PathBuf) -> Option<PathBuf> {
+fn path_if_plist(path: &Path) -> Option<PathBuf> {
     if path.is_dir()
         || path
             .extension()
@@ -186,7 +200,7 @@ fn path_if_plist(path: &PathBuf) -> Option<PathBuf> {
     {
         None
     } else {
-        Some(path.clone())
+        Some(path.to_path_buf())
     }
 }
 
@@ -234,7 +248,7 @@ pub fn init_plist_map(runtime_handle: &Handle) {
 /// Get plist for a label
 pub fn for_label<S: Into<String>>(label: S) -> Option<LaunchdPlist> {
     let label_map = LABEL_TO_ENTRY_CONFIG.read().ok()?;
-    label_map.get(label.into().as_str()).map(|c| c.clone())
+    label_map.get(label.into().as_str()).cloned()
 }
 
 /// Given a LaunchdPlist, start editor pointing to temporary file
@@ -271,7 +285,7 @@ pub fn edit_and_replace(plist_meta: &LaunchdPlist) -> Result<(), String> {
     let exit = Command::new(&*EDITOR)
         .arg(&temp_path)
         .status()
-        .map_err(|e| format!("{} failed: {}", &*EDITOR, e.to_string()))?;
+        .map_err(|e| format!("{} failed: {}", &*EDITOR, e))?;
 
     if !exit.success() {
         return Err(format!("{} did not exit successfully", &*EDITOR));

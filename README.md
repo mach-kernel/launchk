@@ -2,11 +2,9 @@
 
 [![Rust](https://github.com/mach-kernel/launchk/actions/workflows/rust.yml/badge.svg?branch=master)](https://github.com/mach-kernel/launchk/actions/workflows/rust.yml)
 
-A [Cursive](https://github.com/gyscos/cursive) TUI that makes XPC queries & helps manage launchd jobs.
+A [Cursive](https://github.com/gyscos/cursive) TUI for looking at launchd agents and daemons.
 
-Should work on macOS 10.10+ according to the availability sec. [in the docs](https://developer.apple.com/documentation/xpc?language=objc).
-
-<img src="https://user-images.githubusercontent.com/396039/120085936-6700a180-c0aa-11eb-8606-31dc6a3cbe99.gif" width="600">
+<img src="https://github.com/user-attachments/assets/80a3bf9a-0b71-4b61-a314-830e4ca34eb1" width="400">
 
 #### Install
 
@@ -26,8 +24,8 @@ Use `:` to enter command mode, `/` to enter filtering mode, and any of `sguadl` 
   - System (/System/Library/)
   - Global (/Library)
   - User (~/) 
-- `load`
-- `unload`
+- `bootstrap`
+- `bootout`
 - `dumpstate` (opens in `$PAGER`)
 - `dumpjpcategory` (opens in `$PAGER`)
 - `procinfo` (opens in `$PAGER`, does not require root!)
@@ -63,6 +61,3 @@ A big thanks to these open source projects and general resources:
 - [Fortinet XPC RE article](https://www.fortinet.com/blog/threat-research/a-look-into-xpc-internals--reverse-engineering-the-xpc-objects)
 - [This HN comment](https://news.ycombinator.com/item?id=2565780) re history
 - The various source links found in comments, from Chrome's sandbox and other headers with definitions for private API functions.
-- After all, it is Apple's launchd :>)
-
-Everything else (C) David Stancu & Contributors 2021

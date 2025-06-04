@@ -3,13 +3,19 @@
 #![allow(non_snake_case)]
 
 #[macro_use]
+extern crate bitflags;
+#[macro_use]
 extern crate lazy_static;
 
-#[macro_use]
-extern crate bitflags;
-
 pub use libc::MAP_SHARED;
-use libc::{geteuid, mach_task_self_, strerror, sysctlbyname, KERN_SUCCESS, MACH_PORT_NULL};
+use libc::{geteuid, strerror, sysctlbyname, KERN_SUCCESS, MACH_PORT_NULL};
+use mach2::bootstrap::bootstrap_port;
+use mach2::kern_return::kern_return_t;
+use mach2::mach_port::mach_port_deallocate;
+use mach2::message::mach_msg_type_number_t;
+use mach2::port::mach_port_t;
+use mach2::task::mach_ports_lookup;
+use mach2::traps::mach_task_self;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_long, c_void};
 use std::ptr::null_mut;
@@ -17,10 +23,10 @@ use std::ptr::null_mut;
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 //
+pub mod api;
 pub mod csr;
 pub mod enums;
-pub mod objects;
-pub mod traits;
+pub mod object;
 //
 
 pub type xpc_pipe_t = *mut c_void;
@@ -32,7 +38,6 @@ pub type xpc_pipe_t = *mut c_void;
 extern "C" {
     // Can decode i64 returned in "errors" for XPC responses
     pub fn xpc_strerror(err: c_int) -> *const c_char;
-    pub static errno: c_int;
 
     pub fn xpc_pipe_create_from_port(port: mach_port_t, flags: u64) -> xpc_pipe_t;
     pub fn xpc_pipe_routine_with_flags(
@@ -43,6 +48,14 @@ extern "C" {
     ) -> c_int;
     pub fn xpc_pipe_routine(pipe: xpc_pipe_t, msg: xpc_object_t, reply: *mut xpc_object_t)
         -> c_int;
+
+    pub fn _xpc_pipe_interface_routine(
+        pipe: xpc_pipe_t,
+        routine: u64,
+        msg: xpc_object_t,
+        reply: *mut xpc_object_t,
+        flags: u64,
+    ) -> c_int;
 
     // https://grep.app/search?q=_xpc_type_mach_.%2A&regexp=true
     pub fn xpc_mach_send_create(port: mach_port_t) -> xpc_object_t;
@@ -104,9 +117,9 @@ pub unsafe fn lookup_bootstrap_port() -> mach_port_t {
     let mut num_ports: mach_msg_type_number_t = 0;
     let mut found_ports: *mut mach_port_t = null_mut();
 
-    let kr: kern_return_t = mach_ports_lookup(mach_task_self_, &mut found_ports, &mut num_ports);
+    let kr: kern_return_t = mach_ports_lookup(mach_task_self(), &mut found_ports, &mut num_ports);
 
-    if kr != KERN_SUCCESS as i32 {
+    if kr != KERN_SUCCESS {
         panic!("Unable to obtain Mach bootstrap port!");
     }
 
@@ -124,7 +137,7 @@ pub unsafe fn lookup_bootstrap_port() -> mach_port_t {
 
         log::debug!("Deallocating mach_port_t {}", port);
 
-        mach_port_deallocate(mach_task_self_, port);
+        mach_port_deallocate(mach_task_self(), port);
     }
 
     ret_port
@@ -177,12 +190,4 @@ pub unsafe fn rs_sysctlbyname(name: &str) -> Result<String, String> {
 
 pub fn rs_geteuid() -> uid_t {
     unsafe { geteuid() }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
 }

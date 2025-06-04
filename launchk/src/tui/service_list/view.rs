@@ -1,8 +1,7 @@
-use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::HashSet;
+use std::ops::Deref;
 use std::ptr::slice_from_raw_parts;
-use std::rc::Rc;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -11,21 +10,22 @@ use cursive::direction::Direction;
 use cursive::event::EventResult;
 use cursive::view::CannotFocus;
 use cursive::view::ViewWrapper;
-use cursive::{Cursive, View, XY};
+use cursive::{Cursive, CursiveExt, View, XY};
 use sudo::RunningAs;
 
+use crate::launchd::command::{blame, bootout, bootstrap, dumpjpcategory, dumpstate, list_all, procinfo, read_disabled_hashset};
+use crate::launchd::command::{disable, enable};
+use crate::launchd::job_type_filter::JobTypeFilter;
+use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};
+use crate::launchd::{
+    entry_status::get_entry_status, entry_status::LaunchdEntryStatus,
+};
+use crate::tui::dialog::{show_csr_info, show_notice};
+use crate::tui::omnibox::command::OmniboxCommand;
 use tokio::runtime::Handle;
 use tokio::time::interval;
-use xpc_sys::enums::{DomainType, SessionType};
-
-use crate::launchd::job_type_filter::JobTypeFilter;
-use crate::launchd::plist::{edit_and_replace, LaunchdEntryLocation, LABEL_TO_ENTRY_CONFIG};
-use crate::launchd::query::procinfo;
-use crate::launchd::query::{disable, enable, list_all, load, unload};
-use crate::launchd::{
-    entry_status::get_entry_status, entry_status::LaunchdEntryStatus, plist::LaunchdPlist,
-};
-use crate::tui::omnibox::command::OmniboxCommand;
+use xpc_sys::enums::DomainType;
+use xpc_sys::rs_geteuid;
 
 use crate::tui::omnibox::state::OmniboxState;
 use crate::tui::omnibox::subscribed_view::{OmniboxResult, OmniboxSubscriber};
@@ -36,64 +36,109 @@ use crate::tui::service_list::list_item::ServiceListItem;
 use crate::tui::table::table_list_view::TableListView;
 
 /// Polls XPC for job list
-async fn poll_running_jobs(svcs: Arc<RwLock<HashSet<String>>>, cb_sink: Sender<CbSinkMessage>) {
+async fn poll_running_jobs(
+    service_list_state: Arc<RwLock<ServiceListState>>,
+    cb_sink: Sender<CbSinkMessage>,
+) {
     let mut interval = interval(Duration::from_secs(1));
 
     loop {
         interval.tick().await;
-        let write = svcs.try_write();
 
-        if write.is_err() {
-            continue;
+        match service_list_state.try_write() {
+            Ok(mut w) => {
+                let running_jobs = list_all();
+
+                let disabled_job_domain = if rs_geteuid() == 0 {
+                    DomainType::System
+                } else {
+                    DomainType::User
+                };
+
+                let disabled_jobs = read_disabled_hashset(disabled_job_domain).unwrap();
+
+                *w = ServiceListState {
+                    running_jobs,
+                    disabled_jobs,
+                }
+            }
+            Err(_) => continue,
         }
-
-        let mut write = write.unwrap();
-        *write = list_all();
 
         cb_sink.send(Box::new(Cursive::noop)).expect("Must send");
     }
 }
 
+#[derive(Default)]
+struct ServiceListState {
+    running_jobs: HashSet<String>,
+    disabled_jobs: HashSet<String>,
+}
+
 pub struct ServiceListView {
+    state: Arc<RwLock<ServiceListState>>,
     cb_sink: Sender<CbSinkMessage>,
-    running_jobs: Arc<RwLock<HashSet<String>>>,
     table_list_view: TableListView<ServiceListItem>,
-    label_filter: RefCell<String>,
-    job_type_filter: RefCell<JobTypeFilter>,
+    label_filter: Arc<RwLock<String>>,
+    job_type_filter: Arc<RwLock<JobTypeFilter>>,
+}
+
+enum ServiceListError {
+    PresentationError,
 }
 
 impl ServiceListView {
     pub fn new(runtime_handle: &Handle, cb_sink: Sender<CbSinkMessage>) -> Self {
-        let arc_svc = Arc::new(RwLock::new(HashSet::new()));
-        runtime_handle.spawn(poll_running_jobs(arc_svc.clone(), cb_sink.clone()));
+        let service_list_state = Arc::new(RwLock::new(ServiceListState::default()));
+
+        runtime_handle.spawn(poll_running_jobs(
+            service_list_state.clone(),
+            cb_sink.clone(),
+        ));
 
         Self {
+            state: service_list_state,
             cb_sink,
-            running_jobs: arc_svc.clone(),
-            label_filter: RefCell::new("".into()),
-            job_type_filter: RefCell::new(JobTypeFilter::launchk_default()),
+            label_filter: Arc::new(RwLock::new("".into())),
+            job_type_filter: Arc::new(RwLock::new(JobTypeFilter::launchk_default())),
             table_list_view: TableListView::new(vec![
                 ("Name", None),
-                ("Session", Some(12)),
-                ("Job Type", Some(14)),
+                ("Session", Some(10)),
+                ("Type", Some(8)),
                 ("PID", Some(6)),
                 ("Loaded", Some(6)),
             ]),
         }
     }
 
-    fn present_services(&self) -> Option<Vec<ServiceListItem>> {
-        let plists = LABEL_TO_ENTRY_CONFIG.read().ok()?;
-        let running = self.running_jobs.read().ok()?;
+    fn present_services(&self) -> Result<Vec<ServiceListItem>, ServiceListError> {
+        let plists = LABEL_TO_ENTRY_CONFIG
+            .read()
+            .map_err(|_| ServiceListError::PresentationError)?;
 
-        let name_filter = self.label_filter.borrow();
-        let job_type_filter = self.job_type_filter.borrow();
+        let state = self
+            .state
+            .read()
+            .map_err(|_| ServiceListError::PresentationError)?;
 
-        let running_no_plist = running.iter().filter(|r| !plists.contains_key(*r));
+        let ServiceListState {
+            disabled_jobs,
+            running_jobs,
+        } = state.deref();
+
+        let name_filter = self
+            .label_filter
+            .read()
+            .map_err(|_| ServiceListError::PresentationError)?;
+        let job_type_filter = self
+            .job_type_filter
+            .read()
+            .map_err(|_| ServiceListError::PresentationError)?;
+
+        let running_no_plist = running_jobs.iter().filter(|r| !plists.contains_key(*r));
 
         let mut items: Vec<ServiceListItem> = plists
             .keys()
-            .into_iter()
             .chain(running_no_plist)
             .filter_map(|label| {
                 if !name_filter.is_empty()
@@ -105,14 +150,17 @@ impl ServiceListView {
                 }
 
                 let status = get_entry_status(label);
-                let is_loaded = running.contains(label);
+                let is_loaded = running_jobs.contains(label);
+                let is_disabled = disabled_jobs.contains(label);
 
                 let entry_job_type_filter = status
                     .plist
                     .as_ref()
-                    .map(|ec| ec.job_type_filter(is_loaded))
+                    .map(|ec| ec.job_type_filter(is_loaded, is_disabled))
                     .unwrap_or(if is_loaded {
                         JobTypeFilter::LOADED
+                    } else if is_disabled {
+                        JobTypeFilter::DISABLED
                     } else {
                         JobTypeFilter::default()
                     });
@@ -144,7 +192,7 @@ impl ServiceListView {
             }
         });
 
-        Some(items)
+        Ok(items)
     }
 
     fn handle_state_update(&mut self, state: OmniboxState) -> OmniboxResult {
@@ -157,14 +205,31 @@ impl ServiceListView {
 
         match mode {
             OmniboxMode::LabelFilter => {
-                self.label_filter.replace(label_filter);
+                let mut view_filter = self
+                    .label_filter
+                    .try_write()
+                    .map_err(|_| OmniboxError::StateError)?;
+                *view_filter = label_filter;
             }
             OmniboxMode::JobTypeFilter => {
-                self.job_type_filter.replace(job_type_filter);
+                let mut view_job_type_filter = self
+                    .job_type_filter
+                    .try_write()
+                    .map_err(|_| OmniboxError::StateError)?;
+                *view_job_type_filter = job_type_filter;
             }
             OmniboxMode::Idle => {
-                self.label_filter.replace(label_filter);
-                self.job_type_filter.replace(job_type_filter);
+                let mut view_filter = self
+                    .label_filter
+                    .try_write()
+                    .map_err(|_| OmniboxError::StateError)?;
+                *view_filter = label_filter;
+
+                let mut view_job_type_filter = self
+                    .job_type_filter
+                    .try_write()
+                    .map_err(|_| OmniboxError::StateError)?;
+                *view_job_type_filter = job_type_filter;
             }
             _ => {}
         };
@@ -172,82 +237,53 @@ impl ServiceListView {
         Ok(None)
     }
 
-    fn get_active_list_item(&self) -> Result<Rc<ServiceListItem>, OmniboxError> {
-        self.table_list_view
-            .get_highlighted_row()
-            .ok_or_else(|| OmniboxError::CommandError("Cannot get highlighted row".to_string()))
-    }
+    fn handle_plist_command(&self, cmd: OmniboxCommand, item: Arc<ServiceListItem>) -> OmniboxResult {
+        let ServiceListItem { name, status, .. } = item.deref();
 
-    fn with_active_item_plist(
-        &self,
-    ) -> Result<(ServiceListItem, Option<LaunchdPlist>), OmniboxError> {
-        let item = &*self.get_active_list_item()?;
-        let plist = item.status.plist.clone();
-
-        Ok((item.clone(), plist))
-    }
-
-    fn handle_plist_command(&self, cmd: OmniboxCommand) -> OmniboxResult {
-        let (ServiceListItem { name, status, .. }, plist) = self.with_active_item_plist()?;
-
-        let plist =
-            plist.ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
+        let plist = status
+            .clone()
+            .plist
+            .ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
 
         match cmd {
             OmniboxCommand::Edit => {
-                edit_and_replace(&plist).map_err(OmniboxError::CommandError)?;
+                let edited = edit_and_replace(&plist)
+                    .map_err(OmniboxError::CommandError)
+                    .map(|()| Option::<OmniboxCommand>::None);
 
-                // Clear term
+                // Reinit curses
                 self.cb_sink
-                    .send(Box::new(Cursive::clear))
+                    .send(Box::new(|siv: &mut Cursive| siv.run()))
                     .expect("Must clear");
 
-                Ok(Some(OmniboxCommand::Confirm(
-                    format!("Reload {}?", name),
-                    vec![OmniboxCommand::Reload],
-                )))
+                edited
             }
-            OmniboxCommand::Load(st, dt, _handle) => {
-                load(name, plist.plist_path, Some(dt), Some(st), None)
-                    .map(|_| None)
-                    .map_err(|e| OmniboxError::CommandError(e.to_string()))
-            }
-            OmniboxCommand::Unload(dt, _handle) => {
-                let LaunchdEntryStatus {
-                    limit_load_to_session_type,
-                    ..
-                } = status;
-
-                unload(
-                    name,
-                    plist.plist_path,
-                    Some(dt),
-                    Some(limit_load_to_session_type),
-                    None,
-                )
+            OmniboxCommand::Bootstrap(dt) => bootstrap(name, dt, &plist.plist_path)
                 .map(|_| None)
-                .map_err(|e| OmniboxError::CommandError(e.to_string()))
-            }
+                .map_err(|e| OmniboxError::CommandError(e.to_string())),
+            OmniboxCommand::Bootout(dt) => bootout(name, dt)
+                .map(|_| None)
+                .map_err(|e| OmniboxError::CommandError(e.to_string())),
             _ => Ok(None),
         }
     }
 
-    fn handle_command(&self, cmd: OmniboxCommand) -> OmniboxResult {
-        let (ServiceListItem { name, status, .. }, plist) = self.with_active_item_plist()?;
+    fn handle_item_command(&self, cmd: OmniboxCommand, item: Arc<ServiceListItem>) -> OmniboxResult {
+        let ServiceListItem { name, status, .. } = item.deref().clone();
 
-        let need_escalate = plist
-            .map(|LaunchdPlist { entry_location, .. }| {
-                entry_location == LaunchdEntryLocation::System
-                    || entry_location == LaunchdEntryLocation::Global
-            })
-            .unwrap_or(true);
+        let need_escalate = status
+            .clone()
+            .plist
+            .map(|p| p.entry_location.into())
+            .map(|d: DomainType| d == DomainType::System)
+            .unwrap_or(false);
 
         match cmd {
-            OmniboxCommand::LoadRequest
-            | OmniboxCommand::UnloadRequest
-            | OmniboxCommand::DisableRequest
+            OmniboxCommand::DisableRequest
             | OmniboxCommand::EnableRequest
             | OmniboxCommand::ProcInfo
+            | OmniboxCommand::BootstrapRequest
+            | OmniboxCommand::BootoutRequest
             | OmniboxCommand::Edit => {
                 if (sudo::check() != RunningAs::Root) && need_escalate {
                     return Ok(Some(OmniboxCommand::Confirm(
@@ -260,69 +296,29 @@ impl ServiceListView {
         };
 
         match cmd {
-            OmniboxCommand::Reload => {
-                let LaunchdEntryStatus {
-                    limit_load_to_session_type,
-                    domain,
-                    ..
-                } = status;
-
-                match (limit_load_to_session_type, domain) {
-                    (_, DomainType::Unknown) | (SessionType::Unknown, _) => Ok(Some(
-                        OmniboxCommand::DomainSessionPrompt(name.clone(), false, |dt, st| {
-                            vec![
-                                OmniboxCommand::Unload(dt.clone(), None),
-                                OmniboxCommand::Load(st.expect("Must provide"), dt, None),
-                            ]
-                        }),
-                    )),
-                    (st, dt) => Ok(Some(OmniboxCommand::Chain(vec![
-                        OmniboxCommand::Unload(dt.clone(), None),
-                        OmniboxCommand::Load(st.clone(), dt.clone(), None),
-                    ]))),
-                }
-            }
-            OmniboxCommand::LoadRequest => Ok(Some(OmniboxCommand::DomainSessionPrompt(
-                name.clone(),
-                false,
-                |dt, st| {
-                    vec![OmniboxCommand::Load(
-                        st.expect("Must be provided"),
-                        dt,
-                        None,
-                    )]
-                },
-            ))),
-            OmniboxCommand::UnloadRequest => {
+            OmniboxCommand::Blame => {
                 let LaunchdEntryStatus { domain, .. } = status;
-
-                match domain {
-                    DomainType::Unknown => Ok(Some(OmniboxCommand::DomainSessionPrompt(
-                        name.clone(),
-                        true,
-                        |dt, _| vec![OmniboxCommand::Unload(dt, None)],
-                    ))),
-                    _ => Ok(Some(OmniboxCommand::Unload(domain, None))),
-                }
+                let response =
+                    blame(name, domain).map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+                self.cb_sink
+                    .send(show_notice(
+                        response.to_string(),
+                        Some("Reason".to_string()),
+                    ))
+                    .unwrap();
+                Ok(None)
             }
-            OmniboxCommand::EnableRequest => Ok(Some(OmniboxCommand::DomainSessionPrompt(
-                name.clone(),
-                true,
-                |dt, _| vec![OmniboxCommand::Enable(dt)],
-            ))),
+            OmniboxCommand::BootstrapRequest => {
+                Ok(Some(OmniboxCommand::Bootstrap(status.domain)))
+            }
+            OmniboxCommand::BootoutRequest => {
+                Ok(Some(OmniboxCommand::Bootout(status.domain)))
+            }
+            OmniboxCommand::EnableRequest => {
+                Ok(Some(OmniboxCommand::Enable(status.domain)))
+            },
             OmniboxCommand::DisableRequest => {
-                let LaunchdEntryStatus { domain, .. } = status;
-
-                match domain {
-                    DomainType::Unknown => Ok(Some(OmniboxCommand::DomainSessionPrompt(
-                        name.clone(),
-                        true,
-                        |dt, _| vec![OmniboxCommand::Disable(dt)],
-                    ))),
-                    _ => Ok(Some(OmniboxCommand::Chain(vec![OmniboxCommand::Disable(
-                        domain,
-                    )]))),
-                }
+                Ok(Some(OmniboxCommand::Disable(status.domain)))
             }
             OmniboxCommand::Enable(dt) => enable(name, dt)
                 .map(|_| None)
@@ -340,14 +336,62 @@ impl ServiceListView {
                 show_pager(&self.cb_sink, unsafe {
                     &*slice_from_raw_parts(shmem.region as *mut u8, size)
                 })
-                .map_err(|e| OmniboxError::CommandError(e))?;
+                .map_err(OmniboxError::CommandError)?;
 
                 Ok(None)
             }
-            OmniboxCommand::Edit | OmniboxCommand::Load(_, _, _) | OmniboxCommand::Unload(_, _) => {
-                self.handle_plist_command(cmd)
+            OmniboxCommand::CSRInfo => {
+                self.cb_sink
+                    .send(show_csr_info())
+                    .expect("Must show prompt");
+
+                Ok(None)
             }
+            OmniboxCommand::DumpState => {
+                let (size, shmem) =
+                    dumpstate().map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+
+                log::info!("shmem response sz {}", size);
+
+                show_pager(&self.cb_sink, unsafe {
+                    &*slice_from_raw_parts(shmem.region as *mut u8, size)
+                })
+                    .map_err(OmniboxError::CommandError)?;
+
+                Ok(None)
+            }
+            OmniboxCommand::DumpJetsamPropertiesCategory => {
+                let (size, shmem) =
+                    dumpjpcategory().map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+
+                show_pager(&self.cb_sink, unsafe {
+                    &*slice_from_raw_parts(shmem.region as *mut u8, size)
+                })
+                    .map_err(OmniboxError::CommandError)?;
+
+                Ok(None)
+            }
+            OmniboxCommand::Edit
+            | OmniboxCommand::Bootout(_)
+            | OmniboxCommand::Bootstrap(_) => self.handle_plist_command(cmd, item),
             _ => Ok(None),
+        }
+    }
+
+    fn handle_general_command(&self, cmd: OmniboxCommand) -> OmniboxResult {
+        match cmd {
+            OmniboxCommand::DumpJetsamPropertiesCategory => {
+                let (size, shmem) =
+                    dumpjpcategory().map_err(|e| OmniboxError::CommandError(e.to_string()))?;
+
+                show_pager(&self.cb_sink, unsafe {
+                    &*slice_from_raw_parts(shmem.region as *mut u8, size)
+                })
+                    .map_err(OmniboxError::CommandError)?;
+
+                Ok(None)
+            }
+            _ => Ok(None)
         }
     }
 }
@@ -358,7 +402,7 @@ impl ViewWrapper for ServiceListView {
     fn wrap_layout(&mut self, size: XY<usize>) {
         self.table_list_view.layout(size);
 
-        if let Some(sorted) = self.present_services() {
+        if let Ok(sorted) = self.present_services() {
             self.with_view_mut(|v| v.replace_and_preserve_selection(sorted));
         }
     }
@@ -370,9 +414,17 @@ impl ViewWrapper for ServiceListView {
 
 impl OmniboxSubscriber for ServiceListView {
     fn on_omnibox(&mut self, event: OmniboxEvent) -> OmniboxResult {
+        let active_item = self.table_list_view.get_highlighted_row();
+
         match event {
-            OmniboxEvent::StateUpdate(state) => self.handle_state_update(state),
-            OmniboxEvent::Command(cmd) => self.handle_command(cmd),
+            OmniboxEvent::StateUpdate(state) =>
+                self.handle_state_update(state),
+            OmniboxEvent::Command(
+                cmd @ OmniboxCommand::DumpJetsamPropertiesCategory
+            ) => self.handle_general_command(cmd),
+            OmniboxEvent::Command(cmd) if active_item.is_some() =>
+                self.handle_item_command(cmd, active_item.unwrap()),
+            _ => Ok(None)
         }
     }
 }

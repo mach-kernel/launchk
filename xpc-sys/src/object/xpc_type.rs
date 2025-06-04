@@ -1,15 +1,15 @@
 use crate::{
     _xpc_type_array, _xpc_type_bool, _xpc_type_dictionary, _xpc_type_double, _xpc_type_fd,
-    _xpc_type_int64, _xpc_type_mach_recv, _xpc_type_mach_send, _xpc_type_s, _xpc_type_shmem,
-    _xpc_type_string, _xpc_type_uint64, xpc_get_type, xpc_object_t, xpc_type_get_name, xpc_type_t, _xpc_type_null,
+    _xpc_type_int64, _xpc_type_mach_recv, _xpc_type_mach_send, _xpc_type_null, _xpc_type_s,
+    _xpc_type_shmem, _xpc_type_string, _xpc_type_uint64, xpc_get_type, xpc_object_t,
+    xpc_type_get_name, xpc_type_t,
 };
 
-use crate::objects::xpc_error::XPCError;
-use crate::objects::xpc_error::XPCError::ValueError;
-use crate::objects::xpc_object::XPCObject;
+use crate::object::xpc_error::XPCError;
+use crate::object::xpc_error::XPCError::ValueError;
+use crate::object::xpc_object::XPCObject;
 use std::ffi::CStr;
 use std::fmt;
-use std::ptr::null;
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,7 +49,7 @@ impl fmt::Display for XPCType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let XPCType(t) = self;
 
-        if *t == null() {
+        if (*t).is_null() {
             return write!(f, "NULL");
         }
 

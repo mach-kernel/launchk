@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -27,6 +26,7 @@ pub enum OmniboxEvent {
 #[derive(Debug, Clone)]
 pub enum OmniboxError {
     ReferenceError,
+    StateError,
     CommandError(String),
     Many(Vec<OmniboxError>),
 }
@@ -90,7 +90,7 @@ async fn tick(state: Arc<RwLock<OmniboxState>>, tx: Sender<OmniboxEvent>) {
 pub struct OmniboxView {
     state: Arc<RwLock<OmniboxState>>,
     tx: Sender<OmniboxEvent>,
-    last_size: RefCell<XY<usize>>,
+    last_size: Arc<RwLock<XY<usize>>>,
 }
 
 impl OmniboxView {
@@ -108,7 +108,7 @@ impl OmniboxView {
             Self {
                 state,
                 tx: tx.clone(),
-                last_size: RefCell::new(XY::new(0, 0)),
+                last_size: Arc::new(RwLock::new(XY::new(0, 0))),
             },
             tx,
             rx,
@@ -143,7 +143,6 @@ impl OmniboxView {
         };
 
         match (event, mode) {
-            (ev, OmniboxMode::JobTypeFilter) => Self::handle_job_type_filter(ev, state),
             // User -> string filters
             (Event::Char(_), OmniboxMode::LabelFilter)
             | (Event::Char(_), OmniboxMode::CommandFilter) => {
@@ -195,19 +194,19 @@ impl OmniboxView {
 
     /// Toggle bitmask on key
     fn handle_job_type_filter(event: &Event, state: &OmniboxState) -> Option<OmniboxState> {
-        let mut jtf = state.job_type_filter.clone();
+        let jtf = state.job_type_filter;
 
-        match event {
-            Event::Char('s') => jtf.toggle(JobTypeFilter::SYSTEM),
-            Event::Char('g') => jtf.toggle(JobTypeFilter::GLOBAL),
-            Event::Char('u') => jtf.toggle(JobTypeFilter::USER),
-            Event::Char('a') => jtf.toggle(JobTypeFilter::AGENT),
-            Event::Char('d') => jtf.toggle(JobTypeFilter::DAEMON),
-            Event::Char('l') => jtf.toggle(JobTypeFilter::LOADED),
+        let new_jtf = match event {
+            Event::Char('s') => jtf.clear_scope().toggle_yield(JobTypeFilter::SYSTEM),
+            Event::Char('g') => jtf.clear_scope().toggle_yield(JobTypeFilter::GLOBAL),
+            Event::Char('u') => jtf.clear_scope().toggle_yield(JobTypeFilter::USER),
+            Event::Char('a') => jtf.clear_type().toggle_yield(JobTypeFilter::AGENT),
+            Event::Char('d') => jtf.clear_type().toggle_yield(JobTypeFilter::DAEMON),
+            Event::Char('l') => jtf.toggle_yield(JobTypeFilter::LOADED),
             _ => return None,
         };
 
-        Some(state.with_new(Some(OmniboxMode::JobTypeFilter), None, None, Some(jtf)))
+        Some(state.with_new(Some(OmniboxMode::JobTypeFilter), None, None, Some(new_jtf)))
     }
 
     fn draw_command_header(&self, printer: &Printer<'_, '_>) {
@@ -223,7 +222,7 @@ impl OmniboxView {
             OmniboxMode::LabelFilter => "Filter > ",
             OmniboxMode::CommandFilter => "Command > ",
             OmniboxMode::CommandConfirm(_) => "OK! > ",
-            _ if command_filter.len() < 1 && label_filter.len() > 0 => "Filter > ",
+            _ if command_filter.is_empty() && !label_filter.is_empty() => "Filter > ",
             _ => "",
         };
 
@@ -236,7 +235,7 @@ impl OmniboxView {
             purple
         };
 
-        let visible_filter = if command_filter.len() > 0 || *mode == OmniboxMode::CommandFilter {
+        let visible_filter = if !command_filter.is_empty() || *mode == OmniboxMode::CommandFilter {
             command_filter
         } else {
             label_filter
@@ -259,9 +258,16 @@ impl OmniboxView {
         let state = self.state.read().expect("Must read");
         let suggestion = state.suggest_command();
 
-        if suggestion.is_none() {
+        if suggestion.is_none() && !state.command_filter.is_empty() {
+            printer.with_style(Style::from(Color::Dark(BaseColor::White)), |p| {
+                p.print(XY::new(2, 0), "-- (not found)");
+            });
+
             return;
         }
+
+        if suggestion.is_none() { return; }
+
         let (cmd, desc, ..) = suggestion.unwrap();
         let cmd_string = cmd.to_string().replacen(&state.command_filter, "", 1);
 
@@ -273,7 +279,7 @@ impl OmniboxView {
         printer.print(XY::new(start, 0), format!("-- {}", desc).as_str());
     }
 
-    fn draw_job_type_filter(&self, printer: &Printer<'_, '_>) {
+    fn draw_job_type_filter(&self, printer: &Printer<'_, '_>) -> Result<(), OmniboxError> {
         let read = self.state.read().expect("Must read state");
         let OmniboxState {
             job_type_filter,
@@ -287,8 +293,19 @@ impl OmniboxView {
             "[system global user agent daemon loaded]".len()
         };
 
-        if jtf_ofs < self.last_size.borrow().x {
-            jtf_ofs = self.last_size.borrow().x - jtf_ofs;
+        if jtf_ofs
+            < self
+                .last_size
+                .read()
+                .map_err(|_| OmniboxError::StateError)?
+                .x
+        {
+            jtf_ofs = self
+                .last_size
+                .read()
+                .map_err(|_| OmniboxError::StateError)?
+                .x
+                - jtf_ofs;
         }
 
         printer.print(XY::new(jtf_ofs, 0), "[");
@@ -330,17 +347,24 @@ impl OmniboxView {
         }
 
         printer.print(XY::new(jtf_ofs, 0), "]");
+
+        Ok(())
     }
 }
 
 impl View for OmniboxView {
     fn draw(&self, printer: &Printer<'_, '_>) {
         self.draw_command_header(printer);
-        self.draw_job_type_filter(printer);
+        self.draw_job_type_filter(printer).expect("Must draw");
     }
 
     fn layout(&mut self, sz: Vec2) {
-        self.last_size.replace(sz);
+        match self.last_size.try_write() {
+            Ok(mut lsz) => *lsz = sz,
+            Err(_) => {
+                log::error!("Unable to update view last_size")
+            }
+        }
     }
 
     fn on_event(&mut self, event: Event) -> EventResult {
@@ -369,8 +393,12 @@ impl View for OmniboxView {
                 Some("".to_string()),
                 None,
             )),
-            (e, OmniboxMode::Idle) => Self::handle_job_type_filter(&e, &*state),
-            (e, _) => Self::handle_active(&e, &*state),
+            (e, OmniboxMode::JobTypeFilter | OmniboxMode::Idle) => {
+                let s = Self::handle_job_type_filter(&e, &state);
+                self.tx.send(OmniboxEvent::Command(OmniboxCommand::FocusServiceList)).expect("Must focus");
+                s
+            },
+            (e, _) => Self::handle_active(&e, &state)
         };
 
         if new_state.is_none() {

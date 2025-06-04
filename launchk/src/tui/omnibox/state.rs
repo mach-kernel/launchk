@@ -27,7 +27,7 @@ impl OmniboxState {
             mode: mode.unwrap_or(self.mode.clone()),
             label_filter: label_filter.unwrap_or(self.label_filter.clone()),
             command_filter: command_filter.unwrap_or(self.command_filter.clone()),
-            job_type_filter: job_type_filter.unwrap_or(self.job_type_filter.clone()),
+            job_type_filter: job_type_filter.unwrap_or(self.job_type_filter),
         }
     }
 
@@ -44,10 +44,7 @@ impl OmniboxState {
         }
 
         OMNIBOX_COMMANDS
-            .iter()
-            .filter(|(c, _, _)| c.to_string().starts_with(command_filter))
-            .next()
-            .map(|s| s.clone())
+            .iter().find(|(c, _, _)| c.to_string().starts_with(command_filter)).cloned()
     }
 }
 

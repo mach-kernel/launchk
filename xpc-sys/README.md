@@ -5,19 +5,19 @@
 Various utilities for conveniently dealing with XPC in Rust.
 
 - [Object lifecycle](#object-lifecycle)
-- [QueryBuilder](#query-builder)
 - [XPC Dictionary](#xpc-dictionary)
 - [XPC Array](#xpc-array)
 - [XPC Shmem](#xpc-shmem)
+- [Pipe Routine API](#api)
 
 #### Getting Started
 
-Conversions to/from Rust/XPC objects uses the [xpc.h functions documented on Apple Developer](https://developer.apple.com/documentation/xpc/xpc_services_xpc_h?language=objc) using the `From` trait. Complex types such as arrays and shared memory objects described in greater detail below.
+Conversions to/from Rust/XPC objects uses the [xpc.h functions documented on Apple Developer](https://developer.apple.com/documentation/xpc/xpc_services_xpc_h?language=objc) using the `From` trait.
 
 | Rust                                   | XPC                        |
 |----------------------------------------|----------------------------|
-| i64                                    | _xpc_type_int64            |
-| u64                                    | _xpc_type_uint64           |
+| i64/i32                                | _xpc_type_int64            |
+| u64/u32                                | _xpc_type_uint64           |
 | f64                                    | _xpc_type_double           |
 | bool                                   | _xpc_bool_true/false       |
 | Into<String>                           | _xpc_type_string           |
@@ -28,24 +28,29 @@ Conversions to/from Rust/XPC objects uses the [xpc.h functions documented on App
 | (MachPortType::Recv, mach_port_t)      | _xpc_type_mach_recv        |
 | XPCShmem                               | _xpc_type_shmem            |
 
-Make XPC objects for anything with `From<T>`. Make sure to use the correct type for file descriptors and Mach ports:
+Make XPC objects for anything with `From<T>`. `XPCShmem` and file descriptors have their own constructors:
 ```rust
-let mut message: HashMap<&str, XPCObject> = HashMap::new();
+use xpc_sys::api::dict_builder::DictBuilder;
 
-message.insert(
-    "domain-port",
-    XPCObject::from((MachPortType::Send, unsafe {
-        get_bootstrap_port() as mach_port_t
-    })),
-);
+let fd = unsafe { XPCObject::from_raw_fd(42) };
+
+let shmem = XPCShmem::allocate_task_self(
+  1_000_000,
+  MAP_SHARED,
+)?;
+
+// pub type XPCHashMap = HashMap<String, Arc<XPCObject>>
+let dict: XPCHashMap = HashMap::new()
+    .entry("fd", fd)
+    .entry("shmem", &shmem.xpc_object);
 ```
 
-Go from an XPC object to value via the `TryXPCValue` trait. It checks your object's type via `xpc_get_type()` and yields a clear error if you're using the wrong type:
+Go from an XPC object to value via `to_rust()` from the `TryXPCIntoRust` trait. Object types are checked with `xpc_get_type()` to yield a clear error if trying to read as the wrong type:
 ```rust
 #[test]
 fn deserialize_as_wrong_type() {
     let an_i64: XPCObject = XPCObject::from(42 as i64);
-    let as_u64: Result<u64, XPCError> = an_i64.xpc_value();
+    let as_u64: Result<u64, XPCError> = an_i64.to_rust();
     assert_eq!(
         as_u64.err().unwrap(),
         XPCValueError("Cannot get int64 as uint64".to_string())
@@ -67,98 +72,35 @@ When it is dropped, [`xpc_release`](https://developer.apple.com/documentation/xp
 
 [Top](#xpc-sys)
 
-#### QueryBuilder
-
-While we can go from `HashMap<&str, XPCObject>` to `XPCObject`, it can be a little verbose. A `QueryBuilder` trait exposes some builder methods to make building an XPC dictionary a little easier (without all of the `into()`s, and some additional error checking).
-
-To write the query for `launchctl list`:
-
-```rust
-    let LIST_SERVICES: XPCDictionary = XPCDictionary::new()
-        // "list com.apple.Spotlight" (if specified)
-        // .entry("name", "com.apple.Spotlight");
-        .entry("subsystem", 3 as u64)
-        .entry("handle", 0 as u64)
-        .entry("routine", 815 as u64)
-        .entry("legacy", true);
-
-    let reply: Result<XPCDictionary, XPCError> = XPCDictionary::new()
-        // LIST_SERVICES is a proto 
-        .extend(&LIST_SERVICES)
-        // Specify the domain type, or fall back on requester domain
-        .with_domain_type_or_default(Some(domain_type))
-        .entry_if_present("name", name)
-        .pipe_routine_with_error_handling();
-```
-
-In addition to checking `errno` is 0, `pipe_routine_with_error_handling` also looks for possible `error`  and `errors` keys in the response dictionary and provides an `Err()` with `xpc_strerror` contents.
-
-[Top](#xpc-sys)
-
 #### XPC Dictionary
 
-Go from a `HashMap` to `xpc_object_t` with the `XPCObject` type:
+Go from a `HashMap` to `xpc_object_t`:
 
 ```rust
-let mut message: HashMap<&str, XPCObject> = HashMap::new();
-message.insert("type", XPCObject::from(1 as u64));
-message.insert("handle", XPCObject::from(0 as u64));
-message.insert("subsystem", XPCObject::from(3 as u64));
-message.insert("routine", XPCObject::from(815 as u64));
-message.insert("legacy", XPCObject::from(true));
+use xpc_sys::api::dict_builder::DictBuilder;
 
-let xpc_object: XPCObject = message.into();
+// pub type XPCHashMap = HashMap<String, Arc<XPCObject>>
+let dict: XPCHashMap = HashMap::new()
+    .entry("type", 1u64);
+    .entry("handle", 0u64);
+    .entry("subsystem", 3u64);
+    .entry("routine", 815u64);
+    .entry("legacy", true);
+
+let xpc_object: XPCObject = dict.into()
+let ptr: xpc_object_t = xpc_object.as_ptr();
 ```
 
-Call `xpc_pipe_routine` and receive `Result<XPCObject, XPCError>`:
+Go from `XPCObject` back to `HashMap`:
 
 ```rust
-let xpc_object: XPCObject = message.into();
+let xpc_object: XPCObject = unsafe { XPCObject::from_raw(some_pointer) };
 
-match xpc_object.pipe_routine() {
-    Ok(xpc_object) => { /* do stuff and things */ },
-    Err(XPCError::PipeError(err)) => { /* err is a string w/strerror(errno) */ }
+// Error if something is wrong during conversion (e.g. the pointer is not a XPC dictionary)
+match xpc_object.to_rust() {
+  Ok(dict) => dict.get("some_key"),
+  Err(e) => ...
 }
-```
-
-The response is likely an XPC dictionary -- go back to a HashMap:
-
-```rust
-let xpc_object: XPCObject = message.into();
-let response: Result<XPCDictionary, XPCError> = xpc_object
-    .pipe_routine()
-    .and_then(|r| r.try_into());
-
-let XPCDictionary(hm) = response.unwrap();
-let whatever = hm.get("...");
-```
-
-Response dictionaries can be nested, so `XPCDictionary` has a helper included for this scenario:
-
-```rust
-let xpc_object: XPCObject = message.into();
-
-// A string: either "Aqua", "StandardIO", "Background", "LoginWindow", "System"
-let response: Result<String, XPCError> = xpc_object
-    .pipe_routine()
-    .and_then(|r: XPCObject| r.try_into());
-    .and_then(|d: XPCDictionary| d.get(&["service", "LimitLoadToSessionType"])
-    .and_then(|lltst: XPCObject| lltst.xpc_value());
-```
-
-Or, retrieve the `service` key (a child XPC Dictionary) from this response:
-
-```rust
-let xpc_object: XPCObject = message.into();
-
-// A string: either "Aqua", "StandardIO", "Background", "LoginWindow", "System"
-let response: Result<XPCDictionary, XPCError> = xpc_object
-    .pipe_routine()
-    .and_then(|r: XPCObject| r.try_into());
-    .and_then(|d: XPCDictionary| d.get_as_dictionary(&["service"]);
-
-let XPCDictionary(hm) = response.unwrap();
-let whatever = hm.get("...");
 ```
 
 [Top](#xpc-sys)
@@ -169,7 +111,6 @@ An XPC array can be made from either `Vec<XPCObject>` or `Vec<Into<XPCObject>>`:
 
 ```rust
 let xpc_array = XPCObject::from(vec![XPCObject::from("eins"), XPCObject::from("zwei"), XPCObject::from("polizei")]);
-
 let xpc_array = XPCObject::from(vec!["eins", "zwei", "polizei"]);
 ```
 
@@ -191,10 +132,9 @@ let shmem = XPCShmem::new_task_self(
     i32::try_from(MAP_SHARED).expect("Must conv flags"),
 )?;
 
-// Use as _xpc_type_shmem argument in XPCDictionary
-let response = XPCDictionary::new()
-    .extend(&DUMPSTATE)
-    .entry("shmem", shmem.xpc_object.clone())
+// Use _xpc_type_shmem value in XPC Dictionary
+let response = HashMap::new()
+    .entry("shmem", &shmem)
     .pipe_routine_with_error_handling()?;
 ```
 
@@ -208,6 +148,46 @@ let bytes: &[u8] = unsafe {
 // Make a string from bytes in the shmem
 let mut hey_look_a_string = String::new();
 bytes.read_to_string(buf);
+```
+
+[Top](#xpc-sys)
+
+#### API
+
+The following XPC functions have Rust friendly wrappers, all of which return `Result<XPCObject, XPCError>`:
+
+| Function                    | Rust API                                   |
+|-----------------------------|--------------------------------------------|
+| xpc_pipe_routine            | api::pipe_routine::pipe_routine            |
+| xpc_pipe_routine_with_flags | api::pipe_routine::pipe_routine_with_flags |
+| _xpc_pipe_interface_routine | api::pipe_routine::pipe_interface_routine  |
+
+If desired, errors in the XPC reply can be handled by chaining `api::handle_reply_dict_errors` onto the pipe routine call.
+
+This is an example of sending `launchctl bootout` via the XPC bootstrap pipe:
+
+```rust
+let dict = HashMap::new()
+    .entry("name", label_string)
+    .entry("no-einprogress", true)
+    // Current user UID
+    .entry("handle", 501u64)
+    // Domain
+    .entry("type", 8u64);
+
+let reply: XPCHashMap = pipe_interface_routine(
+    // Some(xpc_pipe_t) or fall back to `get_xpc_bootstrap_pipe()`
+    None,
+    // routine
+    801,
+    dict,
+    // flags (or fall back to 0)
+    None
+)
+    // Check for errors in response XPC dictionary (if desired)
+    .and_then(handle_reply_dict_errors)
+    // Convert reply to a Rust hash map
+    .and_then(|o| o.to_rust())
 ```
 
 [Top](#xpc-sys)
@@ -234,6 +214,3 @@ A big thanks to these open source projects and general resources:
 - [objc.io XPC guide](https://www.objc.io/issues/14-mac/xpc/)
 - [Fortinet XPC RE article](https://www.fortinet.com/blog/threat-research/a-look-into-xpc-internals--reverse-engineering-the-xpc-objects)
 - The various source links found in comments, from Chrome's sandbox and other headers with definitions for private API functions.
-- After all, it is Apple's launchd :>)
-
-Everything else (C) David Stancu & Contributors 2021
