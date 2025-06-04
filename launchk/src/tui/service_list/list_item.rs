@@ -3,6 +3,7 @@ use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::tui::table::table_list_view::TableListItem;
 use std::borrow::Borrow;
 use xpc_sys::enums::SessionType;
+use crate::launchd::plist::LaunchdEntryType;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ServiceListItem {
@@ -21,9 +22,8 @@ impl TableListItem for ServiceListItem {
         let entry_type = self
             .status
             .plist
-            .borrow()
             .as_ref()
-            .map(|ec| format!("{}/{}", ec.entry_location, ec.entry_type))
+            .map(|p| p.entry_type.to_string())
             .unwrap_or("-".to_string());
 
         let pid = if self.status.pid > 0 && self.job_type_filter.intersects(JobTypeFilter::LOADED) {
@@ -39,7 +39,7 @@ impl TableListItem for ServiceListItem {
         };
 
         if self.job_type_filter.intersects(JobTypeFilter::DISABLED) {
-            loaded = format!("{} (disabled)", loaded)
+            loaded = format!("{} disabled", loaded)
         }
 
         vec![

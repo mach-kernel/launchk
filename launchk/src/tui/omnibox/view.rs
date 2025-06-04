@@ -259,9 +259,16 @@ impl OmniboxView {
         let state = self.state.read().expect("Must read");
         let suggestion = state.suggest_command();
 
-        if suggestion.is_none() {
+        if suggestion.is_none() && !state.command_filter.is_empty() {
+            printer.with_style(Style::from(Color::Dark(BaseColor::White)), |p| {
+                p.print(XY::new(2, 0), "-- (not found)");
+            });
+
             return;
         }
+
+        if suggestion.is_none() { return; }
+
         let (cmd, desc, ..) = suggestion.unwrap();
         let cmd_string = cmd.to_string().replacen(&state.command_filter, "", 1);
 

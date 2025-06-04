@@ -103,8 +103,8 @@ impl ServiceListView {
             job_type_filter: Arc::new(RwLock::new(JobTypeFilter::launchk_default())),
             table_list_view: TableListView::new(vec![
                 ("Name", None),
-                ("Session", Some(12)),
-                ("Type", Some(14)),
+                ("Session", Some(10)),
+                ("Type", Some(8)),
                 ("PID", Some(6)),
                 ("Loaded", Some(6)),
             ]),

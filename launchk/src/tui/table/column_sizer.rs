@@ -1,12 +1,13 @@
 use std::sync::RwLock;
 use std::{collections::HashMap, sync::Arc};
+use std::cmp::{max, min};
+use std::ops::Deref;
 
 /// Width oriented column sizing utility
 pub struct ColumnSizer {
     /// Non user defined columns are an even split of space remaining from
     /// x - user_sizes_total
     pub dynamic_column_size: Arc<RwLock<usize>>,
-    /// TODO; wtf do I mean by padding
     pub padding: Arc<RwLock<usize>>,
     /// Column index -> width
     pub user_sizes: HashMap<usize, usize>,
@@ -47,7 +48,7 @@ impl ColumnSizer {
             user_sizes,
             user_sizes_total,
             dynamic_column_size: Default::default(),
-            padding: Default::default(),
+            padding: Arc::new(RwLock::new(1)),
         };
 
         Arc::new(cs)
@@ -81,24 +82,32 @@ impl ColumnSizer {
 
     /// Call when x changes to recompute dynamic_column_size and padding
     pub fn update_x(&self, x: usize) -> Result<(), ColumnSizerError> {
-        let mut remaining = x.saturating_sub(self.user_sizes_total);
+        let current_padding = self.padding.read().unwrap().clone();
+        let padding_used =
+            (self.user_sizes.len() + self.num_dynamic_columns - 1) * current_padding;
 
-        let mut new_dcs = remaining / self.num_dynamic_columns;
-        if new_dcs > 35 {
-            new_dcs = 35;
-        }
+        let remaining_dynamic = x
+            .saturating_sub(padding_used)
+            .saturating_sub(self.user_sizes_total);
 
-        if remaining > (self.num_dynamic_columns * new_dcs) {
-            remaining -= self.num_dynamic_columns * new_dcs;
-        }
+        let new_dynamic_column_size = min(
+            remaining_dynamic / self.num_dynamic_columns,
+            32
+        );
+
+        let remaining = x
+            .saturating_sub(self.num_dynamic_columns * new_dynamic_column_size)
+            .saturating_sub(self.user_sizes_total);
+
+        let new_padding = remaining / (self.num_dynamic_columns + self.user_sizes.len());
 
         match (
             self.dynamic_column_size.try_write(),
             self.padding.try_write(),
         ) {
             (Ok(mut dcs), Ok(mut pad)) => {
-                *dcs = new_dcs;
-                *pad = remaining / (self.num_dynamic_columns + self.user_sizes.len());
+                *dcs = new_dynamic_column_size;
+                *pad = new_padding;
 
                 Ok(())
             }

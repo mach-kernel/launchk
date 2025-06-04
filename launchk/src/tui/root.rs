@@ -65,6 +65,7 @@ impl RootLayout {
         let cbsink_channel = RootLayout::cbsink_channel(siv);
 
         runtime_handle.spawn(poll_omnibox(cbsink_channel.clone(), omnibox_rx));
+        siv.set_autorefresh(true);
 
         let mut new = Self {
             omnibox_tx,
