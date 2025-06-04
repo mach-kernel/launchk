@@ -2,7 +2,7 @@
 
 [![Rust](https://github.com/mach-kernel/launchk/actions/workflows/rust.yml/badge.svg?branch=master)](https://github.com/mach-kernel/launchk/actions/workflows/rust.yml)
 
-A [Cursive](https://github.com/gyscos/cursive) TUI that makes XPC queries & helps manage launchd jobs.
+A [Cursive](https://github.com/gyscos/cursive) TUI for looking at launchd agents and daemons.
 
 <img src="https://github.com/user-attachments/assets/80a3bf9a-0b71-4b61-a314-830e4ca34eb1" width="400">
 
