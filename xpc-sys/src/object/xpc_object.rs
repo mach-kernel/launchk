@@ -285,8 +285,8 @@ mod tests {
 
     use crate::{get_bootstrap_port, xpc_dictionary_get_string};
 
-    use super::MachPortType;
     use super::XPCObject;
+    use super::MachPortType;
 
     // Mostly for docs, int, uint, bool segfault here
     #[test]

@@ -26,8 +26,8 @@ Use `:` to enter command mode, `/` to enter filtering mode, and any of `sguadl` 
   - System (/System/Library/)
   - Global (/Library)
   - User (~/) 
-- `load`
-- `unload`
+- `bootstrap`
+- `bootout`
 - `dumpstate` (opens in `$PAGER`)
 - `dumpjpcategory` (opens in `$PAGER`)
 - `procinfo` (opens in `$PAGER`, does not require root!)
@@ -63,6 +63,3 @@ A big thanks to these open source projects and general resources:
 - [Fortinet XPC RE article](https://www.fortinet.com/blog/threat-research/a-look-into-xpc-internals--reverse-engineering-the-xpc-objects)
 - [This HN comment](https://news.ycombinator.com/item?id=2565780) re history
 - The various source links found in comments, from Chrome's sandbox and other headers with definitions for private API functions.
-- After all, it is Apple's launchd :>)
-
-Everything else (C) David Stancu & Contributors 2021
