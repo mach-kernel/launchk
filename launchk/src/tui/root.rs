@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 
-use std::ptr::slice_from_raw_parts;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 use cursive::event::{Event, EventResult, Key};
@@ -16,13 +15,9 @@ use crate::tui::omnibox::subscribed_view::{
     OmniboxResult, OmniboxSubscribedView, OmniboxSubscriber, Subscribable,
 };
 use crate::tui::omnibox::view::{OmniboxError, OmniboxEvent, OmniboxView};
-use crate::tui::pager::show_pager;
 use crate::tui::service_list::view::ServiceListView;
-use crate::{
-    launchd::command::dumpjpcategory,
-    tui::dialog::{show_csr_info, show_help},
-};
-use crate::{launchd::command::dumpstate, tui::dialog};
+use crate::tui::dialog::show_help;
+use crate::tui::dialog;
 use std::thread;
 
 pub type CbSinkMessage = Box<dyn FnOnce(&mut Cursive) + Send>;

@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 use std::collections::HashSet;
-use std::iter::FromIterator;
 use std::ops::Deref;
 use std::ptr::slice_from_raw_parts;
 use std::sync::mpsc::Sender;
@@ -14,7 +13,7 @@ use cursive::view::ViewWrapper;
 use cursive::{Cursive, CursiveExt, View, XY};
 use sudo::RunningAs;
 
-use crate::launchd::command::{blame, bootout, bootstrap, dumpjpcategory, dumpstate, list_all, list_services, procinfo, read_disabled_hashset};
+use crate::launchd::command::{blame, bootout, bootstrap, dumpjpcategory, dumpstate, list_all, procinfo, read_disabled_hashset};
 use crate::launchd::command::{disable, enable};
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};

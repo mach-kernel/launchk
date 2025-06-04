@@ -191,7 +191,7 @@ fn build_label_map_entry(plist_path: PathBuf) -> Option<(String, LaunchdPlist)> 
     ))
 }
 
-fn path_if_plist(path: &PathBuf) -> Option<PathBuf> {
+fn path_if_plist(path: &Path) -> Option<PathBuf> {
     if path.is_dir()
         || path
             .extension()
@@ -200,7 +200,7 @@ fn path_if_plist(path: &PathBuf) -> Option<PathBuf> {
     {
         None
     } else {
-        Some(path.clone())
+        Some(path.to_path_buf())
     }
 }
 
