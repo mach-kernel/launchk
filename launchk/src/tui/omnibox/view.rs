@@ -395,7 +395,12 @@ impl View for OmniboxView {
                 None,
             )),
             (e, OmniboxMode::Idle) => Self::handle_job_type_filter(&e, &state),
-            (e, _) => Self::handle_active(&e, &state),
+            (e, OmniboxMode::JobTypeFilter) => {
+                let s = Self::handle_active(&e, &state);
+                self.tx.send(OmniboxEvent::Command(OmniboxCommand::FocusServiceList)).expect("Must focus");
+                s
+            },
+            (e, _) => Self::handle_active(&e, &state)
         };
 
         if new_state.is_none() {

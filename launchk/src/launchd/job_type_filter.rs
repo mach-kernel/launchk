@@ -33,7 +33,7 @@ impl JobTypeFilter {
     }
 
     pub fn clear_type(&self) -> Self {
-        let all_scope = Self::SYSTEM | Self::GLOBAL | Self::USER;
+        let all_scope = Self::SYSTEM | Self::GLOBAL | Self::USER | Self::LOADED;
         self.bitand(all_scope)
     }
 }
