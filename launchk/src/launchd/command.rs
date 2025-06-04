@@ -184,7 +184,7 @@ pub fn disable<S: Into<String>>(label: S, domain_type: DomainType) -> Result<XPC
 pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
     let shmem = XPCShmem::allocate_task_self(
         0x1400000,
-        i32::try_from(MAP_SHARED).expect("Must conv flags"),
+        MAP_SHARED,
     )?;
 
     let dict = HashMap::new()
@@ -206,7 +206,7 @@ pub fn dumpstate() -> Result<(usize, XPCShmem), XPCError> {
 pub fn dumpjpcategory() -> Result<(usize, XPCShmem), XPCError> {
     let shmem = XPCShmem::allocate_task_self(
         0x1400000,
-        i32::try_from(MAP_SHARED).expect("Must conv flags"),
+        MAP_SHARED,
     )?;
 
     let dict = HashMap::new()
@@ -228,7 +228,7 @@ pub fn dumpjpcategory() -> Result<(usize, XPCShmem), XPCError> {
 pub fn procinfo(pid: i64) -> Result<(usize, XPCShmem), XPCError> {
     let shmem = XPCShmem::allocate_task_self(
         0x1400000,
-        i32::try_from(MAP_SHARED).expect("Must conv flags"),
+        MAP_SHARED,
     )?;
 
     let dict = HashMap::new()
@@ -251,7 +251,7 @@ pub fn procinfo(pid: i64) -> Result<(usize, XPCShmem), XPCError> {
 pub fn read_disabled(domain_type: DomainType) -> Result<(usize, XPCShmem), XPCError> {
     let shmem = XPCShmem::allocate_task_self(
         1_000_000,
-        i32::try_from(MAP_SHARED).expect("Must conv flags"),
+        MAP_SHARED,
     )?;
 
     let dict = HashMap::new()

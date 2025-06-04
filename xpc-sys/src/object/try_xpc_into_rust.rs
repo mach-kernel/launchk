@@ -92,7 +92,7 @@ impl TryXPCIntoRust<Vec<Arc<XPCObject>>> for XPCObject {
         let vec_rc_clone = vec.clone();
 
         let block = ConcreteBlock::new(move |_: usize, obj: xpc_object_t| {
-            let xpc_object: XPCObject = XPCObject::xpc_copy(obj);
+            let xpc_object: XPCObject = unsafe { XPCObject::xpc_copy(obj) };
             vec_rc_clone.borrow_mut().push(xpc_object.into());
             true
         });
@@ -127,7 +127,7 @@ impl TryXPCIntoRust<XPCHashMap> for XPCObject {
 
         // https://developer.apple.com/documentation/xpc/1505404-xpc_dictionary_apply?language=objc
         let block = ConcreteBlock::new(move |key: *const c_char, value: xpc_object_t| {
-            let xpc_object: XPCObject = XPCObject::xpc_copy(value);
+            let xpc_object: XPCObject = unsafe { XPCObject::xpc_copy(value) };
             let str_key = unsafe { CStr::from_ptr(key).to_string_lossy().to_string() };
 
             map_block_clone
@@ -192,23 +192,23 @@ mod tests {
 
     #[test]
     fn i64_to_rust() {
-        let xpc_i64 = XPCObject::from(std::i64::MAX);
+        let xpc_i64 = XPCObject::from(i64::MAX);
         let rs_i64: i64 = xpc_i64.to_rust().unwrap();
-        assert_eq!(std::i64::MAX, rs_i64);
+        assert_eq!(i64::MAX, rs_i64);
     }
 
     #[test]
     fn u64_to_rust() {
-        let xpc_u64 = XPCObject::from(std::u64::MAX);
+        let xpc_u64 = XPCObject::from(u64::MAX);
         let rs_u64: u64 = xpc_u64.to_rust().unwrap();
-        assert_eq!(std::u64::MAX, rs_u64);
+        assert_eq!(u64::MAX, rs_u64);
     }
 
     #[test]
     fn f64_to_rust() {
-        let xpc_f64 = XPCObject::from(std::f64::MAX);
+        let xpc_f64 = XPCObject::from(f64::MAX);
         let rs_f64: f64 = xpc_f64.to_rust().unwrap();
-        assert_eq!(std::f64::MAX, rs_f64);
+        assert_eq!(f64::MAX, rs_f64);
     }
 
     #[test]

@@ -1,7 +1,6 @@
 use std::sync::RwLock;
 use std::{collections::HashMap, sync::Arc};
-use std::cmp::{max, min};
-use std::ops::Deref;
+use std::cmp::min;
 
 /// Width oriented column sizing utility
 pub struct ColumnSizer {
@@ -82,7 +81,7 @@ impl ColumnSizer {
 
     /// Call when x changes to recompute dynamic_column_size and padding
     pub fn update_x(&self, x: usize) -> Result<(), ColumnSizerError> {
-        let current_padding = self.padding.read().unwrap().clone();
+        let current_padding = *self.padding.read().unwrap();
         let padding_used =
             (self.user_sizes.len() + self.num_dynamic_columns - 1) * current_padding;
 
@@ -92,7 +91,7 @@ impl ColumnSizer {
 
         let new_dynamic_column_size = min(
             remaining_dynamic / self.num_dynamic_columns,
-            32
+            35
         );
 
         let remaining = x

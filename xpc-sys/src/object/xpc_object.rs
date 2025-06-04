@@ -27,10 +27,12 @@ unsafe impl Sync for XPCObject {}
 pub type XPCHashMap = HashMap<String, Arc<XPCObject>>;
 
 impl XPCObject {
+    /// Make an XPCObject from a raw xpc_object_t
     pub unsafe fn from_raw(value: xpc_object_t) -> XPCObject {
         Self::new(value)
     }
 
+    /// Make an XPCObject from a raw xpc_object_t, but also call xpc_retain on it
     pub unsafe fn from_raw_retain(value: xpc_object_t) -> XPCObject {
         Self::new(xpc_retain(value))
     }
@@ -70,7 +72,7 @@ impl XPCObject {
 
     /// Should (?) return a deep copy of the underlying object
     /// https://developer.apple.com/documentation/xpc/1505584-xpc_copy
-    pub fn xpc_copy(xpc_object: xpc_object_t) -> Self {
+    pub unsafe fn xpc_copy(xpc_object: xpc_object_t) -> Self {
         let clone = unsafe { xpc_copy(xpc_object) };
         Self::new(clone)
     }
@@ -215,7 +217,7 @@ impl<R: AsRef<XPCObject>> From<R> for XPCObject {
     /// Use xpc_copy() to copy out of refs.
     /// https://developer.apple.com/documentation/xpc/1505584-xpc_copy?language=objc
     fn from(other: R) -> Self {
-        Self::xpc_copy(other.as_ref().as_ptr())
+        unsafe { Self::xpc_copy(other.as_ref().as_ptr()) }
     }
 }
 
@@ -269,7 +271,7 @@ impl Drop for XPCObject {
 
 impl Clone for XPCObject {
     fn clone(&self) -> Self {
-        XPCObject::xpc_copy(self.as_ptr())
+        unsafe { XPCObject::xpc_copy(self.as_ptr()) }
     }
 }
 

@@ -1,9 +1,7 @@
 use crate::launchd::entry_status::LaunchdEntryStatus;
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::tui::table::table_list_view::TableListItem;
-use std::borrow::Borrow;
 use xpc_sys::enums::SessionType;
-use crate::launchd::plist::LaunchdEntryType;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ServiceListItem {

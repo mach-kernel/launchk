@@ -18,7 +18,7 @@ use crate::launchd::command::{disable, enable, list_all};
 use crate::launchd::job_type_filter::JobTypeFilter;
 use crate::launchd::plist::{edit_and_replace, LABEL_TO_ENTRY_CONFIG};
 use crate::launchd::{
-    entry_status::get_entry_status, entry_status::LaunchdEntryStatus, plist::LaunchdPlist,
+    entry_status::get_entry_status, entry_status::LaunchdEntryStatus,
 };
 use crate::tui::dialog::show_notice;
 use crate::tui::omnibox::command::OmniboxCommand;
@@ -237,26 +237,13 @@ impl ServiceListView {
         Ok(None)
     }
 
-    fn get_active_list_item(&self) -> Result<Arc<ServiceListItem>, OmniboxError> {
-        self.table_list_view
-            .get_highlighted_row()
-            .ok_or_else(|| OmniboxError::CommandError("Cannot get highlighted row".to_string()))
-    }
+    fn handle_plist_command(&self, cmd: OmniboxCommand, item: Arc<ServiceListItem>) -> OmniboxResult {
+        let ServiceListItem { name, status, .. } = item.deref();
 
-    fn with_active_item_plist(
-        &self,
-    ) -> Result<(ServiceListItem, Option<LaunchdPlist>), OmniboxError> {
-        let item = &*self.get_active_list_item()?;
-        let plist = item.status.plist.clone();
-
-        Ok((item.clone(), plist))
-    }
-
-    fn handle_plist_command(&self, cmd: OmniboxCommand) -> OmniboxResult {
-        let (ServiceListItem { name, .. }, plist) = self.with_active_item_plist()?;
-
-        let plist =
-            plist.ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
+        let plist = status
+            .clone()
+            .plist
+            .ok_or_else(|| OmniboxError::CommandError("Cannot find plist".to_string()))?;
 
         match cmd {
             OmniboxCommand::Edit => {
@@ -271,7 +258,7 @@ impl ServiceListView {
 
                 edited
             }
-            OmniboxCommand::Bootstrap(dt) => bootstrap(name, dt, plist.plist_path)
+            OmniboxCommand::Bootstrap(dt) => bootstrap(name, dt, &plist.plist_path)
                 .map(|_| None)
                 .map_err(|e| OmniboxError::CommandError(e.to_string())),
             OmniboxCommand::Bootout(dt) => bootout(name, dt)
@@ -281,10 +268,12 @@ impl ServiceListView {
         }
     }
 
-    fn handle_command(&self, cmd: OmniboxCommand) -> OmniboxResult {
-        let (ServiceListItem { name, status, .. }, plist) = self.with_active_item_plist()?;
+    fn handle_command(&self, cmd: OmniboxCommand, item: Arc<ServiceListItem>) -> OmniboxResult {
+        let ServiceListItem { name, status, .. } = item.deref().clone();
 
-        let need_escalate = plist
+        let need_escalate = status
+            .clone()
+            .plist
             .map(|p| p.entry_location.into())
             .map(|d: DomainType| d == DomainType::System)
             .unwrap_or(false);
@@ -353,7 +342,7 @@ impl ServiceListView {
             }
             OmniboxCommand::Edit
             | OmniboxCommand::Bootout(_)
-            | OmniboxCommand::Bootstrap(_) => self.handle_plist_command(cmd),
+            | OmniboxCommand::Bootstrap(_) => self.handle_plist_command(cmd, item),
             _ => Ok(None),
         }
     }
@@ -377,9 +366,14 @@ impl ViewWrapper for ServiceListView {
 
 impl OmniboxSubscriber for ServiceListView {
     fn on_omnibox(&mut self, event: OmniboxEvent) -> OmniboxResult {
+        let active_item = self.table_list_view.get_highlighted_row();
+
         match event {
-            OmniboxEvent::StateUpdate(state) => self.handle_state_update(state),
-            OmniboxEvent::Command(cmd) => self.handle_command(cmd),
+            OmniboxEvent::StateUpdate(state) =>
+                self.handle_state_update(state),
+            OmniboxEvent::Command(cmd) if active_item.is_some() =>
+                self.handle_command(cmd, active_item.unwrap()),
+            _ => Ok(None)
         }
     }
 }

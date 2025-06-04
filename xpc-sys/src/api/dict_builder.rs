@@ -91,10 +91,10 @@ impl DictBuilder for XPCHashMap {
         key: S,
         value: Option<O>,
     ) -> XPCHashMap {
-        if value.is_none() {
-            self
+        if let Some(v) = value {
+            self.entry(key, v)
         } else {
-            self.entry(key, value.unwrap())
+            self
         }
     }
 
