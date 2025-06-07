@@ -248,6 +248,10 @@ pub fn read_disabled(domain_type: DomainType) -> Result<(usize, XPCShmem), XPCEr
     Ok((usize::try_from(bytes_written).unwrap(), shmem))
 }
 
+lazy_static! {
+    static ref DISABLED_RE: Regex = Regex::new(r#""([\w.]+)" => disabled"#).expect("Must compile");
+}
+
 pub fn read_disabled_hashset(domain_type: DomainType) -> Result<HashSet<String>, XPCError> {
     let (sz, shmem) = read_disabled(domain_type)?;
 
@@ -257,10 +261,7 @@ pub fn read_disabled_hashset(domain_type: DomainType) -> Result<HashSet<String>,
     let cs = unsafe { CString::from_vec_unchecked(data) };
 
     // Find all the quoted service names
-    let re =
-        Regex::new(r#""([\w.]+)" => disabled"#).map_err(|e| XPCError::ValueError(e.to_string()))?;
-
-    let services: Vec<String> = re
+    let services: Vec<String> = DISABLED_RE
         .captures_iter(cs.to_str().unwrap())
         .flat_map(|c| c.iter().flatten().map(|m| m.as_str().to_string()).last())
         .collect();

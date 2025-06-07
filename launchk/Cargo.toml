@@ -1,6 +1,6 @@
 [package]
 name = "launchk"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["David Stancu <dstancu@nyu.edu>"]
 edition = "2018"
 

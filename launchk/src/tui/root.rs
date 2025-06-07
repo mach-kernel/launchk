@@ -60,7 +60,6 @@ impl RootLayout {
         let cbsink_channel = RootLayout::cbsink_channel(siv);
 
         runtime_handle.spawn(poll_omnibox(cbsink_channel.clone(), omnibox_rx));
-        siv.set_autorefresh(true);
 
         let mut new = Self {
             omnibox_tx,
@@ -70,6 +69,7 @@ impl RootLayout {
             key_ring: VecDeque::with_capacity(3),
         };
 
+        siv.set_fps(2);
         new.setup(omnibox);
         new
     }
